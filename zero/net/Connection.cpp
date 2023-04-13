@@ -104,7 +104,7 @@ Connection::Connection(MemoryArena& perm_arena, MemoryArena& temp_arena, WorkQue
 
 Connection::TickResult Connection::Tick() {
   constexpr s32 kSyncDelay = 500;
-  constexpr s32 kTimeout = 1500;
+  constexpr s32 kTimeout = 3000;
 
   sockaddr_in addr = {};
   addr.sin_family = remote_addr.family;
@@ -120,6 +120,10 @@ Connection::TickResult Connection::Tick() {
     return TickResult::ConnectionError;
   }
 
+  if (!this->connected || TICK_DIFF(current_tick, last_packet_tick) >= kTimeout) {
+    return TickResult::ConnectionClosed;
+  }
+
   // Don't read new packets until the encryption is finalized
   if (encrypt_method == EncryptMethod::Continuum && encrypt.expanding) {
     return TickResult::Success;
@@ -128,10 +132,6 @@ Connection::TickResult Connection::Tick() {
   // Continuum client seems to send sync request every 5 seconds
   if (TICK_DIFF(current_tick, last_sync_tick) >= kSyncDelay) {
     SendSyncTimeRequestPacket(false);
-  }
-
-  if (TICK_DIFF(current_tick, last_packet_tick) >= kTimeout) {
-    return TickResult::ConnectionClosed;
   }
 
   while (true) {
@@ -344,6 +344,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
         ping = current_ping;
       } break;
       case ProtocolCore::Disconnect: {
+        printf("Server sent disconnect packet.\n");
         this->connected = false;
       } break;
       case ProtocolCore::SmallChunkBody: {

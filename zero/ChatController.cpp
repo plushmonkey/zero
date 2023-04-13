@@ -101,6 +101,21 @@ void ChatController::Update(float dt) {
   
 }
 
+char GetChatTypePrefix(ChatType type) {
+  static const char kPrefixes[] = { 'A', ' ', ' ', 'T', 'O', 'P', 'W', 'R', 'E', 'C' };
+
+  u8 index = (u8)type;
+  if (index >= 0 && index <= (u8)ChatType::Channel) {
+    return kPrefixes[index];
+  }
+
+  if (type == ChatType::Fuchsia) {
+    return 'F';
+  }
+
+  return ' ';
+}
+
 void ChatController::OnChatPacket(u8* packet, size_t size) {
   ChatType type = (ChatType) * (packet + 1);
   u8 sound = *(packet + 2);
@@ -112,8 +127,16 @@ void ChatController::OnChatPacket(u8* packet, size_t size) {
   if (player) {
     memcpy(entry->sender, player->name, 20);
 
+    char prefix = GetChatTypePrefix(type);
+
     if (entry->type == ChatType::Private && player->id != player_manager.player_id) {
-      history.InsertRecent(player->name);
+      history.InsertRecent(player->name); 
+    }
+
+    if (type == ChatType::RemotePrivate) {
+      printf("%c %s\n", prefix, entry->message);
+    } else {
+      printf("%c %s> %s\n", prefix, entry->sender, entry->message);
     }
   }
 
