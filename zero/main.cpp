@@ -168,6 +168,8 @@ struct ZeroBot {
       auto end = std::chrono::high_resolution_clock::now();
       frame_time = std::chrono::duration_cast<ms_float>(end - start).count();
 
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
       trans_arena.Reset();
     }
 
