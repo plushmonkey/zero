@@ -136,6 +136,10 @@ void Map::UpdateDoors(const ArenaSettings& settings) {
     count /= settings.DoorDelay;
   }
 
+  if (count >= 100) {
+    count = 100;
+  }
+
   for (s32 i = 0; i < count; ++i) {
     u8 seed = door_rng.seed;
 
