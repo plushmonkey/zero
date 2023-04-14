@@ -21,6 +21,18 @@ inline constexpr float Degrees(float radians) {
   return radians * kRadianToDegrees;
 }
 
+inline float WrapMax(float x, float max) {
+  return fmodf(max + fmodf(x, max), max);
+}
+
+inline float WrapMinMax(float x, float min, float max) {
+  return min + WrapMax(x - min, max - min);
+}
+
+inline float WrapToPi(float rads) {
+  return WrapMinMax(rads, -3.14159f, 3.14159f);
+}
+
 inline constexpr float min(float left, float right) {
   return right < left ? right : left;
 }

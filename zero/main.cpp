@@ -55,6 +55,195 @@ u16 kServerPort = kServers[kServerIndex].port;
 
 MemoryArena* perm_global = nullptr;
 
+struct Steering {
+  Vector2f force;
+  float rotation = 0.0f;
+
+  void Reset() {
+    force = Vector2f(0, 0);
+    rotation = 0.0f;
+  }
+
+  void Face(Game& game, const Vector2f& target) {
+    Player* self = game.player_manager.GetSelf();
+
+    Vector2f to_target = target - self->position;
+    Vector2f heading = Rotate(self->GetHeading(), rotation);
+
+    float rotation = atan2f(heading.y, heading.x) - atan2f(to_target.y, to_target.x);
+
+    this->rotation += WrapToPi(rotation);
+  }
+
+  void Seek(Game& game, const Vector2f& target) {
+    Player* self = game.player_manager.GetSelf();
+
+    force += target - self->position;
+  }
+
+  void Pursue(Game& game, Player& target, float target_distance) {
+    Player* self = game.player_manager.GetSelf();
+
+    float weapon_speed = game.connection.settings.ShipSettings[self->ship].BulletSpeed / 16.0f / 10.0f;
+
+    Vector2f to_target = target.position - self->position;
+
+    if (to_target.LengthSq() <= target_distance * target_distance) {
+      return Seek(game, target.position - (Normalize(to_target) * target_distance));
+    }
+
+    float away_speed = target.velocity.Dot(Normalize(to_target));
+    //Vector2f shot_velocity = self->velocity + self->GetHeading() * weapon_speed;
+    //float shot_speed = shot_velocity.Length();
+    float combined_speed = weapon_speed + away_speed;
+    float time_to_target = 0.0f;
+
+    if (combined_speed != 0.0f) {
+      time_to_target = to_target.Length() / combined_speed;
+    }
+    
+    if (time_to_target < 0.0f || time_to_target > 5.0f) {
+      time_to_target = 0.0f;
+    }
+
+    Vector2f projected_pos = target.position + target.velocity * time_to_target;
+
+    to_target = Normalize(projected_pos - self->position);
+
+    if (to_target.Dot(Normalize(target.position - self->position)) < 0.0f) {
+      projected_pos = target.position;
+    }
+
+    force += projected_pos - self->position;
+  }
+};
+
+// Converts a steering force into actual key presses
+struct Actuator {
+  void Update(Game& game, InputState& input, const Vector2f& heading, const Vector2f& force, float rotation) {
+    float enter_delay = (game.connection.settings.EnterDelay / 100.0f);
+    Player* self = game.player_manager.GetSelf();
+
+    if (!self || self->ship == 8) return;
+    if (self->enter_delay > 0.0f && self->enter_delay < enter_delay) return;
+
+    Vector2f steering_direction = heading;
+
+    bool has_force = force.LengthSq() > 0.0f;
+    if (has_force) {
+      steering_direction = Normalize(force);
+    }
+
+    Vector2f rotate_target = steering_direction;
+
+    if (rotation != 0.0f) {
+      rotate_target = Rotate(self->GetHeading(), -rotation);
+    }
+
+    if (!has_force) {
+      steering_direction = rotate_target;
+    }
+
+    Vector2f perp = Perpendicular(heading);
+    bool behind = force.Dot(heading) < 0;
+    bool leftside = steering_direction.Dot(perp) < 0;
+
+    if (steering_direction.Dot(rotate_target) < 0.75) {
+      float rotation = 0.1f;
+      int sign = leftside ? 1 : -1;
+
+      if (behind) sign *= -1;
+
+      steering_direction = Rotate(rotate_target, rotation * sign);
+
+      leftside = steering_direction.Dot(perp) < 0;
+    }
+
+    bool clockwise = !leftside;
+
+    if (has_force) {
+      if (behind) {
+        input.SetAction(InputAction::Backward, true);
+      } else {
+        input.SetAction(InputAction::Forward, true);
+      }
+    }
+
+    if (heading.Dot(steering_direction) < 0.996f) {
+      input.SetAction(InputAction::Right, clockwise);
+      input.SetAction(InputAction::Left, !clockwise);
+    }
+  }
+};
+
+struct ShipEnforcer {
+  s32 last_request_tick;
+  u8 requested_ship;
+
+  ShipEnforcer() {
+    last_request_tick = GetCurrentTick();
+    requested_ship = 0;
+  }
+
+  void Update(Game& game) {
+    constexpr s32 kRequestInterval = 300;
+
+    Player* self = game.player_manager.GetSelf();
+
+    if (!self) return;
+    if (self->ship == requested_ship) return;
+
+    s32 current_tick = GetCurrentTick();
+
+    if (TICK_DIFF(current_tick, last_request_tick) >= kRequestInterval) {
+      printf("Sending ship request\n");
+      game.connection.SendShipRequest(requested_ship);
+      last_request_tick = current_tick;
+    }
+  }
+};
+
+struct BotController {
+  void Update(Game& game, InputState& input) {
+    Player* self = game.player_manager.GetSelf();
+    if (!self || self->ship == 8) return;
+
+    Player* follow_target = game.player_manager.GetPlayerByName("monkey");
+    if (!follow_target || follow_target->ship == 8) return;
+
+    float enter_delay = (game.connection.settings.EnterDelay / 100.0f);
+    if (follow_target->enter_delay > 0.0f && follow_target->enter_delay < enter_delay) return;
+
+    float weapon_speed = game.connection.settings.ShipSettings[self->ship].BulletSpeed / 16.0f / 10.0f;
+    Vector2f shot_velocity = self->GetHeading() * weapon_speed;
+    Vector2f shot_direction = Normalize(self->velocity + shot_velocity);
+
+    Steering steering;
+    steering.Pursue(game, *follow_target, 15.0f);
+
+    if ((float)self->energy > game.ship_controller.ship.energy * 0.3f) {
+      steering.Face(game, follow_target->position);
+    }
+
+    // Optimize for shot direction unless it's going backwards
+    if (shot_direction.Dot(self->GetHeading()) < 0.0f) {
+      shot_direction = self->GetHeading();
+    }
+
+    Actuator actuator;
+    actuator.Update(game, input, shot_direction, steering.force, steering.rotation);
+
+    float nearby_radius = game.connection.settings.ShipSettings[follow_target->ship].GetRadius() * 1.5f;
+    Vector2f nearest_point = GetClosestLinePoint(self->position, self->position + shot_direction * 100.0f, follow_target->position);
+
+    bool in_safe = game.connection.map.GetTileId(self->position) == kTileSafeId;
+
+    if (!in_safe && nearest_point.DistanceSq(follow_target->position) < nearby_radius * nearby_radius) {
+      input.SetAction(InputAction::Bullet, true);
+    }
+  }
+};
+
 struct ZeroBot {
   MemoryArena perm_arena;
   MemoryArena trans_arena;
@@ -136,117 +325,8 @@ struct ZeroBot {
     return true;
   }
 
-  struct ShipEnforcer {
-    s32 last_request_tick;
-    u8 requested_ship;
-
-    ShipEnforcer() {
-      last_request_tick = GetCurrentTick();
-      requested_ship = 0;
-    }
-
-    void Update(Game& game) {
-      constexpr s32 kRequestInterval = 300;
-
-      Player* self = game.player_manager.GetSelf();
-
-      if (!self) return;
-      if (self->ship == requested_ship) return;
-
-      s32 current_tick = GetCurrentTick();
-
-      if (TICK_DIFF(current_tick, last_request_tick) >= kRequestInterval) {
-        printf("Sending ship request\n");
-        game.connection.SendShipRequest(requested_ship);
-        last_request_tick = current_tick;
-      }
-    }
-  };
-
-  struct ShipController {
-    void Update(Game& game, InputState& input) {
-      Player* self = game.player_manager.GetSelf();
-
-      if (!self || self->ship == 8) return;
-      if (self->explode_anim_t > 0.0f && self->explode_anim_t < 0.8f) {
-        printf("Exploding.\n");
-        return;
-      }
-      float enter_delay = (game.connection.settings.EnterDelay / 100.0f) + 0.8f;
-      if (self->enter_delay > 0.0f && self->enter_delay < enter_delay) {
-        printf("Respawning.\n");
-        return;
-      }
-
-      Player* follow_target = game.player_manager.GetPlayerByName("monkey");
-      if (!follow_target || follow_target->ship == 8) return;
-
-      if (follow_target->enter_delay > 0.0f && follow_target->enter_delay < enter_delay) {
-        printf("Target is dead.\n");
-        return;
-      }
-
-      Vector2f force = follow_target->position - self->position;
-
-      Vector2f to_target = Normalize(follow_target->position - self->position);
-      float weapon_speed = game.connection.settings.ShipSettings[self->ship].BulletSpeed / 16.0f / 10.0f;
-      Vector2f shot_velocity = self->velocity + (self->GetHeading() * weapon_speed);
-      Vector2f shot_direction = Normalize(shot_velocity);
-
-      // Optimize so the shot direction goes toward the enemy
-      Vector2f heading = shot_direction;
-      Vector2f steering_direction = heading;
-
-      bool has_force = force.LengthSq() > 0.0f;
-      if (has_force) {
-        steering_direction = Normalize(force);
-      }
-
-      Vector2f rotate_target = steering_direction;
-      Vector2f perp = Perpendicular(heading);
-      bool behind = force.Dot(heading) < 0;
-      bool leftside = steering_direction.Dot(perp) < 0;
-
-      if (steering_direction.Dot(rotate_target) < 0.75) {
-        float rotation = 0.1f;
-        int sign = leftside ? 1 : -1;
-        if (behind) sign *= -1;
-
-        steering_direction = Rotate(rotate_target, rotation * sign);
-
-        leftside = steering_direction.Dot(perp) < 0;
-      }
-
-      bool clockwise = !leftside;
-
-      if (has_force) {
-        if (behind) {
-          input.SetAction(InputAction::Backward, true);
-        } else {
-          input.SetAction(InputAction::Forward, true);
-        }
-      }
-
-      if (heading.Dot(steering_direction) < 0.996f) {
-        input.SetAction(InputAction::Right, clockwise);
-        input.SetAction(InputAction::Left, !clockwise);
-      }
-
-      if (to_target.Dot(heading) < 0.0f) return;
-
-      float nearby_radius = game.connection.settings.ShipSettings[follow_target->ship].GetRadius() * 1.25f;
-      Vector2f nearest_point = GetClosestLinePoint(self->position, self->position + shot_direction * 100.0f, follow_target->position);
-
-      bool in_safe = game.connection.map.GetTileId(self->position) == kTileSafeId;
-      
-      if (!in_safe && nearest_point.DistanceSq(follow_target->position) < nearby_radius * nearby_radius) {
-        input.SetAction(InputAction::Bullet, true);
-      }
-    }
-  };
-
   ShipEnforcer ship_enforcer;
-  ShipController ship_controller;
+  BotController bot_controller;
 
   void Update() {
     input.Clear();
@@ -254,7 +334,7 @@ struct ZeroBot {
     if (game->connection.login_state != Connection::LoginState::Complete) return;
 
     ship_enforcer.Update(*game);
-    ship_controller.Update(*game, input);
+    bot_controller.Update(*game, input);
   }
 
   void Run() {
