@@ -97,12 +97,10 @@ inline int GetShipStatusPercent(u32 upgrade, u32 maximum, u32 current) {
   return (current_upgrades * 100) / maximum_upgrades;
 }
 
-void ChatController::Update(float dt) {
-  
-}
+void ChatController::Update(float dt) {}
 
 char GetChatTypePrefix(ChatType type) {
-  static const char kPrefixes[] = { 'A', ' ', ' ', 'T', 'O', 'P', 'W', 'R', 'E', 'C' };
+  static const char kPrefixes[] = {'A', ' ', ' ', 'T', 'O', 'P', 'W', 'R', 'E', 'C'};
 
   u8 index = (u8)type;
   if (index >= 0 && index <= (u8)ChatType::Channel) {
@@ -130,10 +128,11 @@ void ChatController::OnChatPacket(u8* packet, size_t size) {
     char prefix = GetChatTypePrefix(type);
 
     if (entry->type == ChatType::Private && player->id != player_manager.player_id) {
-      history.InsertRecent(player->name); 
+      history.InsertRecent(player->name);
     }
 
-    if (type == ChatType::RemotePrivate) {
+    if (type == ChatType::RemotePrivate || type == ChatType::Arena || type == ChatType::RedWarning ||
+        type == ChatType::RedError) {
       printf("%c %s\n", prefix, entry->message);
     } else {
       printf("%c %s> %s\n", prefix, entry->sender, entry->message);

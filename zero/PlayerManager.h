@@ -73,6 +73,8 @@ struct PlayerManager {
 
   Player* GetSelf();
   Player* GetPlayerById(u16 id, size_t* index = nullptr);
+  Player* GetPlayerByName(const char* name);
+
   inline u16 GetPlayerIndex(u16 id) { return player_lookup[id]; }
 
   void SendPositionPacket();

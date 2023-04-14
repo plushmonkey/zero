@@ -296,6 +296,18 @@ Player* PlayerManager::GetPlayerById(u16 id, size_t* index) {
   return nullptr;
 }
 
+Player* PlayerManager::GetPlayerByName(const char* name) {
+  for (size_t i = 0; i < player_count; ++i) {
+    Player* player = players + i;
+
+    if (strcmp(player->name, name) == 0) {
+      return player;
+    }
+  }
+
+  return nullptr;
+}
+
 void PlayerManager::OnPlayerIdChange(u8* pkt, size_t size) {
   player_id = *(u16*)(pkt + 1);
   printf("Player id: %d\n", player_id);

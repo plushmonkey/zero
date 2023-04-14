@@ -49,13 +49,9 @@ struct Vector2f {
     return *this;
   }
 
-  inline bool operator==(const Vector2f& other) const {
-    return x == other.x && y == other.y;
-  }
+  inline bool operator==(const Vector2f& other) const { return x == other.x && y == other.y; }
 
-  inline bool operator!=(const Vector2f& other) const {
-    return !(x == other.x && y == other.y);
-  }
+  inline bool operator!=(const Vector2f& other) const { return !(x == other.x && y == other.y); }
 
   inline float& operator[](size_t index) { return values[index]; }
 
@@ -97,23 +93,15 @@ struct Vector2f {
     return *this;
   }
 
-  inline Vector2f operator+(const Vector2f& other) const {
-    return Vector2f(x + other.x, y + other.y);
-  }
+  inline Vector2f operator+(const Vector2f& other) const { return Vector2f(x + other.x, y + other.y); }
 
-  inline Vector2f operator-(const Vector2f& other) const {
-    return Vector2f(x - other.x, y - other.y);
-  }
+  inline Vector2f operator-(const Vector2f& other) const { return Vector2f(x - other.x, y - other.y); }
 
   inline Vector2f operator-() const { return Vector2f(-x, -y); }
 
-  inline Vector2f operator*(float value) const {
-    return Vector2f(x * value, y * value);
-  }
+  inline Vector2f operator*(float value) const { return Vector2f(x * value, y * value); }
 
-  inline Vector2f operator/(float value) const {
-    return Vector2f(x / value, y / value);
-  }
+  inline Vector2f operator/(float value) const { return Vector2f(x / value, y / value); }
 
   inline float Length() const { return sqrtf(x * x + y * y); }
 
@@ -133,9 +121,7 @@ struct Vector2f {
     return dx * dx + dy * dy;
   }
 
-  inline float Dot(const Vector2f& other) const {
-    return x * other.x + y * other.y;
-  }
+  inline float Dot(const Vector2f& other) const { return x * other.x + y * other.y; }
 
   inline Vector2f& Normalize() {
     float length = Length();
@@ -175,7 +161,9 @@ inline float Dot(const Vector2f& v1, const Vector2f& v2) {
   return v1.x * v2.x + v1.y * v2.y;
 }
 
-inline Vector2f Perpendicular(const Vector2f& v) { return Vector2f(-v.y, v.x); }
+inline Vector2f Perpendicular(const Vector2f& v) {
+  return Vector2f(-v.y, v.x);
+}
 
 inline Vector2f Normalize(const Vector2f& v) {
   float length = v.Length();
@@ -194,29 +182,23 @@ inline Vector2f Rotate(const Vector2f& vec, float rads) {
   return Vector2f(cosA * vec.x - sinA * vec.y, sinA * vec.x + cosA * vec.y);
 }
 
-inline bool BoxContainsPoint(const Vector2f& min, const Vector2f& max,
-                             const Vector2f& point) {
-  return (point.x >= min.x && point.x <= max.x) &&
-         (point.y >= min.y && point.y <= max.y);
+inline bool BoxContainsPoint(const Vector2f& min, const Vector2f& max, const Vector2f& point) {
+  return (point.x >= min.x && point.x <= max.x) && (point.y >= min.y && point.y <= max.y);
 }
 
-inline bool BoxBoxIntersect(const Vector2f& first_min,
-                            const Vector2f& first_max,
-                            const Vector2f& second_min,
+inline bool BoxBoxIntersect(const Vector2f& first_min, const Vector2f& first_max, const Vector2f& second_min,
                             const Vector2f& second_max) {
-  return (first_max.x >= second_min.x && first_min.x < second_max.x &&
-          first_max.y >= second_min.y && first_min.y < second_max.y);
+  return (first_max.x >= second_min.x && first_min.x < second_max.x && first_max.y >= second_min.y &&
+          first_min.y < second_max.y);
 }
 
-inline bool BoxBoxOverlap(const Vector2f& first_min, const Vector2f& first_max,
-                          const Vector2f& second_min,
+inline bool BoxBoxOverlap(const Vector2f& first_min, const Vector2f& first_max, const Vector2f& second_min,
                           const Vector2f& second_max) {
-  return (first_max.x > second_min.x && first_min.x < second_max.x &&
-          first_max.y > second_min.y && first_min.y < second_max.y);
+  return (first_max.x > second_min.x && first_min.x < second_max.x && first_max.y > second_min.y &&
+          first_min.y < second_max.y);
 }
 
-inline float BoxPointDistance(Vector2f box_pos, Vector2f box_extent,
-                              Vector2f p) {
+inline float BoxPointDistance(Vector2f box_pos, Vector2f box_extent, Vector2f p) {
   Vector2f bmin = box_pos;
   Vector2f bmax = box_pos + box_extent;
 
@@ -226,9 +208,8 @@ inline float BoxPointDistance(Vector2f box_pos, Vector2f box_extent,
   return sqrtf(dx * dx + dy * dy);
 }
 
-inline bool RayBoxIntersect(const Vector2f& origin, const Vector2f& direction,
-                            const Vector2f& box_pos, const Vector2f& box_extent,
-                            float* dist, Vector2f* norm) {
+inline bool RayBoxIntersect(const Vector2f& origin, const Vector2f& direction, const Vector2f& box_pos,
+                            const Vector2f& box_extent, float* dist, Vector2f* norm) {
   Vector2f recip(1.0f / direction.x, 1.0f / direction.y);
   const Vector2f& lb = box_pos;
   Vector2f rt = box_pos + box_extent;
@@ -277,14 +258,23 @@ inline bool RayBoxIntersect(const Vector2f& origin, const Vector2f& direction,
   return intersected;
 }
 
-inline bool LineBoxIntersect(Vector2f point, Vector2f direction,
-                             Vector2f box_pos, Vector2f box_extent, float* dist,
+inline bool LineBoxIntersect(Vector2f point, Vector2f direction, Vector2f box_pos, Vector2f box_extent, float* dist,
                              Vector2f* norm) {
   if (RayBoxIntersect(point, direction, box_pos, box_extent, dist, norm)) {
     return true;
   }
 
   return RayBoxIntersect(point, -direction, box_pos, box_extent, dist, norm);
+}
+
+inline Vector2f GetClosestLinePoint(const Vector2f& start, const Vector2f& end, const Vector2f& target) {
+  Vector2f to_end = end - start;
+  float t = (target - start).Dot(to_end) / to_end.Dot(to_end);
+
+  if (t < 0.0f) t = 0.0f;
+  if (t > 1.0f) t = 1.0f;
+
+  return start + to_end * t;
 }
 
 struct Vector3f {
@@ -310,13 +300,9 @@ struct Vector3f {
     return *this;
   }
 
-  inline bool operator==(const Vector3f& other) {
-    return x == other.x && y == other.y && z == other.z;
-  }
+  inline bool operator==(const Vector3f& other) { return x == other.x && y == other.y && z == other.z; }
 
-  inline bool operator!=(const Vector3f& other) {
-    return !(x == other.x && y == other.y && z == other.z);
-  }
+  inline bool operator!=(const Vector3f& other) { return !(x == other.x && y == other.y && z == other.z); }
 
   inline float& operator[](size_t index) { return values[index]; }
 
@@ -364,23 +350,15 @@ struct Vector3f {
     return *this;
   }
 
-  inline Vector3f operator+(const Vector3f& other) const {
-    return Vector3f(x + other.x, y + other.y, z + other.z);
-  }
+  inline Vector3f operator+(const Vector3f& other) const { return Vector3f(x + other.x, y + other.y, z + other.z); }
 
-  inline Vector3f operator-(const Vector3f& other) const {
-    return Vector3f(x - other.x, y - other.y, z - other.z);
-  }
+  inline Vector3f operator-(const Vector3f& other) const { return Vector3f(x - other.x, y - other.y, z - other.z); }
 
   inline Vector3f operator-() const { return Vector3f(-x, -y, -z); }
 
-  inline Vector3f operator*(float value) const {
-    return Vector3f(x * value, y * value, z * value);
-  }
+  inline Vector3f operator*(float value) const { return Vector3f(x * value, y * value, z * value); }
 
-  inline Vector3f operator/(float value) const {
-    return Vector3f(x / value, y / value, z / value);
-  }
+  inline Vector3f operator/(float value) const { return Vector3f(x / value, y / value, z / value); }
 
   inline float Length() const { return sqrtf(x * x + y * y + z * z); }
 
@@ -402,13 +380,10 @@ struct Vector3f {
     return dx * dx + dy * dy + dz * dz;
   }
 
-  inline float Dot(const Vector3f& other) const {
-    return x * other.x + y * other.y + z * other.z;
-  }
+  inline float Dot(const Vector3f& other) const { return x * other.x + y * other.y + z * other.z; }
 
   inline Vector3f Cross(const Vector3f& other) const {
-    return Vector3f(y * other.z - z * other.y, z * other.x - x * other.z,
-                    x * other.y - y * other.x);
+    return Vector3f(y * other.z - z * other.y, z * other.x - x * other.z, x * other.y - y * other.x);
   }
 
   inline Vector3f& Normalize() {
@@ -439,8 +414,7 @@ inline float Dot(const Vector3f& v1, const Vector3f& v2) {
 }
 
 inline Vector3f Cross(const Vector3f& v1, const Vector3f& v2) {
-  return Vector3f(v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z,
-                  v1.x * v2.y - v1.y * v2.x);
+  return Vector3f(v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z, v1.x * v2.y - v1.y * v2.x);
 }
 
 inline Vector3f Normalize(const Vector3f& v) {
@@ -466,10 +440,8 @@ struct Vector4f {
 
   Vector4f() : x(0), y(0), z(0), w(0) {}
   Vector4f(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
-  Vector4f(const Vector2f& v2, float z, float w)
-      : x(v2.x), y(v2.y), z(z), w(w) {}
-  Vector4f(const Vector3f& other, float w)
-      : x(other.x), y(other.y), z(other.z), w(w) {}
+  Vector4f(const Vector2f& v2, float z, float w) : x(v2.x), y(v2.y), z(z), w(w) {}
+  Vector4f(const Vector3f& other, float w) : x(other.x), y(other.y), z(other.z), w(w) {}
 
   Vector4f& operator=(const Vector4f& other) {
     x = other.x;
@@ -480,9 +452,7 @@ struct Vector4f {
     return *this;
   }
 
-  inline bool operator==(const Vector4f& other) {
-    return x == other.x && y == other.y && z == other.z && w == other.w;
-  }
+  inline bool operator==(const Vector4f& other) { return x == other.x && y == other.y && z == other.z && w == other.w; }
 
   inline bool operator!=(const Vector4f& other) {
     return !(x == other.x && y == other.y && z == other.z && w == other.w);
@@ -492,9 +462,7 @@ struct Vector4f {
 
   inline float operator[](size_t index) const { return values[index]; }
 
-  inline Vector4f operator*(float value) {
-    return Vector4f(x * value, y * value, z * value, w * value);
-  }
+  inline Vector4f operator*(float value) { return Vector4f(x * value, y * value, z * value, w * value); }
 
   inline Vector4f operator+(const Vector4f& other) {
     return Vector4f(x + other.x, y + other.y, z + other.z, w + other.w);
@@ -521,8 +489,7 @@ struct mat4 {
     Vector4f result;
 
     for (size_t row = 0; row < 4; ++row) {
-      result[row] = v.x * data[0][row] + v.y * data[1][row] +
-                    v.z * data[2][row] + w * data[3][row];
+      result[row] = v.x * data[0][row] + v.y * data[1][row] + v.z * data[2][row] + w * data[3][row];
     }
 
     return result;
@@ -531,8 +498,7 @@ struct mat4 {
   // Constructs the matrix from column vectors.
   // The columns are for operational order not for internal order (column-major
   // stored)
-  static mat4 FromColumns(const Vector4f& x, const Vector4f& y,
-                          const Vector4f& z, const Vector4f& w) {
+  static mat4 FromColumns(const Vector4f& x, const Vector4f& y, const Vector4f& z, const Vector4f& w) {
     mat4 result;
 
     for (size_t i = 0; i < 4; ++i) {
@@ -548,8 +514,7 @@ struct mat4 {
   // Constructs the matrix from row vectors.
   // The rows are for operational order not for internal order (column-major
   // stored)
-  static mat4 FromRows(const Vector4f& x, const Vector4f& y, const Vector4f& z,
-                       const Vector4f& w) {
+  static mat4 FromRows(const Vector4f& x, const Vector4f& y, const Vector4f& z, const Vector4f& w) {
     mat4 result;
 
     for (size_t i = 0; i < 4; ++i) {
@@ -588,8 +553,7 @@ inline mat4 operator*(const mat4& M1, const mat4& M2) {
   return result;
 }
 
-inline mat4 LookAt(const Vector3f& eye, const Vector3f& to,
-                   Vector3f world_up = Vector3f(0, 1, 0)) {
+inline mat4 LookAt(const Vector3f& eye, const Vector3f& to, Vector3f world_up = Vector3f(0, 1, 0)) {
   // Compute camera axes
   Vector3f forward = Normalize(to - eye);
   Vector3f side = Normalize(forward.Cross(world_up));
@@ -597,32 +561,15 @@ inline mat4 LookAt(const Vector3f& eye, const Vector3f& to,
 
   // Insert camera axes in column major order and transform eye into the camera
   // space for translation
-  float values[] = {side.x,          up.x,          -forward.x,        0,
-                    side.y,          up.y,          -forward.y,        0,
-                    side.z,          up.z,          -forward.z,        0,
-                    -Dot(side, eye), -Dot(up, eye), Dot(forward, eye), 1};
+  float values[] = {side.x, up.x, -forward.x, 0, side.y,          up.y,          -forward.y,        0,
+                    side.z, up.z, -forward.z, 0, -Dot(side, eye), -Dot(up, eye), Dot(forward, eye), 1};
 
   return mat4(values);
 }
 
 inline mat4 Translate(const mat4& M, const Vector3f& translation) {
   float values[] = {
-      1,
-      0,
-      0,
-      0,
-      0,
-      1,
-      0,
-      0,
-      0,
-      0,
-      1,
-      0,
-      translation.x,
-      translation.y,
-      translation.z,
-      1,
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, translation.x, translation.y, translation.z, 1,
   };
 
   mat4 translate_op((float*)values);
@@ -642,8 +589,7 @@ inline mat4 Scale(const mat4& M, const Vector3f& scale) {
 // aspect_ratio: width / height
 // near: near plane in camera space
 // far: far plane in camera space
-inline mat4 Perspective(float fov, float aspect_ratio, float near_plane,
-                        float far_plane) {
+inline mat4 Perspective(float fov, float aspect_ratio, float near_plane, float far_plane) {
   float half_tan = tanf(fov / 2.0f);
 
   float values[] = {
@@ -668,8 +614,7 @@ inline mat4 Perspective(float fov, float aspect_ratio, float near_plane,
   return mat4(values);
 }
 
-inline mat4 Orthographic(float left, float right, float bottom, float top,
-                         float near_plane, float far_plane) {
+inline mat4 Orthographic(float left, float right, float bottom, float top, float near_plane, float far_plane) {
   float values[] = {
       2.0f / (right - left),
       0,
@@ -721,9 +666,8 @@ inline mat4 Rotate(const mat4& M, float angle, const Vector3f& rotate_axis) {
   Vector4f R1 = M0 * rotator[1][0] + M1 * rotator[1][1] + M2 * rotator[1][2];
   Vector4f R2 = M0 * rotator[2][0] + M1 * rotator[2][1] + M2 * rotator[2][2];
 
-  float values[] = {R0[0],   R0[1],   R0[2],   R0[3],  R1[0], R1[1],
-                    R1[2],   R2[3],   R2[0],   R2[1],  R2[2], R1[3],
-                    M[3][0], M[3][1], M[3][2], M[3][3]};
+  float values[] = {R0[0], R0[1], R0[2], R0[3], R1[0],   R1[1],   R1[2],   R2[3],
+                    R2[0], R2[1], R2[2], R1[3], M[3][0], M[3][1], M[3][2], M[3][3]};
 
   return mat4((float*)values);
 }
@@ -732,8 +676,7 @@ inline Vector4f operator*(const mat4& M, const Vector4f& v) {
   Vector4f result;
 
   for (size_t row = 0; row < 4; ++row) {
-    result[row] = v.x * M.data[0][row] + v.y * M.data[1][row] +
-                  v.z * M.data[2][row] + v.w * M.data[3][row];
+    result[row] = v.x * M.data[0][row] + v.y * M.data[1][row] + v.z * M.data[2][row] + v.w * M.data[3][row];
   }
 
   return result;
@@ -744,16 +687,13 @@ struct Plane {
   float distance;
 
   Plane() {}
-  Plane(const Vector3f normal, float distance)
-      : normal(normal), distance(distance) {}
+  Plane(const Vector3f normal, float distance) : normal(normal), distance(distance) {}
   Plane(const Vector3f& p1, const Vector3f& p2, const Vector3f& p3) {
     normal = Normalize(Cross(p2 - p1, p3 - p1));
     distance = normal.Dot(p1);
   }
 
-  inline float PointDistance(const Vector3f& v) {
-    return (normal.Dot(v) - distance) / normal.Dot(normal);
-  }
+  inline float PointDistance(const Vector3f& v) { return (normal.Dot(v) - distance) / normal.Dot(normal); }
 };
 
 inline Vector2f OrientationToHeading(u8 discrete_rotation) {

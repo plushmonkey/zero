@@ -27,7 +27,7 @@ void InitializeSettings() {
   g_Settings.encrypt_method = EncryptMethod::Continuum;
 }
 
-const char* kPlayerName = "null space";
+const char* kPlayerName = "ZeroBot";
 const char* kPlayerPassword = "none";
 
 struct ServerInfo {
@@ -136,6 +136,127 @@ struct ZeroBot {
     return true;
   }
 
+  struct ShipEnforcer {
+    s32 last_request_tick;
+    u8 requested_ship;
+
+    ShipEnforcer() {
+      last_request_tick = GetCurrentTick();
+      requested_ship = 0;
+    }
+
+    void Update(Game& game) {
+      constexpr s32 kRequestInterval = 300;
+
+      Player* self = game.player_manager.GetSelf();
+
+      if (!self) return;
+      if (self->ship == requested_ship) return;
+
+      s32 current_tick = GetCurrentTick();
+
+      if (TICK_DIFF(current_tick, last_request_tick) >= kRequestInterval) {
+        printf("Sending ship request\n");
+        game.connection.SendShipRequest(requested_ship);
+        last_request_tick = current_tick;
+      }
+    }
+  };
+
+  struct ShipController {
+    void Update(Game& game, InputState& input) {
+      Player* self = game.player_manager.GetSelf();
+
+      if (!self || self->ship == 8) return;
+      if (self->explode_anim_t > 0.0f && self->explode_anim_t < 0.8f) {
+        printf("Exploding.\n");
+        return;
+      }
+      float enter_delay = (game.connection.settings.EnterDelay / 100.0f) + 0.8f;
+      if (self->enter_delay > 0.0f && self->enter_delay < enter_delay) {
+        printf("Respawning.\n");
+        return;
+      }
+
+      Player* follow_target = game.player_manager.GetPlayerByName("monkey");
+      if (!follow_target || follow_target->ship == 8) return;
+
+      if (follow_target->enter_delay > 0.0f && follow_target->enter_delay < enter_delay) {
+        printf("Target is dead.\n");
+        return;
+      }
+
+      Vector2f force = follow_target->position - self->position;
+
+      Vector2f to_target = Normalize(follow_target->position - self->position);
+      float weapon_speed = game.connection.settings.ShipSettings[self->ship].BulletSpeed / 16.0f / 10.0f;
+      Vector2f shot_velocity = self->velocity + (self->GetHeading() * weapon_speed);
+      Vector2f shot_direction = Normalize(shot_velocity);
+
+      // Optimize so the shot direction goes toward the enemy
+      Vector2f heading = shot_direction;
+      Vector2f steering_direction = heading;
+
+      bool has_force = force.LengthSq() > 0.0f;
+      if (has_force) {
+        steering_direction = Normalize(force);
+      }
+
+      Vector2f rotate_target = steering_direction;
+      Vector2f perp = Perpendicular(heading);
+      bool behind = force.Dot(heading) < 0;
+      bool leftside = steering_direction.Dot(perp) < 0;
+
+      if (steering_direction.Dot(rotate_target) < 0.75) {
+        float rotation = 0.1f;
+        int sign = leftside ? 1 : -1;
+        if (behind) sign *= -1;
+
+        steering_direction = Rotate(rotate_target, rotation * sign);
+
+        leftside = steering_direction.Dot(perp) < 0;
+      }
+
+      bool clockwise = !leftside;
+
+      if (has_force) {
+        if (behind) {
+          input.SetAction(InputAction::Backward, true);
+        } else {
+          input.SetAction(InputAction::Forward, true);
+        }
+      }
+
+      if (heading.Dot(steering_direction) < 0.996f) {
+        input.SetAction(InputAction::Right, clockwise);
+        input.SetAction(InputAction::Left, !clockwise);
+      }
+
+      if (to_target.Dot(heading) < 0.0f) return;
+
+      float nearby_radius = game.connection.settings.ShipSettings[follow_target->ship].GetRadius() * 1.25f;
+      Vector2f nearest_point = GetClosestLinePoint(self->position, self->position + shot_direction * 100.0f, follow_target->position);
+
+      bool in_safe = game.connection.map.GetTileId(self->position) == kTileSafeId;
+      
+      if (!in_safe && nearest_point.DistanceSq(follow_target->position) < nearby_radius * nearby_radius) {
+        input.SetAction(InputAction::Bullet, true);
+      }
+    }
+  };
+
+  ShipEnforcer ship_enforcer;
+  ShipController ship_controller;
+
+  void Update() {
+    input.Clear();
+
+    if (game->connection.login_state != Connection::LoginState::Complete) return;
+
+    ship_enforcer.Update(*game);
+    ship_controller.Update(*game, input);
+  }
+
   void Run() {
     constexpr float kMaxDelta = 1.0f / 20.0f;
 
@@ -160,15 +281,17 @@ struct ZeroBot {
         break;
       }
 
+      Update();
+
       if (!game->Update(input, dt)) {
         game->Cleanup();
         break;
       }
 
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
       auto end = std::chrono::high_resolution_clock::now();
       frame_time = std::chrono::duration_cast<ms_float>(end - start).count();
-
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
       trans_arena.Reset();
     }
