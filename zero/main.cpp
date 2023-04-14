@@ -46,12 +46,11 @@ ServerInfo kServers[] = {
 };
 
 constexpr size_t kServerIndex = 0;
-
-static_assert(kServerIndex < ZERO_ARRAY_SIZE(kServers), "Bad server index");
+constexpr u8 kRequestedShip = 0;
 
 const char* kServerName = kServers[kServerIndex].name;
-const char* kServerIp = kServers[kServerIndex].ipaddr;
-u16 kServerPort = kServers[kServerIndex].port;
+
+static_assert(kServerIndex < ZERO_ARRAY_SIZE(kServers), "Bad server index");
 
 MemoryArena* perm_global = nullptr;
 
@@ -93,15 +92,15 @@ struct Steering {
     }
 
     float away_speed = target.velocity.Dot(Normalize(to_target));
-    //Vector2f shot_velocity = self->velocity + self->GetHeading() * weapon_speed;
-    //float shot_speed = shot_velocity.Length();
+    // Vector2f shot_velocity = self->velocity + self->GetHeading() * weapon_speed;
+    // float shot_speed = shot_velocity.Length();
     float combined_speed = weapon_speed + away_speed;
     float time_to_target = 0.0f;
 
     if (combined_speed != 0.0f) {
       time_to_target = to_target.Length() / combined_speed;
     }
-    
+
     if (time_to_target < 0.0f || time_to_target > 5.0f) {
       time_to_target = 0.0f;
     }
@@ -182,7 +181,7 @@ struct ShipEnforcer {
 
   ShipEnforcer() {
     last_request_tick = GetCurrentTick();
-    requested_ship = 0;
+    requested_ship = kRequestedShip;
   }
 
   void Update(Game& game) {
@@ -234,7 +233,8 @@ struct BotController {
     actuator.Update(game, input, shot_direction, steering.force, steering.rotation);
 
     float nearby_radius = game.connection.settings.ShipSettings[follow_target->ship].GetRadius() * 1.5f;
-    Vector2f nearest_point = GetClosestLinePoint(self->position, self->position + shot_direction * 100.0f, follow_target->position);
+    Vector2f nearest_point =
+        GetClosestLinePoint(self->position, self->position + shot_direction * 100.0f, follow_target->position);
 
     bool in_safe = game.connection.map.GetTileId(self->position) == kTileSafeId;
 
@@ -298,10 +298,6 @@ struct ZeroBot {
   }
 
   bool JoinZone(ServerInfo& server) {
-    kServerName = server.name;
-    kServerIp = server.ipaddr;
-    kServerPort = server.port;
-
     perm_arena.Reset();
 
     kPlayerName = name;
@@ -314,7 +310,7 @@ struct ZeroBot {
       return false;
     }
 
-    ConnectResult result = game->connection.Connect(kServerIp, kServerPort);
+    ConnectResult result = game->connection.Connect(server.ipaddr, server.port);
 
     if (result != ConnectResult::Success) {
       fprintf(stderr, "Failed to connect. Error: %d\n", (int)result);
@@ -344,7 +340,7 @@ struct ZeroBot {
     using ms_float = std::chrono::duration<float, std::milli>;
     float frame_time = 0.0f;
 
-    JoinZone(kServers[0]);
+    JoinZone(kServers[kServerIndex]);
 
     while (true) {
       auto start = std::chrono::high_resolution_clock::now();
