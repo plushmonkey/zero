@@ -125,28 +125,128 @@ std::vector<Vector2f> Pathfinder::FindPath(const Map& map, const Vector2f& from,
   return path;
 }
 
-std::vector<Vector2f> Pathfinder::SmoothPath(Game& game, const std::vector<Vector2f>& path, float ship_radius) {
-  std::vector<Vector2f> result = path;
-  return result;
+inline Vector2f ClosestWall(const Map& map, Vector2f pos, int search) {
+  float closest_dist = std::numeric_limits<float>::max();
+  Vector2f closest;
 
-#if 0
-  for (std::size_t i = 0; i < result.size(); i++) {
-    std::size_t next = i + 1;
+  Vector2f base(std::floor(pos.x), std::floor(pos.y));
+  for (int y = -search; y <= search; ++y) {
+    for (int x = -search; x <= search; ++x) {
+      Vector2f current = base + Vector2f((float)x, (float)y);
 
-    if (next == result.size() - 1) {
-      return result;
-    }
+      if (!map.IsSolid((unsigned short)current.x, (unsigned short)current.y, 0xFFFF)) {
+        continue;
+      }
 
-    bool hit = DiameterRayCastHit(bot, result[i], result[next], 3.0f);
+      float dist = BoxPointDistance(current, Vector2f(1, 1), pos);
 
-    if (!hit) {
-      result.erase(result.begin() + next);
-      i--;
+      if (dist < closest_dist) {
+        closest_dist = dist;
+        closest = current;
+      }
     }
   }
 
+  return closest;
+}
+
+bool IsPassablePath(const Map& map, Vector2f from, Vector2f to, float radius, u32 frequency) {
+  const Vector2f direction = Normalize(to - from);
+  const Vector2f side = Perpendicular(direction) * radius;
+  const float distance = from.Distance(to);
+
+  CastResult cast_center = map.Cast(from, direction, distance, frequency);
+  CastResult cast_side1 = map.Cast(from + side, direction, distance, frequency);
+  CastResult cast_side2 = map.Cast(from - side, direction, distance, frequency);
+
+  return !cast_center.hit && !cast_side1.hit && !cast_side2.hit;
+}
+
+std::vector<Vector2f> Pathfinder::SmoothPath(Game& game, const std::vector<Vector2f>& path, float ship_radius) {
+  std::vector<Vector2f> result;
+
+  // How far away it should try to push the path from walls
+  float push_distance = ship_radius * 1.5f;
+
+  result.resize(path.size());
+
+  if (!path.empty()) {
+    result[0] = path[0];
+  }
+
+  for (std::size_t i = 1; i < path.size(); ++i) {
+    Vector2f current = path[i];
+    Vector2f closest = ClosestWall(game.GetMap(), current, (int)ceilf(push_distance + 1));
+    Vector2f new_pos = current;
+
+    if (closest != Vector2f(0, 0)) {
+      // Attempt to push the path outward from the wall
+      // TODO: iterative box penetration push
+
+      Vector2f center = closest + Vector2f(0.5, 0.5);
+      Vector2f direction = Normalize(center - current);
+      CastResult cast_result = game.GetMap().Cast(current, direction, push_distance, 0xFFFF);
+
+      if (cast_result.hit) {
+        Vector2f hit = cast_result.position;
+        float dist = hit.Distance(current);
+        float force = push_distance - dist;
+
+        new_pos = current + Normalize(current - hit) * force;
+      }
+    }
+
+    if (current != new_pos) {
+      // Make sure the new node is in line of sight
+      if (!IsPassablePath(game.GetMap(), current, new_pos, ship_radius, 0xFFFF)) {
+        new_pos = current;
+      }
+    }
+
+    result[i] = new_pos;
+  }
+
+#if 1  // Don't cull the path if this is enabled
   return result;
 #endif
+
+  if (result.size() <= 2) return result;
+
+  std::vector<Vector2f> minimum;
+  minimum.reserve(result.size());
+
+  Vector2f prev = result[0];
+  for (std::size_t i = 1; i < result.size(); ++i) {
+    Vector2f curr = result[i];
+    Vector2f direction = Normalize(curr - prev);
+    Vector2f side = Perpendicular(direction) * ship_radius;
+    float dist = prev.Distance(curr);
+
+    CastResult cast_center = game.GetMap().Cast(prev, direction, dist, 0xFFFF);
+    CastResult cast_side1 = game.GetMap().Cast(prev + side, direction, dist, 0xFFFF);
+    CastResult cast_side2 = game.GetMap().Cast(prev - side, direction, dist, 0xFFFF);
+
+    if (cast_center.hit || cast_side1.hit || cast_side2.hit) {
+      if (minimum.size() > result.size()) {
+        minimum = result;
+        break;
+      }
+
+      if (!minimum.empty() && result[i - 1] != minimum.back()) {
+        minimum.push_back(result[i - 1]);
+        prev = minimum.back();
+        i--;
+      } else {
+        minimum.push_back(result[i]);
+        prev = minimum.back();
+      }
+    }
+  }
+
+  minimum.push_back(result.back());
+
+  result = minimum;
+  return result;
 }
 
 std::vector<Vector2f> Pathfinder::CreatePath(Game& game, Vector2f from, Vector2f to, float radius) {

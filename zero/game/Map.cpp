@@ -574,7 +574,7 @@ u32 Map::GetChecksum(u32 key) const {
   return key;
 }
 
-CastResult Map::Cast(const Vector2f& from, const Vector2f& direction, float max_distance, u32 frequency) {
+CastResult Map::Cast(const Vector2f& from, const Vector2f& direction, float max_distance, u32 frequency) const {
   CastResult result;
 
   result.hit = false;

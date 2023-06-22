@@ -93,6 +93,9 @@ struct Game {
   void OnFlagPosition(u8* pkt, size_t size);
   void OnTurfFlagUpdate(u8* pkt, size_t size);
   void OnPlayerId(u8* pkt, size_t size);
+
+  Map& GetMap() { return connection.map; }
+  const Map& GetMap() const { return connection.map; }
 };
 
 }  // namespace zero

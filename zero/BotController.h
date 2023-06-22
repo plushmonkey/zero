@@ -1,19 +1,13 @@
 #pragma once
 
 #include <zero/game/Game.h>
+#include <zero/path/Pathfinder.h>
 
 #include <memory>
 
 namespace zero {
 
 struct ShipEnforcer;
-class RegionRegistry;
-
-namespace path {
-
-struct Pathfinder;
-
-}  // namespace path
 
 struct BotController {
   BotController();
@@ -26,6 +20,8 @@ struct BotController {
   std::unique_ptr<ShipEnforcer> ship_enforcer;
   std::unique_ptr<path::Pathfinder> pathfinder;
   std::unique_ptr<RegionRegistry> region_registry;
+
+  std::vector<Vector2f> current_path;
 };
 
 }  // namespace zero
