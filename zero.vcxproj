@@ -19,66 +19,80 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="zero\BrickManager.cpp" />
-    <ClCompile Include="zero\Buffer.cpp" />
-    <ClCompile Include="zero\ChatController.cpp" />
-    <ClCompile Include="zero\Clock.cpp" />
-    <ClCompile Include="zero\FileRequester.cpp" />
-    <ClCompile Include="zero\Game.cpp" />
-    <ClCompile Include="zero\Inflate.cpp" />
+    <ClCompile Include="zero\BotController.cpp" />
+    <ClCompile Include="zero\ZeroBot.cpp" />
+    <ClCompile Include="zero\game\BrickManager.cpp" />
+    <ClCompile Include="zero\game\Buffer.cpp" />
+    <ClCompile Include="zero\game\ChatController.cpp" />
+    <ClCompile Include="zero\game\Clock.cpp" />
+    <ClCompile Include="zero\game\FileRequester.cpp" />
+    <ClCompile Include="zero\game\Game.cpp" />
+    <ClCompile Include="zero\game\Inflate.cpp" />
     <ClCompile Include="zero\main.cpp" />
-    <ClCompile Include="zero\Map.cpp" />
-    <ClCompile Include="zero\Memory.cpp" />
-    <ClCompile Include="zero\net\Connection.cpp" />
-    <ClCompile Include="zero\net\PacketDispatcher.cpp" />
-    <ClCompile Include="zero\net\PacketSequencer.cpp" />
-    <ClCompile Include="zero\net\security\Checksum.cpp" />
-    <ClCompile Include="zero\net\security\Crypt.cpp" />
-    <ClCompile Include="zero\net\security\MD5.cpp" />
-    <ClCompile Include="zero\net\security\SecuritySolver.cpp" />
-    <ClCompile Include="zero\Platform.cpp" />
-    <ClCompile Include="zero\PlayerManager.cpp" />
-    <ClCompile Include="zero\Radar.cpp" />
-    <ClCompile Include="zero\ShipController.cpp" />
-    <ClCompile Include="zero\Soccer.cpp" />
-    <ClCompile Include="zero\WeaponManager.cpp" />
-    <ClCompile Include="zero\WorkQueue.cpp" />
+    <ClCompile Include="zero\game\Map.cpp" />
+    <ClCompile Include="zero\game\Memory.cpp" />
+    <ClCompile Include="zero\game\net\Connection.cpp" />
+    <ClCompile Include="zero\game\net\PacketDispatcher.cpp" />
+    <ClCompile Include="zero\game\net\PacketSequencer.cpp" />
+    <ClCompile Include="zero\game\net\security\Checksum.cpp" />
+    <ClCompile Include="zero\game\net\security\Crypt.cpp" />
+    <ClCompile Include="zero\game\net\security\MD5.cpp" />
+    <ClCompile Include="zero\game\net\security\SecuritySolver.cpp" />
+    <ClCompile Include="zero\path\NodeProcessor.cpp" />
+    <ClCompile Include="zero\path\Pathfinder.cpp" />
+    <ClCompile Include="zero\game\Platform.cpp" />
+    <ClCompile Include="zero\game\PlayerManager.cpp" />
+    <ClCompile Include="zero\game\Radar.cpp" />
+    <ClCompile Include="zero\RegionRegistry.cpp" />
+    <ClCompile Include="zero\game\ShipController.cpp" />
+    <ClCompile Include="zero\game\Soccer.cpp" />
+    <ClCompile Include="zero\game\WeaponManager.cpp" />
+    <ClCompile Include="zero\game\WorkQueue.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="zero\ArenaSettings.h" />
-    <ClInclude Include="zero\BrickManager.h" />
-    <ClInclude Include="zero\Buffer.h" />
-    <ClInclude Include="zero\Camera.h" />
-    <ClInclude Include="zero\ChatController.h" />
-    <ClInclude Include="zero\Clock.h" />
-    <ClInclude Include="zero\FileRequester.h" />
-    <ClInclude Include="zero\Game.h" />
-    <ClInclude Include="zero\HashMap.h" />
-    <ClInclude Include="zero\Inflate.h" />
-    <ClInclude Include="zero\InputState.h" />
-    <ClInclude Include="zero\Map.h" />
+    <ClInclude Include="zero\Actuator.h" />
+    <ClInclude Include="zero\BotController.h" />
+    <ClInclude Include="zero\ZeroBot.h" />
+    <ClInclude Include="zero\game\ArenaSettings.h" />
+    <ClInclude Include="zero\game\BrickManager.h" />
+    <ClInclude Include="zero\game\Buffer.h" />
+    <ClInclude Include="zero\game\Camera.h" />
+    <ClInclude Include="zero\game\ChatController.h" />
+    <ClInclude Include="zero\game\Clock.h" />
+    <ClInclude Include="zero\game\FileRequester.h" />
+    <ClInclude Include="zero\game\Game.h" />
+    <ClInclude Include="zero\Hash.h" />
+    <ClInclude Include="zero\game\HashMap.h" />
+    <ClInclude Include="zero\game\Inflate.h" />
+    <ClInclude Include="zero\game\InputState.h" />
+    <ClInclude Include="zero\game\Map.h" />
     <ClInclude Include="zero\Math.h" />
-    <ClInclude Include="zero\Memory.h" />
-    <ClInclude Include="zero\net\Connection.h" />
-    <ClInclude Include="zero\net\PacketDispatcher.h" />
-    <ClInclude Include="zero\net\PacketSequencer.h" />
-    <ClInclude Include="zero\net\Protocol.h" />
-    <ClInclude Include="zero\net\security\Checksum.h" />
-    <ClInclude Include="zero\net\security\Crypt.h" />
-    <ClInclude Include="zero\net\security\MD5.h" />
-    <ClInclude Include="zero\net\security\SecuritySolver.h" />
-    <ClInclude Include="zero\net\Socket.h" />
-    <ClInclude Include="zero\Platform.h" />
-    <ClInclude Include="zero\Player.h" />
-    <ClInclude Include="zero\PlayerManager.h" />
-    <ClInclude Include="zero\Radar.h" />
-    <ClInclude Include="zero\Random.h" />
-    <ClInclude Include="zero\Settings.h" />
-    <ClInclude Include="zero\ShipController.h" />
-    <ClInclude Include="zero\Soccer.h" />
+    <ClInclude Include="zero\game\Memory.h" />
+    <ClInclude Include="zero\game\net\Connection.h" />
+    <ClInclude Include="zero\game\net\PacketDispatcher.h" />
+    <ClInclude Include="zero\game\net\PacketSequencer.h" />
+    <ClInclude Include="zero\game\net\Protocol.h" />
+    <ClInclude Include="zero\game\net\security\Checksum.h" />
+    <ClInclude Include="zero\game\net\security\Crypt.h" />
+    <ClInclude Include="zero\game\net\security\MD5.h" />
+    <ClInclude Include="zero\game\net\security\SecuritySolver.h" />
+    <ClInclude Include="zero\game\net\Socket.h" />
+    <ClInclude Include="zero\path\Node.h" />
+    <ClInclude Include="zero\path\NodeProcessor.h" />
+    <ClInclude Include="zero\path\Pathfinder.h" />
+    <ClInclude Include="zero\game\Platform.h" />
+    <ClInclude Include="zero\game\Player.h" />
+    <ClInclude Include="zero\game\PlayerManager.h" />
+    <ClInclude Include="zero\game\Radar.h" />
+    <ClInclude Include="zero\game\Random.h" />
+    <ClInclude Include="zero\RegionRegistry.h" />
+    <ClInclude Include="zero\game\Settings.h" />
+    <ClInclude Include="zero\game\ShipController.h" />
+    <ClInclude Include="zero\game\Soccer.h" />
+    <ClInclude Include="zero\Steering.h" />
     <ClInclude Include="zero\Types.h" />
-    <ClInclude Include="zero\WeaponManager.h" />
-    <ClInclude Include="zero\WorkQueue.h" />
+    <ClInclude Include="zero\game\WeaponManager.h" />
+    <ClInclude Include="zero\game\WorkQueue.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -142,7 +156,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NOMINMAX;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
@@ -156,7 +170,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NOMINMAX;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
