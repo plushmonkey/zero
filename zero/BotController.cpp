@@ -167,6 +167,11 @@ void BotController::Update(float dt, Game& game, InputState& input) {
   Vector2f shot_velocity = self->GetHeading() * weapon_speed;
   Vector2f shot_direction = Normalize(self->velocity + shot_velocity);
 
+  // Seek directly out of safe to prevent oscillating in safe attempting to fight nearby player.
+  if (game.GetMap().GetTileId(self->position) == kTileSafeId) {
+    path_following = true;
+  }
+
   Steering steering;
 
   if (path_following) {

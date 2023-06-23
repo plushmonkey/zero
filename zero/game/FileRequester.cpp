@@ -105,6 +105,7 @@ void FileRequester::OnCompressedFile(u8* pkt, size_t size) {
     fprintf(stderr, "Failed to open %s for writing.\n", current->filename);
   }
 
+  printf("Download complete: %s\n", current->filename);
   current->callback(current->user, current, data);
 
   temp_arena.Revert(snapshot);
@@ -170,6 +171,7 @@ void FileRequester::Request(const char* filename, u16 index, u32 size, u32 check
     return;
   }
 
+  printf("Requesting download: %s\n", filename);
   request->next = requests;
   requests = request;
 
