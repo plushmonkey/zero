@@ -68,11 +68,10 @@ struct Map {
   bool CanOverlapTile(const Vector2f& position, float radius, u32 frequency) const;
   bool CanOccupy(const Vector2f& position, float radius, u32 frequency) const;
   bool CanOccupyRadius(const Vector2f& position, float radius, u32 frequency) const;
+  bool CanFit(const Vector2f& position, float radius, u32 frequency) const;
 
   void UpdateDoors(const ArenaSettings& settings);
   void SeedDoors(u32 seed);
-
-  bool CanFit(const Vector2f& position, float radius, u32 frequency);
 
   u32 GetChecksum(u32 key) const;
 

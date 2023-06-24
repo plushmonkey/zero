@@ -147,6 +147,9 @@ BotController::BotController() {
   root->Child(move(ship_join_sequence)).Child(move(chase_sequence));
 #else
   root->Child(move(ship_join_sequence));
+
+  // auto goto_fr = make_unique<GoToNode>("flagroom");
+  // root->Child(move(goto_fr));
 #endif
 
   behavior_tree = move(root);
@@ -171,12 +174,16 @@ void BotController::Update(float dt, Game& game, InputState& input, behavior::Ex
     auto processor = std::make_unique<path::NodeProcessor>(game);
 
     region_registry = std::make_unique<RegionRegistry>();
-    region_registry->CreateAll(game.connection.map, 16.0f / 14.0f);
+    region_registry->CreateAll(game.GetMap(), 16.0f / 14.0f);
 
     pathfinder = std::make_unique<path::Pathfinder>(std::move(processor), *region_registry);
+
+    pathfinder->CreateMapWeights(game.GetMap(), 14.0f / 16.0f);
   }
 
   steering.Reset();
+
+  execute_ctx.blackboard.Set("flagroom", Vector2f(155, 580));
 
   if (behavior_tree) {
     behavior_tree->Execute(execute_ctx);
@@ -272,6 +279,7 @@ void BotController::Update(float dt, Game& game, InputState& input, behavior::Ex
 
   if (path_following) {
     steering.Seek(game, movement_target);
+    steering.AvoidWalls(game, 30.0f);
   } else {
     aimshot = CalculateShot(self->position, target->position, self->velocity, target->velocity, weapon_speed);
 

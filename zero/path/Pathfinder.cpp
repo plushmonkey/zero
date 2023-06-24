@@ -1,9 +1,20 @@
+#include <xmmintrin.h>
 #include <zero/game/Game.h>
 #include <zero/path/NodeProcessor.h>
 #include <zero/path/Pathfinder.h>
 
 namespace zero {
 namespace path {
+
+inline float fast_sqrt(float v) {
+  __m128 v_x4 = _mm_set1_ps(v);
+
+  __m128 result = _mm_sqrt_ps(v_x4);
+
+  _mm_store_ss(&v, result);
+
+  return v;
+}
 
 inline NodePoint ToNodePoint(const Vector2f v) {
   NodePoint np;
@@ -24,18 +35,21 @@ inline float Euclidean(NodeProcessor& processor, const Node* from, const Node* t
   return sqrt(dx * dx + dy * dy);
 }
 
+inline float Euclidean(const NodePoint& __restrict from_p, const NodePoint& __restrict to_p) {
+  float dx = static_cast<float>(from_p.x - to_p.x);
+  float dy = static_cast<float>(from_p.y - to_p.y);
+
+  __m128 mult = _mm_set_ss(dx * dx + dy * dy);
+  __m128 result = _mm_sqrt_ss(mult);
+
+  return _mm_cvtss_f32(result);
+}
+
 Pathfinder::Pathfinder(std::unique_ptr<NodeProcessor> processor, RegionRegistry& regions)
     : processor_(std::move(processor)), regions_(regions) {}
 
 std::vector<Vector2f> Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& to, float radius) {
   std::vector<Vector2f> path;
-
-  // Clear the touched nodes before pathfinding.
-  for (Node* node : touched_nodes_) {
-    // Setting the flag to zero causes GetNode to reset the node on next fetch.
-    node->flags = 0;
-  }
-  touched_nodes_.clear();
 
   Node* start = processor_->GetNode(ToNodePoint(from));
   Node* goal = processor_->GetNode(ToNodePoint(to));
@@ -55,15 +69,12 @@ std::vector<Vector2f> Pathfinder::FindPath(const Map& map, const Vector2f& from,
   openset_.Clear();
   openset_.Push(start);
 
-  touched_nodes_.insert(start);
-  touched_nodes_.insert(goal);
-
   // at the start there is only one node here, the start node
   while (!openset_.Empty()) {
     // grab front item then delete it
     Node* node = openset_.Pop();
 
-    touched_nodes_.insert(node);
+    touched_.push_back(node);
 
     // this is the only way to break the pathfinder
     if (node == goal) {
@@ -72,28 +83,30 @@ std::vector<Vector2f> Pathfinder::FindPath(const Map& map, const Vector2f& from,
 
     node->flags |= NodeFlag_Closed;
 
+    NodePoint node_point = processor_->GetPoint(node);
+
     // returns neighbor nodes that are not solid
-    NodeConnections connections = processor_->FindEdges(node, start, goal);
+    NodeConnections connections = processor_->FindEdges(node, start, goal, radius);
 
     for (std::size_t i = 0; i < connections.count; ++i) {
       Node* edge = connections.neighbors[i];
+      NodePoint edge_point = processor_->GetPoint(edge);
 
-      touched_nodes_.insert(edge);
+      touched_.push_back(edge);
 
-      float cost = node->g + edge->weight * Euclidean(*processor_, node, edge);
+      float cost = node->g + edge->weight * Euclidean(node_point, edge_point);
 
       if ((edge->flags & NodeFlag_Closed) && cost < edge->g) {
         edge->flags &= ~NodeFlag_Closed;
       }
 
-      float h = Euclidean(*processor_, edge, goal);
+      float h = Euclidean(edge_point, goal_p);
 
       if (!(edge->flags & NodeFlag_Openset) || cost + h < edge->f) {
+        edge->parent = node;
+        edge->flags |= NodeFlag_Openset;
         edge->g = cost;
         edge->f = edge->g + h;
-        edge->parent = node;
-
-        edge->flags |= NodeFlag_Openset;
 
         openset_.Push(edge);
       }
@@ -121,6 +134,11 @@ std::vector<Vector2f> Pathfinder::FindPath(const Map& map, const Vector2f& from,
 
     path.push_back(pos);
   }
+
+  for (Node* node : touched_) {
+    node->flags &= ~NodeFlag_Initialized;
+  }
+  touched_.clear();
 
   return path;
 }
@@ -163,6 +181,8 @@ bool IsPassablePath(const Map& map, Vector2f from, Vector2f to, float radius, u3
 }
 
 std::vector<Vector2f> Pathfinder::SmoothPath(Game& game, const std::vector<Vector2f>& path, float ship_radius) {
+  return path;
+
   std::vector<Vector2f> result;
 
   // How far away it should try to push the path from walls
@@ -288,15 +308,19 @@ float Pathfinder::GetWallDistance(const Map& map, u16 x, u16 y, u16 radius) {
   return sqrt(closest_sq);
 }
 
-void Pathfinder::CreateMapWeights(const Map& map) {
+void Pathfinder::CreateMapWeights(const Map& map, float ship_radius) {
   for (u16 y = 0; y < 1024; ++y) {
     for (u16 x = 0; x < 1024; ++x) {
-      if (map.IsSolid(x, y, 0xFFFF)) continue;
-
       Node* node = this->processor_->GetNode(NodePoint(x, y));
 
+      if (map.CanOccupy(Vector2f(x, y), ship_radius, 0xFFFF)) {
+        node->flags |= NodeFlag_Traversable;
+      }
+
+      if (map.IsSolid(x, y, 0xFFFF)) continue;
+
       // Search width is double this number (for 8, searches a 16 x 16 square).
-      int close_distance = 8;
+      int close_distance = 5;
 
       /* Causes exponentianl weight increase as the path gets closer to wall tiles.
       Known Issue: 3 tile gaps and 4 tile gaps will carry the same weight since each tiles closest wall is 2 tiles
@@ -307,9 +331,9 @@ void Pathfinder::CreateMapWeights(const Map& map) {
       // Nodes are initialized with a weight of 1.0f, so never calculate when the distance is greater or equal
       // because the result will be less than 1.0f.
       if (distance < close_distance) {
-        float weight = 8.0f / distance;
+        float weight = close_distance / distance;
         // paths directly next to a wall will be a last resort, 1 tile from wall very unlikely
-        node->weight = (float)std::pow(weight, 4.0);
+        node->weight = powf(weight, 4.0f);
       }
     }
   }

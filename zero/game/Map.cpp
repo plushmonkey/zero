@@ -133,6 +133,24 @@ bool Map::CanOverlapTile(const Vector2f& position, float radius, u32 frequency) 
 }
 
 bool Map::CanOccupy(const Vector2f& position, float radius, u32 frequency) const {
+  u16 position_x = (u16)position.x;
+  u16 position_y = (u16)position.y;
+
+  int radius_check = (int)(radius + 0.5f);
+
+  for (int y = -radius_check; y <= radius_check; ++y) {
+    for (int x = -radius_check; x <= radius_check; ++x) {
+      uint16_t world_x = (uint16_t)(position_x + x);
+      uint16_t world_y = (uint16_t)(position_y + y);
+
+      if (IsSolid(world_x, world_y, frequency)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+#if 0
   /* Convert the ship into a tiled grid and put each tile of the ship on the test
      position.
 
@@ -157,6 +175,7 @@ bool Map::CanOccupy(const Vector2f& position, float radius, u32 frequency) const
     }
   }
   return false;
+#endif
 }
 
 bool Map::CanOccupyRadius(const Vector2f& position, float radius, u32 frequency) const {
@@ -505,7 +524,7 @@ void Map::SeedDoors(u32 seed) {
   }
 }
 
-bool Map::CanFit(const Vector2f& position, float radius, u32 frequency) {
+bool Map::CanFit(const Vector2f& position, float radius, u32 frequency) const {
   for (float y_offset_check = -radius; y_offset_check < radius; ++y_offset_check) {
     for (float x_offset_check = -radius; x_offset_check < radius; ++x_offset_check) {
       if (IsSolid((u16)(position.x + x_offset_check), (u16)(position.y + y_offset_check), frequency)) {

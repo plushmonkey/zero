@@ -54,7 +54,7 @@ struct Pathfinder {
 
   std::vector<Vector2f> CreatePath(Game& game, Vector2f from, Vector2f to, float radius);
 
-  void CreateMapWeights(const Map& map);
+  void CreateMapWeights(const Map& map, float ship_radius);
 
  private:
   float GetWallDistance(const Map& map, u16 x, u16 y, u16 radius);
@@ -66,7 +66,7 @@ struct Pathfinder {
   std::unique_ptr<NodeProcessor> processor_;
   RegionRegistry& regions_;
   PriorityQueue<Node*, NodeCompare> openset_;
-  std::unordered_set<Node*> touched_nodes_;
+  std::vector<Node*> touched_;
 };
 
 }  // namespace path

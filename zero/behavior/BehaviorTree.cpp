@@ -23,6 +23,8 @@ ExecuteResult SequenceNode::Execute(ExecuteContext& ctx) {
     }
   }
 
+  this->running_node_index_ = 0;
+
   return ExecuteResult::Success;
 }
 

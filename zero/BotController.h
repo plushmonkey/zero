@@ -17,8 +17,12 @@ struct ExecuteContext;
 }  // namespace behavior
 
 struct BotController {
+  std::unique_ptr<path::Pathfinder> pathfinder;
+  std::unique_ptr<RegionRegistry> region_registry;
+
   Steering steering;
   Actuator actuator;
+  std::vector<Vector2f> current_path;
 
   BotController();
 
@@ -26,13 +30,8 @@ struct BotController {
 
   void Update(float dt, Game& game, InputState& input, behavior::ExecuteContext& execute_ctx);
 
- private:
-  std::unique_ptr<path::Pathfinder> pathfinder;
-  std::unique_ptr<RegionRegistry> region_registry;
-
+private:
   std::unique_ptr<behavior::BehaviorNode> behavior_tree;
-
-  std::vector<Vector2f> current_path;
 };
 
 }  // namespace zero

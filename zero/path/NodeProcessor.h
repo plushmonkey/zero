@@ -24,7 +24,7 @@ class NodeProcessor {
   NodeProcessor(Game& game) : game_(game), map_(game.connection.map) {}
   Game& GetGame() { return game_; }
 
-  NodeConnections FindEdges(Node* node, Node* start, Node* goal);
+  NodeConnections FindEdges(Node* node, Node* start, Node* goal, float radius);
   Node* GetNode(NodePoint point);
   bool IsSolid(u16 x, u16 y) { return map_.IsSolid(x, y, 0xFFFF); }
 

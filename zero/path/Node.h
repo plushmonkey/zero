@@ -15,20 +15,24 @@ struct NodePoint {
   bool operator==(const NodePoint& other) const { return x == other.x && y == other.y; }
 };
 
-enum { NodeFlag_Openset = (1 << 0), NodeFlag_Closed = (1 << 1), NodeFlag_Initialized = (1 << 2) };
+enum NodeFlag {
+  NodeFlag_Openset = (1 << 0),
+  NodeFlag_Closed = (1 << 1),
+  NodeFlag_Initialized = (1 << 2),
+  NodeFlag_Traversable = (1 << 3)
+};
 typedef u32 NodeFlags;
 
 struct Node {
   Node* parent;
 
+  u32 flags;
+
   float g;
   float f;
-
   float weight;
 
-  u8 flags;
-
-  Node() : flags(0), parent(nullptr), g(0.0f), f(0.0f), weight(1.0f) {}
+  Node() : parent(nullptr), flags(0), g(0.0f), f(0.0f), weight(1.0f) {}
 };
 
 }  // namespace path
