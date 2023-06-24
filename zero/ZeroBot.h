@@ -1,12 +1,15 @@
 #pragma once
 
+#include <zero/behavior/BehaviorTree.h>
+#include <zero/game/Game.h>
 #include <zero/game/InputState.h>
 #include <zero/game/Memory.h>
+
+#include <memory>
 
 namespace zero {
 
 struct BotController;
-struct Game;
 struct Worker;
 struct WorkQueue;
 
@@ -26,6 +29,8 @@ struct ZeroBot {
 
   InputState input;
   BotController* bot_controller = nullptr;
+
+  behavior::ExecuteContext execute_ctx;
 
   char name[20] = {0};
   char password[256] = {0};

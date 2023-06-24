@@ -113,6 +113,8 @@ struct Player {
   bool ball_carrier;
 
   inline Vector2f GetHeading() const { return OrientationToHeading((u8)(orientation * 40.0f)); }
+
+  inline bool IsRespawning() const { return ship != 8 && enter_delay > 0.0f; }
 };
 
 }  // namespace zero

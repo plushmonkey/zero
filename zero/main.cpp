@@ -31,6 +31,8 @@ BOOL WINAPI ConsoleCloserHandler(DWORD dwCtrlType) {
 
 namespace zero {
 
+const char* kSecurityServiceIp = "127.0.0.1";
+
 ServerInfo kServers[] = {
     {"local", "192.168.0.169", 5000}, {"subgame", "192.168.0.169", 5002}, {"SSCE Hyperspace", "162.248.95.143", 5005},
     //{"SSCJ Devastation", "69.164.220.203", 7022},

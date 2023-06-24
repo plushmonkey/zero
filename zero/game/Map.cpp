@@ -541,8 +541,6 @@ bool Map::IsSolid(u16 x, u16 y, u32 frequency) const {
   if (id == 250 && brick_manager) {
     Brick* brick = brick_manager->GetBrick(x, y);
 
-    assert(brick);
-
     if (brick && brick->team == frequency) {
       return false;
     }
@@ -646,6 +644,14 @@ CastResult Map::Cast(const Vector2f& from, const Vector2f& direction, float max_
   }
 
   return result;
+}
+
+CastResult Map::CastTo(const Vector2f& from, const Vector2f& to, u32 frequency) const {
+  Vector2f diff = to - from;
+  float dist = diff.Length();
+  Vector2f direction = Normalize(diff);
+
+  return Cast(from, direction, dist, frequency);
 }
 
 }  // namespace zero

@@ -3,55 +3,114 @@
 #include <zero/Actuator.h>
 #include <zero/RegionRegistry.h>
 #include <zero/Steering.h>
+#include <zero/behavior/BehaviorTree.h>
+#include <zero/behavior/nodes/GoToNode.h>
+#include <zero/behavior/nodes/ShipNode.h>
 #include <zero/path/Pathfinder.h>
 
 namespace zero {
 
-constexpr u8 kRequestedShip = 0;
+Vector2f CalculateShot(const Vector2f& pShooter, const Vector2f& pTarget, const Vector2f& vShooter,
+                       const Vector2f& vTarget, float sProjectile) {
+  Vector2f totarget = pTarget - pShooter;
+  Vector2f v = vTarget - vShooter;
 
-struct ShipEnforcer {
-  s32 last_request_tick;
-  u8 requested_ship;
+  float a = v.Dot(v) - sProjectile * sProjectile;
+  float b = 2 * v.Dot(totarget);
+  float c = totarget.Dot(totarget);
 
-  ShipEnforcer() {
-    last_request_tick = GetCurrentTick();
-    requested_ship = kRequestedShip;
+  Vector2f solution;
+
+  float disc = (b * b) - 4 * a * c;
+  float t = -1.0;
+
+  if (disc >= 0.0) {
+    float t1 = (-b + sqrtf(disc)) / (2 * a);
+    float t2 = (-b - sqrtf(disc)) / (2 * a);
+    if (t1 < t2 && t1 >= 0)
+      t = t1;
+    else
+      t = t2;
   }
 
-  void Update(Game& game) {
-    constexpr s32 kRequestInterval = 300;
+  solution = pTarget + (v * t);
 
-    Player* self = game.player_manager.GetSelf();
+  return solution;
+}
 
-    if (!self) return;
-    if (self->ship == requested_ship) return;
+struct NearestTargetNode : public behavior::BehaviorNode {
+  NearestTargetNode(const char* player_key) : player_key(player_key) {}
 
-    s32 current_tick = GetCurrentTick();
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    Player* self = ctx.bot->game->player_manager.GetSelf();
+    if (!self) return behavior::ExecuteResult::Failure;
 
-    if (TICK_DIFF(current_tick, last_request_tick) >= kRequestInterval) {
-      printf("Sending ship request\n");
-      game.connection.SendShipRequest(requested_ship);
-      last_request_tick = current_tick;
+    Player* nearest = GetNearestTarget(*ctx.bot->game, *self);
+
+    if (!nearest) return behavior::ExecuteResult::Failure;
+
+    ctx.blackboard.Set(player_key, nearest);
+
+    return behavior::ExecuteResult::Success;
+  }
+
+ private:
+  Player* GetNearestTarget(Game& game, Player& self) {
+    Player* best_target = nullptr;
+    float closest_dist_sq = std::numeric_limits<float>::max();
+
+    for (size_t i = 0; i < game.player_manager.player_count; ++i) {
+      Player* player = game.player_manager.players + i;
+
+      if (player->ship >= 8) continue;
+      if (player->frequency == self.frequency) continue;
+      if (player->IsRespawning()) continue;
+      if (player->position == Vector2f(0, 0)) continue;
+
+      bool in_safe = game.connection.map.GetTileId(player->position) == kTileSafeId;
+      if (in_safe) continue;
+
+      float dist_sq = player->position.DistanceSq(self.position);
+      if (dist_sq < closest_dist_sq) {
+        closest_dist_sq = dist_sq;
+        best_target = player;
+      }
     }
+
+    return best_target;
   }
+
+  const char* player_key;
 };
 
-BotController::BotController() {
-  ship_enforcer = std::make_unique<ShipEnforcer>();
-}
+struct GetPlayerPositionNode : public behavior::BehaviorNode {
+  GetPlayerPositionNode(const char* player_key, const char* position_key)
+      : player_key(player_key), position_key(position_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto player_opt = ctx.blackboard.Value<Player*>(player_key);
+    if (!player_opt.has_value()) return behavior::ExecuteResult::Failure;
+
+    ctx.blackboard.Set(position_key, player_opt.value()->position);
+
+    return behavior::ExecuteResult::Success;
+  }
+
+  const char* player_key;
+  const char* position_key;
+};
 
 Player* BotController::GetNearestTarget(Game& game, Player& self) {
   Player* best_target = nullptr;
   float closest_dist_sq = std::numeric_limits<float>::max();
-
-  float enter_delay = (game.connection.settings.EnterDelay / 100.0f);
 
   for (size_t i = 0; i < game.player_manager.player_count; ++i) {
     Player* player = game.player_manager.players + i;
 
     if (player->ship >= 8) continue;
     if (player->frequency == self.frequency) continue;
-    if (player->enter_delay > 0.0f && player->enter_delay < enter_delay) continue;
+    if (player->IsRespawning()) continue;
+    if (player->position == Vector2f(0, 0)) continue;
 
     bool in_safe = game.connection.map.GetTileId(player->position) == kTileSafeId;
     if (in_safe) continue;
@@ -64,6 +123,33 @@ Player* BotController::GetNearestTarget(Game& game, Player& self) {
   }
 
   return best_target;
+}
+
+BotController::BotController() {
+  using namespace std;
+  using namespace behavior;
+
+  constexpr u8 kRequestedShip = 0;
+
+  auto root = make_unique<SelectorNode>();
+
+  auto ship_join_sequence = make_unique<SequenceNode>();
+  ship_join_sequence->Child(make_unique<InvertNode>(make_unique<ShipQueryNode>(kRequestedShip)))
+      .Child(make_unique<ShipRequestNode>(kRequestedShip));
+
+#if 0
+  auto chase_sequence = make_unique<SequenceNode>();
+
+  chase_sequence->Child(make_unique<NearestTargetNode>("nearest_target"))
+      .Child(make_unique<GetPlayerPositionNode>("nearest_target", "nearest_position"))
+      .Child(make_unique<GoToNode>("nearest_position"));
+
+  root->Child(move(ship_join_sequence)).Child(move(chase_sequence));
+#else
+  root->Child(move(ship_join_sequence));
+#endif
+
+  behavior_tree = move(root);
 }
 
 bool CanMoveBetween(Game& game, Vector2f from, Vector2f to, float radius, u32 frequency) {
@@ -80,13 +166,7 @@ bool CanMoveBetween(Game& game, Vector2f from, Vector2f to, float radius, u32 fr
   return !center.hit && !side1.hit && !side2.hit;
 }
 
-void BotController::Update(float dt, Game& game, InputState& input) {
-  ship_enforcer->Update(game);
-
-  Player* self = game.player_manager.GetSelf();
-  if (!self || self->ship == 8) return;
-
-#if 1
+void BotController::Update(float dt, Game& game, InputState& input, behavior::ExecuteContext& execute_ctx) {
   if (pathfinder == nullptr) {
     auto processor = std::make_unique<path::NodeProcessor>(game);
 
@@ -95,7 +175,19 @@ void BotController::Update(float dt, Game& game, InputState& input) {
 
     pathfinder = std::make_unique<path::Pathfinder>(std::move(processor), *region_registry);
   }
-#endif
+
+  steering.Reset();
+
+  if (behavior_tree) {
+    behavior_tree->Execute(execute_ctx);
+  }
+
+#if 0
+  actuator.Update(game, input, steering.force, steering.rotation);
+
+#else
+  Player* self = game.player_manager.GetSelf();
+  if (!self || self->ship == 8) return;
 
   Player* target = GetNearestTarget(game, *self);
   if (!target || target->ship == 8) return;
@@ -174,14 +266,24 @@ void BotController::Update(float dt, Game& game, InputState& input) {
 
   Steering steering;
 
+  Vector2f aimshot = target->position;
+
+  bool in_safe = game.connection.map.GetTileId(self->position) == kTileSafeId;
+
   if (path_following) {
     steering.Seek(game, movement_target);
   } else {
-    steering.Pursue(game, *target, 15.0f);
+    aimshot = CalculateShot(self->position, target->position, self->velocity, target->velocity, weapon_speed);
 
-    if ((float)self->energy > game.ship_controller.ship.energy * 0.3f) {
-      steering.Face(game, target->position);
+    const float kTargetDistance = 15.0f;
+    // steering.Pursue(game, aimshot, *target, kTargetDistance);
+    steering.Seek(game, aimshot, kTargetDistance);
+
+    if (target->position.DistanceSq(self->position) <= kTargetDistance * kTargetDistance) {
+      //  steering.Face(game, target->position);
+    } else {
     }
+    steering.Face(game, aimshot);
   }
 
   // Optimize for shot direction unless it's going backwards
@@ -190,17 +292,15 @@ void BotController::Update(float dt, Game& game, InputState& input) {
   }
 
   Actuator actuator;
-  actuator.Update(game, input, shot_direction, steering.force, steering.rotation);
+  actuator.Update(game, input, steering.force, steering.rotation);
 
-  float nearby_radius = game.connection.settings.ShipSettings[target->ship].GetRadius() * 1.5f;
-  Vector2f nearest_point =
-      GetClosestLinePoint(self->position, self->position + shot_direction * 100.0f, target->position);
+  float nearby_radius = game.connection.settings.ShipSettings[target->ship].GetRadius() * 18.0f;
+  Vector2f nearest_point = GetClosestLinePoint(self->position, self->position + shot_direction * 200.0f, aimshot);
 
-  bool in_safe = game.connection.map.GetTileId(self->position) == kTileSafeId;
-
-  if (!in_safe && nearest_point.DistanceSq(target->position) < nearby_radius * nearby_radius) {
+  if (!path_following && !in_safe && nearest_point.DistanceSq(target->position) < nearby_radius * nearby_radius) {
     input.SetAction(InputAction::Bullet, true);
   }
+#endif
 }
 
 }  // namespace zero

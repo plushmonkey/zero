@@ -113,7 +113,10 @@ void ZeroBot::Run() {
     input.Clear();
 
     if (bot_controller && game->connection.login_state == Connection::LoginState::Complete) {
-      bot_controller->Update(dt, *game, input);
+      execute_ctx.bot = this;
+      execute_ctx.dt = dt;
+
+      bot_controller->Update(dt, *game, input, execute_ctx);
     }
 
     if (!game->Update(input, dt)) {

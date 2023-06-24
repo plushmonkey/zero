@@ -6,13 +6,14 @@ namespace zero {
 
 // Converts a steering force into actual key presses
 struct Actuator {
-  void Update(Game& game, InputState& input, const Vector2f& heading, const Vector2f& force, float rotation) {
+  void Update(Game& game, InputState& input, const Vector2f& force, float rotation) {
     float enter_delay = (game.connection.settings.EnterDelay / 100.0f);
     Player* self = game.player_manager.GetSelf();
 
     if (!self || self->ship == 8) return;
     if (self->enter_delay > 0.0f && self->enter_delay < enter_delay) return;
 
+    Vector2f heading = self->GetHeading();
     Vector2f steering_direction = heading;
 
     bool has_force = force.LengthSq() > 0.0f;

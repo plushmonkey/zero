@@ -77,6 +77,7 @@ struct Map {
   u32 GetChecksum(u32 key) const;
 
   CastResult Cast(const Vector2f& from, const Vector2f& direction, float max_distance, u32 frequency) const;
+  CastResult CastTo(const Vector2f& from, const Vector2f& to, u32 frequency) const;
 
   inline AnimatedTileSet& GetAnimatedTileSet(AnimatedTile type) { return animated_tiles[(size_t)type]; }
 

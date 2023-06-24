@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="zero\behavior\BehaviorTree.cpp" />
     <ClCompile Include="zero\BotController.cpp" />
     <ClCompile Include="zero\ZeroBot.cpp" />
     <ClCompile Include="zero\game\BrickManager.cpp" />
@@ -51,6 +52,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="zero\Actuator.h" />
+    <ClInclude Include="zero\behavior\BehaviorTree.h" />
+    <ClInclude Include="zero\behavior\Blackboard.h" />
+    <ClInclude Include="zero\behavior\nodes\GoToNode.h" />
+    <ClInclude Include="zero\behavior\nodes\ShipNode.h" />
     <ClInclude Include="zero\BotController.h" />
     <ClInclude Include="zero\ZeroBot.h" />
     <ClInclude Include="zero\game\ArenaSettings.h" />
@@ -158,6 +163,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -172,6 +178,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -186,6 +193,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -200,6 +208,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

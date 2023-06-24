@@ -36,18 +36,13 @@ namespace zero {
 extern const char* kPlayerName;
 extern const char* kPlayerPassword;
 
-#ifndef __ANDROID__
-const char* kSecurityServiceIp = "127.0.0.1";
+extern const char* kSecurityServiceIp;
 const u16 kSecurityServicePort = 8085;
-#else
-const char* kSecurityServiceIp = "10.0.2.2";
-const u16 kSecurityServicePort = 8085;
-#endif
 
 #ifdef __ANDROID__
 constexpr bool kDownloadLvz = false;
 #else
-constexpr bool kDownloadLvz = true;
+constexpr bool kDownloadLvz = false;
 #endif
 
 const char* kLoginResponses[] = {"Ok",
