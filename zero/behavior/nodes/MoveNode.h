@@ -8,6 +8,49 @@
 namespace zero {
 namespace behavior {
 
+struct SeekNode : public BehaviorNode {
+  SeekNode(const char* position_key, const char* target_distance_key)
+      : position_key(position_key), target_distance_key(target_distance_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto opt_position = ctx.blackboard.Value<Vector2f>(position_key);
+    if (!opt_position.has_value()) return ExecuteResult::Failure;
+
+    Vector2f position = opt_position.value();
+
+    auto opt_distance = ctx.blackboard.Value<float>(target_distance_key);
+    if (opt_distance.has_value()) {
+      float target_distance = opt_distance.value();
+
+      ctx.bot->bot_controller->steering.Seek(*ctx.bot->game, position, target_distance);
+    } else {
+      ctx.bot->bot_controller->steering.Seek(*ctx.bot->game, position);
+    }
+
+    return ExecuteResult::Success;
+  }
+
+  const char* position_key;
+  const char* target_distance_key;
+};
+
+struct FaceNode : public BehaviorNode {
+  FaceNode(const char* position_key) : position_key(position_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto opt_position = ctx.blackboard.Value<Vector2f>(position_key);
+    if (!opt_position.has_value()) return ExecuteResult::Failure;
+
+    Vector2f position = opt_position.value();
+
+    ctx.bot->bot_controller->steering.Face(*ctx.bot->game, position);
+
+    return ExecuteResult::Success;
+  }
+
+  const char* position_key;
+};
+
 struct GoToNode : public BehaviorNode {
   GoToNode(const char* position_key) : position_key(position_key) {}
 

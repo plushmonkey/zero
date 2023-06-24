@@ -19,6 +19,7 @@ struct ExecuteContext;
 struct BotController {
   std::unique_ptr<path::Pathfinder> pathfinder;
   std::unique_ptr<RegionRegistry> region_registry;
+  InputState* input;
 
   Steering steering;
   Actuator actuator;
@@ -30,7 +31,7 @@ struct BotController {
 
   void Update(float dt, Game& game, InputState& input, behavior::ExecuteContext& execute_ctx);
 
-private:
+ private:
   std::unique_ptr<behavior::BehaviorNode> behavior_tree;
 };
 

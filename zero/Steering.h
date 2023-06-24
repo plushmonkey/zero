@@ -28,7 +28,11 @@ struct Steering {
   void Seek(Game& game, const Vector2f& target) {
     Player* self = game.player_manager.GetSelf();
 
-    force += target - self->position;
+    float max_speed = game.player_manager.ship_controller->ship.speed / 16.0f / 10.0f;
+
+    Vector2f desired_velocity = Normalize(target - self->position) * max_speed;
+
+    force += desired_velocity - self->velocity;
   }
 
   void Seek(Game& game, const Vector2f& target, float target_distance) {
@@ -40,7 +44,7 @@ struct Steering {
       return Seek(game, target - (Normalize(to_target) * target_distance));
     }
 
-    force += target - self->position;
+    Seek(game, target);
   }
 
   void Pursue(Game& game, const Vector2f& target_position, const Player& target, float target_distance) {
@@ -60,38 +64,6 @@ struct Steering {
     }
 
     return Seek(game, target_position + target.velocity * t);
-#if 0
-
-    float weapon_speed = game.connection.settings.ShipSettings[self->ship].BulletSpeed / 16.0f / 10.0f;
-
-    Vector2f to_target = target - self->position;
-
-    if (to_target.LengthSq() <= target_distance * target_distance) {
-      return Seek(game, target - (Normalize(to_target) * target_distance));
-    }
-
-    float away_speed = target_velocity.Dot(Normalize(to_target));
-    float combined_speed = weapon_speed + away_speed;
-    float time_to_target = 0.0f;
-
-    if (combined_speed != 0.0f) {
-      time_to_target = to_target.Length() / combined_speed;
-    }
-
-    if (time_to_target < 0.0f || time_to_target > 5.0f) {
-      time_to_target = 0.0f;
-    }
-
-    Vector2f projected_pos = target + target_velocity * time_to_target;
-
-    to_target = Normalize(projected_pos - self->position);
-
-    if (to_target.Dot(Normalize(target - self->position)) < 0.0f) {
-      projected_pos = target;
-    }
-
-    force += projected_pos - self->position;
-#endif
   }
 
   void AvoidWalls(Game& game, float max_look_ahead) {
