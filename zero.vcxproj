@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="zero\behavior\BehaviorBuilder.cpp" />
     <ClCompile Include="zero\behavior\BehaviorTree.cpp" />
     <ClCompile Include="zero\BotController.cpp" />
     <ClCompile Include="zero\ZeroBot.cpp" />
@@ -52,6 +53,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="zero\Actuator.h" />
+    <ClInclude Include="zero\behavior\BehaviorBuilder.h" />
     <ClInclude Include="zero\behavior\BehaviorTree.h" />
     <ClInclude Include="zero\behavior\Blackboard.h" />
     <ClInclude Include="zero\behavior\nodes\AimNode.h" />

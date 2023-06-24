@@ -1,5 +1,6 @@
 #include "BotController.h"
 
+#include <zero/behavior/BehaviorBuilder.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/behavior/nodes/AimNode.h>
 #include <zero/behavior/nodes/InputActionNode.h>
@@ -19,45 +20,46 @@ BotController::BotController() {
   constexpr u8 kRequestedShip = 0;
   const Vector2f center(512, 512);
 
-  auto root = make_unique<SelectorNode>();
+  BehaviorBuilder builder;
 
-  auto ship_join_sequence = make_unique<SequenceNode>();
-  ship_join_sequence->Child(make_unique<InvertNode>(make_unique<ShipQueryNode>(kRequestedShip)))
-      .Child(make_unique<ShipRequestNode>(kRequestedShip));
+  // clang-format off
+  builder
+    .Selector()
+      .Sequence()
+        .InvertChild<ShipQueryNode>(kRequestedShip)
+        .Child<ShipRequestNode>(kRequestedShip)
+        .End()
+      .Sequence()
+        .InvertChild<InRegionNode>(center)
+        .Child<WarpNode>()
+        .End()
+      .Sequence()
+        .Sequence()
+          .Child<NearestTargetNode>("nearest_target")
+          .Child<GetPlayerPositionNode>("nearest_target", "nearest_target_position")
+          .End()
+        .Selector()
+          .Sequence()
+            .InvertChild<PositionVisibleNode>("nearest_target_position")
+            .Child<GoToNode>("nearest_target_position")
+            .End()
+          .Sequence()
+            .Child<AimNode>("nearest_target", "aimshot")
+            .Parallel()
+              .Child<FaceNode>("aimshot")
+              .Child<SeekNode>("aimshot", "leash_distance")
+              .Sequence()
+                .InvertChild<TileQueryNode>(kTileSafeId)
+                .Child<InputActionNode>(InputAction::Bullet)
+                .End()
+              .End()
+            .End()
+          .End()
+        .End()
+      .End();
+  // clang-format on
 
-  auto center_sequence = make_unique<SequenceNode>();
-  center_sequence->Child(make_unique<InvertNode>(make_unique<InRegionNode>(center)))
-      .Child(make_unique<InputActionNode>(InputAction::Warp));
-
-  auto select_target_sequence = make_unique<SequenceNode>();
-  select_target_sequence->Child(make_unique<NearestTargetNode>("nearest_target"))
-      .Child(make_unique<GetPlayerPositionNode>("nearest_target", "nearest_target_position"));
-
-  auto shoot_node = make_unique<SequenceNode>();
-  shoot_node->Child(make_unique<InvertNode>(make_unique<TileQueryNode>(kTileSafeId)))
-      .Child(make_unique<InputActionNode>(InputAction::Bullet));
-
-  auto chase_and_shoot_node = make_unique<ParallelNode>();
-  chase_and_shoot_node->Child(make_unique<FaceNode>("aimshot"))
-      .Child(make_unique<SeekNode>("aimshot", "leash_distance"))
-      .Child(move(shoot_node));
-
-  auto visible_combat_sequence = make_unique<SequenceNode>();
-  visible_combat_sequence->Child(make_unique<AimNode>("nearest_target", "aimshot")).Child(move(chase_and_shoot_node));
-
-  auto path_sequence = make_unique<SequenceNode>();
-  path_sequence->Child(make_unique<InvertNode>(make_unique<PositionVisibleNode>("nearest_target_position")))
-      .Child(make_unique<GoToNode>("nearest_target_position"));
-
-  auto path_or_fight_selector = make_unique<SelectorNode>();
-  path_or_fight_selector->Child(move(path_sequence)).Child(move(visible_combat_sequence));
-
-  auto combat_sequence = make_unique<SequenceNode>();
-  combat_sequence->Child(move(select_target_sequence)).Child(move(path_or_fight_selector));
-
-  root->Child(move(ship_join_sequence)).Child(move(center_sequence)).Child(move(combat_sequence));
-
-  this->behavior_tree = move(root);
+  this->behavior_tree = builder.Build();
   this->input = nullptr;
 }
 

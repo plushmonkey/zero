@@ -27,7 +27,12 @@ class BehaviorNode {
   virtual ExecuteResult Execute(ExecuteContext& ctx) = 0;
 };
 
-class SequenceNode : public BehaviorNode {
+class CompositeNode : public BehaviorNode {
+ public:
+  std::vector<std::unique_ptr<BehaviorNode>> children_;
+};
+
+class SequenceNode : public CompositeNode {
  public:
   ExecuteResult Execute(ExecuteContext& ctx) override;
 
@@ -37,11 +42,10 @@ class SequenceNode : public BehaviorNode {
   }
 
  private:
-  std::vector<std::unique_ptr<BehaviorNode>> children_;
   std::size_t running_node_index_ = 0;
 };
 
-class ParallelNode : public BehaviorNode {
+class ParallelNode : public CompositeNode {
  public:
   ExecuteResult Execute(ExecuteContext& ctx) override;
 
@@ -49,12 +53,9 @@ class ParallelNode : public BehaviorNode {
     children_.push_back(std::move(child));
     return *this;
   }
-
- private:
-  std::vector<std::unique_ptr<BehaviorNode>> children_;
 };
 
-class SelectorNode : public BehaviorNode {
+class SelectorNode : public CompositeNode {
  public:
   ExecuteResult Execute(ExecuteContext& ctx) override;
 
@@ -62,9 +63,6 @@ class SelectorNode : public BehaviorNode {
     children_.push_back(std::move(child));
     return *this;
   }
-
- protected:
-  std::vector<std::unique_ptr<BehaviorNode>> children_;
 };
 
 class SuccessNode : public BehaviorNode {
