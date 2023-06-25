@@ -35,6 +35,7 @@ struct NearestTargetNode : public behavior::BehaviorNode {
       if (player->frequency == self.frequency) continue;
       if (player->IsRespawning()) continue;
       if (player->position == Vector2f(0, 0)) continue;
+      if (!game.player_manager.IsSynchronized(*player)) continue;
 
       bool in_safe = game.connection.map.GetTileId(player->position) == kTileSafeId;
       if (in_safe) continue;

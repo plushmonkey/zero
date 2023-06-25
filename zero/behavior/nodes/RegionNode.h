@@ -1,15 +1,15 @@
 #pragma once
 
+#include <zero/BotController.h>
 #include <zero/ZeroBot.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/game/Game.h>
-#include <zero/BotController.h>
 
 namespace zero {
 namespace behavior {
 
-struct InRegionNode : public BehaviorNode {
-  InRegionNode(Vector2f position) : coord(position) {}
+struct RegionContainQueryNode : public BehaviorNode {
+  RegionContainQueryNode(Vector2f position) : coord(position) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
     auto self = ctx.bot->game->player_manager.GetSelf();

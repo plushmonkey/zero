@@ -31,18 +31,18 @@ BotController::BotController() {
             .Child<ShipRequestNode>(kRequestedShip)
             .End()
         .Sequence()
-            .InvertChild<InRegionNode>(center)
+            .InvertChild<RegionContainQueryNode>(center)
             .Child<WarpNode>()
             .End()
         .Selector()
             .Sequence()
                 .Sequence()
                     .Child<NearestTargetNode>("nearest_target")
-                    .Child<GetPlayerPositionNode>("nearest_target", "nearest_target_position")
+                    .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
                     .End()
                 .Selector()
                     .Sequence()
-                        .InvertChild<PositionVisibleNode>("nearest_target_position")
+                        .InvertChild<VisibilityQueryNode>("nearest_target_position")
                         .Child<GoToNode>("nearest_target_position")
                         .End()
                     .Sequence()
@@ -62,7 +62,7 @@ BotController::BotController() {
                 .Child<WaypointNode>("waypoints", "waypoint_index", "waypoint_position", 15.0f)
                 .Selector()
                     .Sequence()
-                        .InvertChild<PositionVisibleNode>("waypoint_position")
+                        .InvertChild<VisibilityQueryNode>("waypoint_position")
                         .Child<GoToNode>("waypoint_position")
                         .End()
                     .Parallel()
@@ -96,10 +96,10 @@ void BotController::Update(float dt, Game& game, InputState& input, behavior::Ex
     execute_ctx.blackboard.Set("leash_distance", 15.0f);
 
     std::vector<Vector2f> waypoints{
-      Vector2f(440, 460),
-      Vector2f(565, 465),
-      Vector2f(570, 565),
-      Vector2f(415, 590),
+        Vector2f(440, 460),
+        Vector2f(565, 465),
+        Vector2f(570, 565),
+        Vector2f(415, 590),
     };
 
     execute_ctx.blackboard.Set("waypoints", waypoints);
