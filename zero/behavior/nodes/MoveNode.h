@@ -34,6 +34,24 @@ struct SeekNode : public BehaviorNode {
   const char* target_distance_key;
 };
 
+struct ArriveNode : public BehaviorNode {
+  ArriveNode(const char* position_key, float deceleration) : position_key(position_key), deceleration(deceleration) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto opt_position = ctx.blackboard.Value<Vector2f>(position_key);
+    if (!opt_position.has_value()) return ExecuteResult::Failure;
+
+    Vector2f position = opt_position.value();
+
+    ctx.bot->bot_controller->steering.Arrive(*ctx.bot->game, position, deceleration);
+
+    return ExecuteResult::Success;
+  }
+
+  const char* position_key;
+  float deceleration;
+};
+
 struct FaceNode : public BehaviorNode {
   FaceNode(const char* position_key) : position_key(position_key) {}
 

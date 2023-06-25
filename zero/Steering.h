@@ -1,5 +1,6 @@
 #pragma once
 
+#include <math.h>
 #include <zero/Math.h>
 #include <zero/game/Game.h>
 
@@ -45,6 +46,24 @@ struct Steering {
     }
 
     Seek(game, target);
+  }
+
+  void Arrive(Game& game, const Vector2f& target, float deceleration) {
+    Player* self = game.player_manager.GetSelf();
+
+    Vector2f to_target = target - self->position;
+    float distance = to_target.Length();
+    float max_speed = game.ship_controller.ship.speed / 16.0f / 10.0f;
+
+    if (distance > 0) {
+      float speed = distance / deceleration;
+
+      speed = fminf(speed, max_speed);
+
+      Vector2f desired = to_target * (speed / distance);
+
+      force += desired - self->velocity;
+    }
   }
 
   void Pursue(Game& game, const Vector2f& target_position, const Player& target, float target_distance) {

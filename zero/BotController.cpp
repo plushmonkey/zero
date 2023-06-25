@@ -10,6 +10,7 @@
 #include <zero/behavior/nodes/RegionNode.h>
 #include <zero/behavior/nodes/ShipNode.h>
 #include <zero/behavior/nodes/TargetNode.h>
+#include <zero/behavior/nodes/WaypointNode.h>
 
 namespace zero {
 
@@ -33,25 +34,40 @@ BotController::BotController() {
             .InvertChild<InRegionNode>(center)
             .Child<WarpNode>()
             .End()
-        .Sequence()
+        .Selector()
             .Sequence()
-                .Child<NearestTargetNode>("nearest_target")
-                .Child<GetPlayerPositionNode>("nearest_target", "nearest_target_position")
-                .End()
-            .Selector()
                 .Sequence()
-                    .InvertChild<PositionVisibleNode>("nearest_target_position")
-                    .Child<GoToNode>("nearest_target_position")
+                    .Child<NearestTargetNode>("nearest_target")
+                    .Child<GetPlayerPositionNode>("nearest_target", "nearest_target_position")
                     .End()
-                .Sequence()
-                    .Child<AimNode>("nearest_target", "aimshot")
-                    .Parallel()
-                        .Child<FaceNode>("aimshot")
-                        .Child<SeekNode>("aimshot", "leash_distance")
-                        .Sequence()
-                            .InvertChild<TileQueryNode>(kTileSafeId)
-                            .Child<InputActionNode>(InputAction::Bullet)
+                .Selector()
+                    .Sequence()
+                        .InvertChild<PositionVisibleNode>("nearest_target_position")
+                        .Child<GoToNode>("nearest_target_position")
+                        .End()
+                    .Sequence()
+                        .Child<AimNode>("nearest_target", "aimshot")
+                        .Parallel()
+                            .Child<FaceNode>("aimshot")
+                            .Child<SeekNode>("aimshot", "leash_distance")
+                            .Sequence()
+                                .InvertChild<TileQueryNode>(kTileSafeId)
+                                .Child<InputActionNode>(InputAction::Bullet)
+                                .End()
                             .End()
+                        .End()
+                    .End()
+                .End()
+            .Sequence()
+                .Child<WaypointNode>("waypoints", "waypoint_index", "waypoint_position", 15.0f)
+                .Selector()
+                    .Sequence()
+                        .InvertChild<PositionVisibleNode>("waypoint_position")
+                        .Child<GoToNode>("waypoint_position")
+                        .End()
+                    .Parallel()
+                        .Child<FaceNode>("waypoint_position")
+                        .Child<ArriveNode>("waypoint_position", 1.25f)
                         .End()
                     .End()
                 .End()
@@ -76,11 +92,20 @@ void BotController::Update(float dt, Game& game, InputState& input, behavior::Ex
     pathfinder = std::make_unique<path::Pathfinder>(std::move(processor), *region_registry);
 
     pathfinder->CreateMapWeights(game.GetMap(), 14.0f / 16.0f);
+
+    execute_ctx.blackboard.Set("leash_distance", 15.0f);
+
+    std::vector<Vector2f> waypoints{
+      Vector2f(440, 460),
+      Vector2f(565, 465),
+      Vector2f(570, 565),
+      Vector2f(415, 590),
+    };
+
+    execute_ctx.blackboard.Set("waypoints", waypoints);
   }
 
   steering.Reset();
-
-  execute_ctx.blackboard.Set("leash_distance", 15.0f);
 
   if (behavior_tree) {
     behavior_tree->Execute(execute_ctx);

@@ -64,6 +64,7 @@
     <ClInclude Include="zero\behavior\nodes\RegionNode.h" />
     <ClInclude Include="zero\behavior\nodes\ShipNode.h" />
     <ClInclude Include="zero\behavior\nodes\TargetNode.h" />
+    <ClInclude Include="zero\behavior\nodes\WaypointNode.h" />
     <ClInclude Include="zero\BotController.h" />
     <ClInclude Include="zero\ZeroBot.h" />
     <ClInclude Include="zero\game\ArenaSettings.h" />
