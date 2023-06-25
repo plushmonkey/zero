@@ -57,6 +57,7 @@
     <ClInclude Include="zero\behavior\BehaviorTree.h" />
     <ClInclude Include="zero\behavior\Blackboard.h" />
     <ClInclude Include="zero\behavior\nodes\AimNode.h" />
+    <ClInclude Include="zero\behavior\nodes\MathNode.h" />
     <ClInclude Include="zero\behavior\nodes\MoveNode.h" />
     <ClInclude Include="zero\behavior\nodes\InputActionNode.h" />
     <ClInclude Include="zero\behavior\nodes\MapNode.h" />

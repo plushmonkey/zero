@@ -209,6 +209,7 @@ Game::Game(MemoryArena& perm_arena, MemoryArena& temp_arena, WorkQueue& work_que
 }
 
 bool Game::Initialize(InputState& input) {
+  input.user = this;
   input.action_callback = OnAction;
 
   return true;

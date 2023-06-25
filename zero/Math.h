@@ -194,6 +194,16 @@ inline Vector2f Rotate(const Vector2f& vec, float rads) {
   return Vector2f(cosA * vec.x - sinA * vec.y, sinA * vec.x + cosA * vec.y);
 }
 
+struct Rectangle {
+  Vector2f bottom_left;
+  Vector2f top_right;
+};
+
+struct Ray {
+  Vector2f origin;
+  Vector2f direction;
+};
+
 inline bool PointInsideBox(const Vector2f& min, const Vector2f& max, const Vector2f& point) {
   return (point.x > min.x && point.x < max.x) && (point.y > min.y && point.y < max.y);
 }
@@ -272,6 +282,10 @@ inline bool RayBoxIntersect(const Vector2f& origin, const Vector2f& direction, c
   }
 
   return intersected;
+}
+
+inline bool RayBoxIntersect(const Ray& ray, const Rectangle& rect, float* dist, Vector2f* norm) {
+  return RayBoxIntersect(ray.origin, ray.direction, rect.bottom_left, rect.top_right - rect.bottom_left, dist, norm);
 }
 
 inline bool LineBoxIntersect(Vector2f point, Vector2f direction, Vector2f box_pos, Vector2f box_extent, float* dist,

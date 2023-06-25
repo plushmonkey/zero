@@ -7,6 +7,56 @@
 namespace zero {
 namespace behavior {
 
+// Returns success if the provided position is within a provided view angle
+struct HeadingPositionViewNode : public behavior::BehaviorNode {
+  HeadingPositionViewNode(const char* position_key, float view_radians)
+      : position_key(position_key), view_radians(view_radians) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto self = ctx.bot->game->player_manager.GetSelf();
+
+    if (!self) return ExecuteResult::Failure;
+
+    auto opt_position = ctx.blackboard.Value<Vector2f>(position_key);
+    if (!opt_position.has_value()) return ExecuteResult::Failure;
+
+    Vector2f& position = opt_position.value();
+    Vector2f direction = Normalize(position - self->position);
+
+    float cos_angle = direction.Dot(self->GetHeading());
+    float angle = acosf(cos_angle);
+
+    return angle <= view_radians ? ExecuteResult::Success : ExecuteResult::Failure;
+  }
+
+  const char* position_key;
+  float view_radians;
+};
+
+struct HeadingDirectionViewNode : public behavior::BehaviorNode {
+  HeadingDirectionViewNode(const char* direction_key, float view_radians)
+      : direction_key(direction_key), view_radians(view_radians) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto self = ctx.bot->game->player_manager.GetSelf();
+
+    if (!self) return ExecuteResult::Failure;
+
+    auto opt_direction = ctx.blackboard.Value<Vector2f>(direction_key);
+    if (!opt_direction.has_value()) return ExecuteResult::Failure;
+
+    Vector2f& direction = opt_direction.value();
+
+    float cos_angle = direction.Dot(self->GetHeading());
+    float angle = acosf(cos_angle);
+
+    return angle <= view_radians ? ExecuteResult::Success : ExecuteResult::Failure;
+  }
+
+  const char* direction_key;
+  float view_radians;
+};
+
 struct NearestTargetNode : public behavior::BehaviorNode {
   NearestTargetNode(const char* player_key) : player_key(player_key) {}
 

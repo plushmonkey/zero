@@ -20,6 +20,9 @@ struct InputActionNode : public BehaviorNode {
 
     input->SetAction(action, true);
 
+    // Activate the callbacks so special action keys are handled like ship togglables.
+    input->OnAction(action);
+
     return ExecuteResult::Success;
   }
 

@@ -9,6 +9,7 @@ namespace zero {
 namespace behavior {
 
 struct SeekNode : public BehaviorNode {
+  SeekNode(const char* position_key) : position_key(position_key), target_distance_key(nullptr) {}
   SeekNode(const char* position_key, const char* target_distance_key)
       : position_key(position_key), target_distance_key(target_distance_key) {}
 
@@ -18,10 +19,17 @@ struct SeekNode : public BehaviorNode {
 
     Vector2f position = opt_position.value();
 
-    auto opt_distance = ctx.blackboard.Value<float>(target_distance_key);
-    if (opt_distance.has_value()) {
-      float target_distance = opt_distance.value();
+    float target_distance = 0.0f;
 
+    if (target_distance_key) {
+      auto opt_distance = ctx.blackboard.Value<float>(target_distance_key);
+
+      if (opt_distance.has_value()) {
+        target_distance = opt_distance.value();
+      }
+    }
+
+    if (target_distance > 0.0f) {
       ctx.bot->bot_controller->steering.Seek(*ctx.bot->game, position, target_distance);
     } else {
       ctx.bot->bot_controller->steering.Seek(*ctx.bot->game, position);
