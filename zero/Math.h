@@ -195,8 +195,8 @@ inline Vector2f Rotate(const Vector2f& vec, float rads) {
 }
 
 struct Rectangle {
-  Vector2f bottom_left;
-  Vector2f top_right;
+  Vector2f min;
+  Vector2f max;
 };
 
 struct Ray {
@@ -237,8 +237,8 @@ inline float BoxPointDistance(Vector2f box_pos, Vector2f box_extent, Vector2f p)
 inline bool RayBoxIntersect(const Vector2f& origin, const Vector2f& direction, const Vector2f& box_pos,
                             const Vector2f& box_extent, float* dist, Vector2f* norm) {
   Vector2f recip(1.0f / direction.x, 1.0f / direction.y);
-  const Vector2f& lb = box_pos;
-  Vector2f rt = box_pos + box_extent;
+  Vector2f lb = box_pos + Vector2f(0, box_extent.y);
+  Vector2f rt = box_pos + Vector2f(box_extent.x, 0);
 
   float t1 = (float)((lb.x - origin.x) * recip.x);
   float t2 = (float)((rt.x - origin.x) * recip.x);
@@ -285,7 +285,7 @@ inline bool RayBoxIntersect(const Vector2f& origin, const Vector2f& direction, c
 }
 
 inline bool RayBoxIntersect(const Ray& ray, const Rectangle& rect, float* dist, Vector2f* norm) {
-  return RayBoxIntersect(ray.origin, ray.direction, rect.bottom_left, rect.top_right - rect.bottom_left, dist, norm);
+  return RayBoxIntersect(ray.origin, ray.direction, rect.min, rect.max - rect.min, dist, norm);
 }
 
 inline bool LineBoxIntersect(Vector2f point, Vector2f direction, Vector2f box_pos, Vector2f box_extent, float* dist,

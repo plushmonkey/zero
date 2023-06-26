@@ -42,6 +42,13 @@ struct SeekNode : public BehaviorNode {
   const char* target_distance_key;
 };
 
+struct SeekZeroNode : public BehaviorNode {
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    ctx.bot->bot_controller->steering.SeekZero(*ctx.bot->game);
+    return ExecuteResult::Success;
+  }
+};
+
 struct ArriveNode : public BehaviorNode {
   ArriveNode(const char* position_key, float deceleration) : position_key(position_key), deceleration(deceleration) {}
 

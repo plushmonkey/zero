@@ -19,11 +19,19 @@ struct Steering {
     Player* self = game.player_manager.GetSelf();
 
     Vector2f to_target = target - self->position;
-    Vector2f heading = Rotate(self->GetHeading(), rotation);
+    Vector2f heading = Rotate(self->GetHeading(), -rotation);
 
     float rotation = atan2f(heading.y, heading.x) - atan2f(to_target.y, to_target.x);
 
     this->rotation += WrapToPi(rotation);
+  }
+
+  void SeekZero(Game& game) {
+    Player* self = game.player_manager.GetSelf();
+
+    Vector2f desired_velocity(0, 0);
+
+    force += desired_velocity - self->velocity;
   }
 
   void Seek(Game& game, const Vector2f& target) {

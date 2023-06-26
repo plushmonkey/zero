@@ -33,6 +33,12 @@ class CompositeBuilder {
     return *this;
   }
 
+  template <typename T, typename... Args>
+  CompositeBuilder& SuccessChild(Args... args) {
+    children.emplace_back(std::make_unique<SuccessNode>(std::make_unique<T>(std::forward<Args>(args)...)));
+    return *this;
+  }
+
   CompositeBuilder& Sequence();
   CompositeBuilder& Selector();
   CompositeBuilder& Parallel();
