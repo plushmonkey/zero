@@ -64,6 +64,7 @@ struct Map {
 
   // Returns a possible rect that creates an occupiable area that contains the tested position.
   OccupyRect GetPossibleOccupyRect(const Vector2f& position, float radius, u32 frequency) const;
+  OccupyRect GetClosestOccupyRect(Vector2f position, float radius, Vector2f point) const;
   bool CanTraverse(const Vector2f& start, const Vector2f& end, float radius, u32 frequency) const;
   bool CanOverlapTile(const Vector2f& position, float radius, u32 frequency) const;
   bool CanOccupy(const Vector2f& position, float radius, u32 frequency) const;

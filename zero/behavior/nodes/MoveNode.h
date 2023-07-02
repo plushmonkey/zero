@@ -86,15 +86,21 @@ struct FaceNode : public BehaviorNode {
 
 struct GoToNode : public BehaviorNode {
   GoToNode(const char* position_key) : position_key(position_key) {}
+  GoToNode(Vector2f position) : position(position), position_key(nullptr) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
     Player* self = ctx.bot->game->player_manager.GetSelf();
     if (!self) return ExecuteResult::Failure;
 
-    auto opt_pos = ctx.blackboard.Value<Vector2f>(position_key);
-    if (!opt_pos.has_value()) return ExecuteResult::Failure;
+    Vector2f target = position;
 
-    Vector2f& target = opt_pos.value();
+    if (position_key) {
+      auto opt_pos = ctx.blackboard.Value<Vector2f>(position_key);
+      if (!opt_pos.has_value()) return ExecuteResult::Failure;
+
+      target = opt_pos.value();
+    }
+    
     auto& map = ctx.bot->game->GetMap();
 
     CastResult cast = map.CastTo(self->position, target, self->frequency);
@@ -112,9 +118,9 @@ struct GoToNode : public BehaviorNode {
 
     float radius = game.connection.settings.ShipSettings[self->ship].GetRadius();
 
-    if (!current_path.empty()) {
-      if (target.DistanceSq(current_path.back()) <= 3.0f * 3.0f) {
-        Vector2f next = current_path.front();
+    if (!current_path.Empty()) {
+      if (target.DistanceSq(current_path.GetGoal()) <= 3.0f * 3.0f) {
+        Vector2f next = current_path.GetNext();
         Vector2f direction = Normalize(next - self->position);
         Vector2f side = Perpendicular(direction);
         float distance = next.Distance(self->position);
@@ -131,37 +137,75 @@ struct GoToNode : public BehaviorNode {
 
     if (build) {
       current_path = pathfinder->FindPath(game.connection.map, self->position, target, radius);
-      current_path = pathfinder->SmoothPath(game, current_path, radius);
     }
 
-    if (current_path.empty()) {
+    if (current_path.IsDone()) {
+      return ExecuteResult::Success;
+    }
+
+    if (current_path.Empty()) {
       return ExecuteResult::Failure;
     }
 
-    Vector2f movement_target = current_path.front();
+    Vector2f movement_target = current_path.GetCurrent();
 
-    if (!current_path.empty() && (u16)self->position.x == (u16)current_path.at(0).x &&
-        (u16)self->position.y == (u16)current_path.at(0).y) {
-      current_path.erase(current_path.begin());
-
-      if (!current_path.empty()) {
-        movement_target = current_path.front();
-      }
+    if (current_path.IsCurrentTile(self->position)) {
+      movement_target = current_path.Advance();
     }
 
     // Cull future nodes if they are all unobstructed from current position.
-    while (current_path.size() > 1 &&
-           CanMoveBetween(game, self->position, current_path.at(1), radius, self->frequency)) {
-      current_path.erase(current_path.begin());
-      movement_target = current_path.front();
+    while (!current_path.Empty()) {
+      Vector2f next = current_path.GetNext();
+
+      if (!CanMoveBetween(game, self->position, next, radius, self->frequency)) {
+        break;
+      }
+
+      movement_target = current_path.Advance();
     }
 
-    if (current_path.size() == 1 && current_path.front().DistanceSq(self->position) < 2 * 2) {
-      current_path.clear();
+    if (current_path.IsDone()) {
+      current_path.Clear();
     }
 
-    ctx.bot->bot_controller->steering.Seek(game, movement_target);
-    ctx.bot->bot_controller->steering.AvoidWalls(game, 30.0f);
+    if (current_path.IsOnGoalNode() && current_path.GetCurrent().DistanceSq(self->position) < 2 * 2) {
+      current_path.Clear();
+    }
+
+    float speed_sq = self->velocity.LengthSq();
+    auto& steering = ctx.bot->bot_controller->steering;
+    if (speed_sq < 0.3f * 0.3f) {
+      // Stuck, try seeking sideways to wiggle out.
+      Vector2f direction = Normalize(movement_target - self->position);
+
+      // Determine the lowest value of the direction so it can apply force in that direction.
+      if (fabsf(direction.x) < fabsf(direction.y)) {
+        // Pick a random sideways direction if it's zero.
+        if (direction.x == 0.0f) direction.x = 1.0f;
+
+        Vector2f new_dir = Normalize(Vector2f(direction.x, 0));
+
+        steering.Seek(game, self->position + new_dir);
+      } else {
+        // Pick a random sideways direction if it's zero.
+        if (direction.y == 0.0f) direction.y = 1.0f;
+
+        Vector2f new_dir = Normalize(Vector2f(0, direction.y));
+
+        steering.Seek(game, self->position + new_dir);
+      }
+
+      // Apply the steering force to the target only in the case of zero movement.
+      if (speed_sq <= 0.0f) {
+        steering.Seek(game, movement_target);
+      }
+    } else {
+      steering.Seek(game, movement_target);
+
+      if (speed_sq > 8.0f * 8.0f) {
+        steering.AvoidWalls(game);
+      }
+    }
 
     return ExecuteResult::Success;
   }
@@ -181,6 +225,7 @@ struct GoToNode : public BehaviorNode {
     return !center.hit && !side1.hit && !side2.hit;
   }
 
+  Vector2f position;
   const char* position_key;
 };
 

@@ -69,6 +69,7 @@
     <ClInclude Include="zero\behavior\nodes\TimerNode.h" />
     <ClInclude Include="zero\behavior\nodes\WaypointNode.h" />
     <ClInclude Include="zero\BotController.h" />
+    <ClInclude Include="zero\path\Path.h" />
     <ClInclude Include="zero\ZeroBot.h" />
     <ClInclude Include="zero\game\ArenaSettings.h" />
     <ClInclude Include="zero\game\BrickManager.h" />

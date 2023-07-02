@@ -48,8 +48,8 @@ inline float Euclidean(const NodePoint& __restrict from_p, const NodePoint& __re
 Pathfinder::Pathfinder(std::unique_ptr<NodeProcessor> processor, RegionRegistry& regions)
     : processor_(std::move(processor)), regions_(regions) {}
 
-std::vector<Vector2f> Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& to, float radius) {
-  std::vector<Vector2f> path;
+Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& to, float radius) {
+  Path path;
 
   Node* start = processor_->GetNode(ToNodePoint(from));
   Node* goal = processor_->GetNode(ToNodePoint(to));
@@ -57,6 +57,9 @@ std::vector<Vector2f> Pathfinder::FindPath(const Map& map, const Vector2f& from,
   if (start == nullptr || goal == nullptr) {
     return path;
   }
+
+  if (!(start->flags & NodeFlag_Traversable)) return path;
+  if (!(goal->flags & NodeFlag_Traversable)) return path;
 
   NodePoint start_p = processor_->GetPoint(start);
   NodePoint goal_p = processor_->GetPoint(goal);
@@ -114,7 +117,7 @@ std::vector<Vector2f> Pathfinder::FindPath(const Map& map, const Vector2f& from,
   }
 
   if (goal->parent) {
-    path.push_back(Vector2f(start_p.x + 0.5f, start_p.y + 0.5f));
+    path.Add(Vector2f(start_p.x + 0.5f, start_p.y + 0.5f));
   }
 
   // Construct path backwards from goal node
@@ -132,7 +135,18 @@ std::vector<Vector2f> Pathfinder::FindPath(const Map& map, const Vector2f& from,
     std::size_t index = points.size() - i - 1;
     Vector2f pos(points[index].x + 0.5f, points[index].y + 0.5f);
 
-    path.push_back(pos);
+    OccupyRect o_rect = map.GetPossibleOccupyRect(pos, radius, 0xFFFF);
+
+    if (!o_rect.occupy) {
+      path.Add(pos);
+    } else {
+      Vector2f min(o_rect.start_x, o_rect.start_y);
+      Vector2f max(o_rect.end_x + 1, o_rect.end_y + 1);
+
+      path.Add((min + max) * 0.5f);
+    }
+
+    path.Add(pos);
   }
 
   for (Node* node : touched_) {
@@ -180,114 +194,6 @@ bool IsPassablePath(const Map& map, Vector2f from, Vector2f to, float radius, u3
   return !cast_center.hit && !cast_side1.hit && !cast_side2.hit;
 }
 
-std::vector<Vector2f> Pathfinder::SmoothPath(Game& game, const std::vector<Vector2f>& path, float ship_radius) {
-  return path;
-
-  std::vector<Vector2f> result;
-
-  // How far away it should try to push the path from walls
-  float push_distance = ship_radius * 1.5f;
-
-  result.resize(path.size());
-
-  if (!path.empty()) {
-    result[0] = path[0];
-  }
-
-  for (std::size_t i = 1; i < path.size(); ++i) {
-    Vector2f current = path[i];
-    Vector2f closest = ClosestWall(game.GetMap(), current, (int)ceilf(push_distance + 1));
-    Vector2f new_pos = current;
-
-    if (closest != Vector2f(0, 0)) {
-      // Attempt to push the path outward from the wall
-      // TODO: iterative box penetration push
-
-      Vector2f center = closest + Vector2f(0.5, 0.5);
-      Vector2f direction = Normalize(center - current);
-      CastResult cast_result = game.GetMap().Cast(current, direction, push_distance, 0xFFFF);
-
-      if (cast_result.hit) {
-        Vector2f hit = cast_result.position;
-        float dist = hit.Distance(current);
-        float force = push_distance - dist;
-
-        new_pos = current + Normalize(current - hit) * force;
-      }
-    }
-
-    if (current != new_pos) {
-      // Make sure the new node is in line of sight
-      if (!IsPassablePath(game.GetMap(), current, new_pos, ship_radius, 0xFFFF)) {
-        new_pos = current;
-      }
-    }
-
-    result[i] = new_pos;
-  }
-
-#if 1  // Don't cull the path if this is enabled
-  return result;
-#endif
-
-  if (result.size() <= 2) return result;
-
-  std::vector<Vector2f> minimum;
-  minimum.reserve(result.size());
-
-  Vector2f prev = result[0];
-  for (std::size_t i = 1; i < result.size(); ++i) {
-    Vector2f curr = result[i];
-    Vector2f direction = Normalize(curr - prev);
-    Vector2f side = Perpendicular(direction) * ship_radius;
-    float dist = prev.Distance(curr);
-
-    CastResult cast_center = game.GetMap().Cast(prev, direction, dist, 0xFFFF);
-    CastResult cast_side1 = game.GetMap().Cast(prev + side, direction, dist, 0xFFFF);
-    CastResult cast_side2 = game.GetMap().Cast(prev - side, direction, dist, 0xFFFF);
-
-    if (cast_center.hit || cast_side1.hit || cast_side2.hit) {
-      if (minimum.size() > result.size()) {
-        minimum = result;
-        break;
-      }
-
-      if (!minimum.empty() && result[i - 1] != minimum.back()) {
-        minimum.push_back(result[i - 1]);
-        prev = minimum.back();
-        i--;
-      } else {
-        minimum.push_back(result[i]);
-        prev = minimum.back();
-      }
-    }
-  }
-
-  minimum.push_back(result.back());
-
-  result = minimum;
-  return result;
-}
-
-std::vector<Vector2f> Pathfinder::CreatePath(Game& game, Vector2f from, Vector2f to, float radius) {
-  bool build = true;
-
-  if (build) {
-    path_.clear();
-#if 0
-    for (Weapon* weapon : processor_->GetGame().GetWeapons()) {
-      const Player* weapon_player = processor_->GetGame().GetPlayerById(weapon->GetPlayerId());
-      if (weapon_player == nullptr) continue;
-      if (weapon_player->frequency == processor_->GetGame().GetPlayer().frequency) continue;
-      if (weapon->IsMine()) mines.push_back(weapon->GetPosition());
-    }
-#endif
-    path_ = FindPath(processor_->GetGame().connection.map, from, to, radius);
-  }
-
-  return path_;
-}
-
 float Pathfinder::GetWallDistance(const Map& map, u16 x, u16 y, u16 radius) {
   float closest_sq = std::numeric_limits<float>::max();
 
@@ -313,28 +219,22 @@ void Pathfinder::CreateMapWeights(const Map& map, float ship_radius) {
     for (u16 x = 0; x < 1024; ++x) {
       Node* node = this->processor_->GetNode(NodePoint(x, y));
 
-      if (map.CanOccupy(Vector2f(x, y), ship_radius, 0xFFFF)) {
+      if (map.CanOverlapTile(Vector2f(x, y), ship_radius, 0xFFFF)) {
         node->flags |= NodeFlag_Traversable;
       }
 
+#if 0 // Disable because it increases pathing time a lot.
       if (map.IsSolid(x, y, 0xFFFF)) continue;
 
-      // Search width is double this number (for 8, searches a 16 x 16 square).
       int close_distance = 5;
-
-      /* Causes exponentianl weight increase as the path gets closer to wall tiles.
-      Known Issue: 3 tile gaps and 4 tile gaps will carry the same weight since each tiles closest wall is 2 tiles
-      away.*/
-
       float distance = GetWallDistance(map, x, y, close_distance);
 
-      // Nodes are initialized with a weight of 1.0f, so never calculate when the distance is greater or equal
-      // because the result will be less than 1.0f.
       if (distance < close_distance) {
         float weight = close_distance / distance;
-        // paths directly next to a wall will be a last resort, 1 tile from wall very unlikely
-        node->weight = powf(weight, 4.0f);
+        //node->weight = powf(weight, 4.0f);
+        node->weight = weight;
       }
+#endif
     }
   }
 }

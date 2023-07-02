@@ -199,6 +199,121 @@ bool Map::CanOccupyRadius(const Vector2f& position, float radius, u32 frequency)
   return true;
 }
 
+OccupyRect Map::GetClosestOccupyRect(Vector2f position, float radius, Vector2f point) const {
+  OccupyRect result = {};
+
+  u16 d = (u16)(radius * 2.0f);
+  u16 start_x = (u16)position.x;
+  u16 start_y = (u16)position.y;
+
+  u16 far_left = start_x - d;
+  u16 far_right = start_x + d;
+  u16 far_top = start_y - d;
+  u16 far_bottom = start_y + d;
+
+  result.occupy = false;
+
+  // Handle wrapping that can occur from using unsigned short
+  if (far_left > 1023) far_left = 0;
+  if (far_right > 1023) far_right = 1023;
+  if (far_top > 1023) far_top = 0;
+  if (far_bottom > 1023) far_bottom = 1023;
+
+  bool solid = IsSolid(start_x, start_y, 0xFFFF);
+  if (d < 1 || solid) {
+    result.occupy = !solid;
+    result.start_x = (u16)position.x;
+    result.start_y = (u16)position.y;
+    result.end_x = (u16)position.x;
+    result.end_y = (u16)position.y;
+
+    return result;
+  }
+
+  float best_distance_sq = 1000.0f;
+
+  // Loop over the entire check region and move in the direction of the check tile.
+  // This makes sure that the check tile is always contained within the found region.
+  for (u16 check_y = far_top; check_y <= far_bottom; ++check_y) {
+    s16 dir_y = (start_y - check_y) > 0 ? 1 : (start_y == check_y ? 0 : -1);
+
+    // Skip cardinal directions because the radius is >1 and must be found from a corner region.
+    if (dir_y == 0) continue;
+
+    for (u16 check_x = far_left; check_x <= far_right; ++check_x) {
+      s16 dir_x = (start_x - check_x) > 0 ? 1 : (start_x == check_x ? 0 : -1);
+
+      if (dir_x == 0) continue;
+
+      bool can_fit = true;
+
+      for (s16 y = check_y; std::abs(y - check_y) <= d && can_fit; y += dir_y) {
+        for (s16 x = check_x; std::abs(x - check_x) <= d; x += dir_x) {
+          if (IsSolid(x, y, 0xFFFF)) {
+            can_fit = false;
+            break;
+          }
+        }
+      }
+
+      if (can_fit) {
+        u16 found_start_x = 0;
+        u16 found_start_y = 0;
+        u16 found_end_x = 0;
+        u16 found_end_y = 0;
+
+        if (check_x > start_x) {
+          found_start_x = check_x - d;
+          found_end_x = check_x;
+        } else {
+          found_start_x = check_x;
+          found_end_x = check_x + d;
+        }
+
+        if (check_y > start_y) {
+          found_start_y = check_y - d;
+          found_end_y = check_y;
+        } else {
+          found_start_y = check_y;
+          found_end_y = check_y + d;
+        }
+
+        bool use_rect = true;
+
+        // Already have an occupied rect, see if this one is better.
+        if (result.occupy) {
+          Vector2f start(found_start_x, found_start_y);
+          Vector2f end(found_end_x, found_end_y);
+
+          Vector2f center = (end + start) * 0.5f;
+          float dist_sq = center.DistanceSq(point);
+
+          use_rect = dist_sq < best_distance_sq;
+        }
+
+        // Check if this occupy rect contains the search position. Use it if it does.
+        bool contains_point =
+            BoxContainsPoint(Vector2f(found_start_x, found_start_y), Vector2f(found_end_x, found_end_y), point);
+
+        if (contains_point || use_rect) {
+          result.start_x = found_start_x;
+          result.start_y = found_start_y;
+          result.end_x = found_end_x;
+          result.end_y = found_end_y;
+
+          result.occupy = true;
+        }
+
+        if (contains_point) {
+          return result;
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
 OccupyRect Map::GetPossibleOccupyRect(const Vector2f& position, float radius, u32 frequency) const {
   OccupyRect result = {};
 
@@ -280,7 +395,7 @@ OccupyRect Map::GetPossibleOccupyRect(const Vector2f& position, float radius, u3
         result.start_x = found_start_x;
         result.start_y = found_start_y;
         result.end_x = found_end_x;
-        result.end_x = found_end_y;
+        result.end_y = found_end_y;
 
         result.occupy = true;
         return result;

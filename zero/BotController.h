@@ -23,11 +23,9 @@ struct BotController {
 
   Steering steering;
   Actuator actuator;
-  std::vector<Vector2f> current_path;
+  path::Path current_path;
 
   BotController();
-
-  Player* GetNearestTarget(Game& game, Player& self);
 
   void Update(float dt, Game& game, InputState& input, behavior::ExecuteContext& execute_ctx);
 

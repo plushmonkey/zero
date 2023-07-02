@@ -17,7 +17,7 @@
 
 namespace zero {
 
-constexpr int kShip = 3;
+constexpr int kShip = 0;
 
 std::unique_ptr<behavior::BehaviorNode> BuildHyperspaceWarbirdCenter(int ship) {
   using namespace behavior;

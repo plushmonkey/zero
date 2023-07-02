@@ -197,6 +197,25 @@ inline Vector2f Rotate(const Vector2f& vec, float rads) {
 struct Rectangle {
   Vector2f min;
   Vector2f max;
+
+  Rectangle() {}
+  Rectangle(Vector2f min, Vector2f max) : min(min), max(max) {}
+
+  inline Rectangle Align() {
+    int min_x = (int)min.x;
+    int min_y = (int)min.y;
+    int max_x = (int)max.x;
+    int max_y = (int)max.y;
+
+    return Rectangle(Vector2f((float)min_x, (float)min_y), Vector2f((float)max_x, (float)max_y));
+  }
+
+  inline Rectangle Translate(Vector2f v) const { return Rectangle(min + v, max + v); }
+  inline Vector2f GetCenter() const { return (min + max) * 0.5f; }
+
+  inline bool Contains(Vector2f point) const {
+    return (point.x >= min.x && point.x < max.x) && (point.y >= min.y && point.y < max.y);
+  }
 };
 
 struct Ray {
