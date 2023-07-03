@@ -231,9 +231,38 @@ BotController::BotController() {
     BuildHyperspaceWarbirdCenter,
     BuildHyperspaceWarbirdCenter,
   };
+
+  using namespace behavior;
+
+  BehaviorBuilder builder;
+
+  const Vector2f center(512, 512);
+
+  // clang-format off
+#if 0
+  // Path following test.
+  Vector2f target_pos(397, 542);
+
+  builder
+    .Selector()
+        .Sequence() // Enter the specified ship if not already in it.
+            .InvertChild<ShipQueryNode>(kShip)
+            .Child<ShipRequestNode>(kShip)
+            .End()
+        .Sequence()
+            .Child<GoToNode>(target_pos)
+            .Sequence()
+                .Child<PlayerNearPositionNode>(target_pos, 1.5f)
+                .Child<WarpNode>()
+                .End()
+            .End()
+        .End();
+  this->behavior_tree = builder.Build();
+#else
+  this->behavior_tree = builders[kShip](kShip);
+#endif
   // clang-format on
 
-  this->behavior_tree = builders[kShip](kShip);
   this->input = nullptr;
 }
 

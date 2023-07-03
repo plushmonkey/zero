@@ -65,6 +65,8 @@ struct Map {
   // Returns a possible rect that creates an occupiable area that contains the tested position.
   OccupyRect GetPossibleOccupyRect(const Vector2f& position, float radius, u32 frequency) const;
   OccupyRect GetClosestOccupyRect(Vector2f position, float radius, Vector2f point) const;
+  Vector2f GetOccupyCenter(const Vector2f& position, float radius, u32 frequency) const;
+
   bool CanTraverse(const Vector2f& start, const Vector2f& end, float radius, u32 frequency) const;
   bool CanOverlapTile(const Vector2f& position, float radius, u32 frequency) const;
   bool CanOccupy(const Vector2f& position, float radius, u32 frequency) const;
@@ -78,6 +80,8 @@ struct Map {
 
   CastResult Cast(const Vector2f& from, const Vector2f& direction, float max_distance, u32 frequency) const;
   CastResult CastTo(const Vector2f& from, const Vector2f& to, u32 frequency) const;
+
+  CastResult CastShip(struct Player* player, float radius, const Vector2f& to) const;
 
   inline AnimatedTileSet& GetAnimatedTileSet(AnimatedTile type) { return animated_tiles[(size_t)type]; }
 

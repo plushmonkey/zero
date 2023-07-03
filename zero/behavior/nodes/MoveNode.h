@@ -100,17 +100,8 @@ struct GoToNode : public BehaviorNode {
 
       target = opt_pos.value();
     }
-    
+
     auto& map = ctx.bot->game->GetMap();
-
-    CastResult cast = map.CastTo(self->position, target, self->frequency);
-
-    if (!cast.hit) {
-      ctx.bot->bot_controller->steering.Seek(*ctx.bot->game, target);
-
-      return ExecuteResult::Success;
-    }
-
     auto& current_path = ctx.bot->bot_controller->current_path;
     auto& pathfinder = ctx.bot->bot_controller->pathfinder;
     auto& game = *ctx.bot->game;
@@ -120,16 +111,11 @@ struct GoToNode : public BehaviorNode {
 
     if (!current_path.Empty()) {
       if (target.DistanceSq(current_path.GetGoal()) <= 3.0f * 3.0f) {
-        Vector2f next = current_path.GetNext();
-        Vector2f direction = Normalize(next - self->position);
-        Vector2f side = Perpendicular(direction);
-        float distance = next.Distance(self->position);
+        Vector2f next = current_path.GetCurrent();
 
-        CastResult center = game.GetMap().Cast(self->position, direction, distance, self->frequency);
-        CastResult side1 = game.GetMap().Cast(self->position + side * radius, direction, distance, self->frequency);
-        CastResult side2 = game.GetMap().Cast(self->position - side * radius, direction, distance, self->frequency);
+        CastResult cast = map.CastShip(self, radius, next);
 
-        if (!center.hit && !side1.hit && !side2.hit) {
+        if (!cast.hit) {
           build = false;
         }
       }
@@ -154,7 +140,7 @@ struct GoToNode : public BehaviorNode {
     }
 
     // Cull future nodes if they are all unobstructed from current position.
-    while (!current_path.Empty()) {
+    while (!current_path.IsOnGoalNode()) {
       Vector2f next = current_path.GetNext();
 
       if (!CanMoveBetween(game, self->position, next, radius, self->frequency)) {
@@ -175,33 +161,28 @@ struct GoToNode : public BehaviorNode {
     float speed_sq = self->velocity.LengthSq();
     auto& steering = ctx.bot->bot_controller->steering;
     if (speed_sq < 0.3f * 0.3f) {
-      // Stuck, try seeking sideways to wiggle out.
       Vector2f direction = Normalize(movement_target - self->position);
+      Vector2f new_direction;
 
-      // Determine the lowest value of the direction so it can apply force in that direction.
       if (fabsf(direction.x) < fabsf(direction.y)) {
-        // Pick a random sideways direction if it's zero.
-        if (direction.x == 0.0f) direction.x = 1.0f;
-
-        Vector2f new_dir = Normalize(Vector2f(direction.x, 0));
-
-        steering.Seek(game, self->position + new_dir);
+        new_direction = Normalize(Reflect(direction, Vector2f(0, 1)));
       } else {
-        // Pick a random sideways direction if it's zero.
-        if (direction.y == 0.0f) direction.y = 1.0f;
-
-        Vector2f new_dir = Normalize(Vector2f(0, direction.y));
-
-        steering.Seek(game, self->position + new_dir);
+        new_direction = Normalize(Reflect(direction, Vector2f(1, 0)));
       }
 
-      // Apply the steering force to the target only in the case of zero movement.
-      if (speed_sq <= 0.0f) {
+      // Face a reflected vector so it rotates away from the wall.
+      steering.Face(game, self->position + new_direction);
+      steering.Seek(game, movement_target);
+    } else {
+      if (speed_sq > 1.0f * 1.0f) {
+        // Arrive to node when moving fast enough.
+        steering.Arrive(game, movement_target, 0.25f);
+      } else {
+        // Seek when going slow so it can get around corners.
         steering.Seek(game, movement_target);
       }
-    } else {
-      steering.Seek(game, movement_target);
 
+      // Avoid walls when moving fast so it slows down while approaching a wall.
       if (speed_sq > 8.0f * 8.0f) {
         steering.AvoidWalls(game);
       }

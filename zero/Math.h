@@ -194,6 +194,10 @@ inline Vector2f Rotate(const Vector2f& vec, float rads) {
   return Vector2f(cosA * vec.x - sinA * vec.y, sinA * vec.x + cosA * vec.y);
 }
 
+inline Vector2f Reflect(const Vector2f& direction, const Vector2f& normal) {
+  return direction - ((2.0f * (direction.Dot(normal))) * normal);
+}
+
 struct Rectangle {
   Vector2f min;
   Vector2f max;

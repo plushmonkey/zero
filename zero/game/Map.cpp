@@ -406,6 +406,91 @@ OccupyRect Map::GetPossibleOccupyRect(const Vector2f& position, float radius, u3
   return result;
 }
 
+Vector2f Map::GetOccupyCenter(const Vector2f& position, float radius, u32 frequency) const {
+  u16 d = (u16)(radius * 2.0f);
+  u16 start_x = (u16)position.x;
+  u16 start_y = (u16)position.y;
+
+  u16 far_left = start_x - d;
+  u16 far_right = start_x + d;
+  u16 far_top = start_y - d;
+  u16 far_bottom = start_y + d;
+
+  // Handle wrapping that can occur from using unsigned short
+  if (far_left > 1023) far_left = 0;
+  if (far_right > 1023) far_right = 1023;
+  if (far_top > 1023) far_top = 0;
+  if (far_bottom > 1023) far_bottom = 1023;
+
+  bool solid = IsSolid(start_x, start_y, frequency);
+  if (d < 1 || solid) {
+    return position;
+  }
+
+  Vector2f accum;
+  size_t count = 0;
+
+  // Loop over the entire check region and move in the direction of the check tile.
+  // This makes sure that the check tile is always contained within the found region.
+  for (u16 check_y = far_top; check_y <= far_bottom; ++check_y) {
+    s16 dir_y = (start_y - check_y) > 0 ? 1 : (start_y == check_y ? 0 : -1);
+
+    // Skip cardinal directions because the radius is >1 and must be found from a corner region.
+    if (dir_y == 0) continue;
+
+    for (u16 check_x = far_left; check_x <= far_right; ++check_x) {
+      s16 dir_x = (start_x - check_x) > 0 ? 1 : (start_x == check_x ? 0 : -1);
+
+      if (dir_x == 0) continue;
+
+      bool can_fit = true;
+
+      for (s16 y = check_y; std::abs(y - check_y) <= d && can_fit; y += dir_y) {
+        for (s16 x = check_x; std::abs(x - check_x) <= d; x += dir_x) {
+          if (IsSolid(x, y, frequency)) {
+            can_fit = false;
+            break;
+          }
+        }
+      }
+
+      if (can_fit) {
+        // Calculate the final region. Not necessary for simple overlap check, but might be useful
+        u16 found_start_x = 0;
+        u16 found_start_y = 0;
+        u16 found_end_x = 0;
+        u16 found_end_y = 0;
+
+        if (check_x > start_x) {
+          found_start_x = check_x - d;
+          found_end_x = check_x;
+        } else {
+          found_start_x = check_x;
+          found_end_x = check_x + d;
+        }
+
+        if (check_y > start_y) {
+          found_start_y = check_y - d;
+          found_end_y = check_y;
+        } else {
+          found_start_y = check_y;
+          found_end_y = check_y + d;
+        }
+
+        Vector2f min(found_start_x, found_start_y);
+        Vector2f max((float)found_end_x + 1.0f, (float)found_end_y + 1.0f);
+
+        accum += (min + max) * 0.5f;
+        ++count;
+      }
+    }
+  }
+
+  if (count <= 0) return position;
+
+  return accum * (1.0f / count);
+}
+
 bool Map::Load(MemoryArena& arena, const char* filename) {
   assert(strlen(filename) < 1024);
 
@@ -786,6 +871,32 @@ CastResult Map::CastTo(const Vector2f& from, const Vector2f& to, u32 frequency) 
   Vector2f direction = Normalize(diff);
 
   return Cast(from, direction, dist, frequency);
+}
+
+CastResult Map::CastShip(Player* player, float radius, const Vector2f& to) const {
+  Vector2f& from = player->position;
+  Vector2f side = Perpendicular(Normalize(to - from));
+  Vector2f direction = to - from;
+  float distance = direction.Length();
+
+  direction = Normalize(direction);
+
+  CastResult center = Cast(from, direction, distance, player->frequency);
+  if (center.hit) {
+    return center;
+  }
+
+  CastResult side1 = Cast(from + side * radius, direction, distance, player->frequency);
+  if (side1.hit) {
+    return side1;
+  }
+
+  CastResult side2 = Cast(from - side * radius, direction, distance, player->frequency);
+  if (side2.hit) {
+    return side2;
+  }
+
+  return center;
 }
 
 }  // namespace zero

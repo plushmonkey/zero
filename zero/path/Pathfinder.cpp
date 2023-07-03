@@ -133,19 +133,9 @@ Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& 
   // Reverse and store as vector
   for (std::size_t i = 0; i < points.size(); ++i) {
     std::size_t index = points.size() - i - 1;
-    Vector2f pos(points[index].x + 0.5f, points[index].y + 0.5f);
+    Vector2f pos(points[index].x, points[index].y);
 
-    OccupyRect o_rect = map.GetPossibleOccupyRect(pos, radius, 0xFFFF);
-
-    if (!o_rect.occupy) {
-      path.Add(pos);
-    } else {
-      Vector2f min(o_rect.start_x, o_rect.start_y);
-      Vector2f max(o_rect.end_x + 1, o_rect.end_y + 1);
-
-      path.Add((min + max) * 0.5f);
-    }
-
+    pos = map.GetOccupyCenter(pos, radius, 0xFFFF);
     path.Add(pos);
   }
 

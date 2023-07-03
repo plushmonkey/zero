@@ -7,6 +7,49 @@
 namespace zero {
 namespace behavior {
 
+struct PlayerNearPositionNode : public behavior::BehaviorNode {
+  PlayerNearPositionNode(const char* player_key, const char* position_key, float near_distance)
+      : player_key(player_key), position_key(position_key), near_distance_sq(near_distance * near_distance) {}
+  PlayerNearPositionNode(const char* player_key, Vector2f position, float near_distance)
+      : player_key(player_key), position(position), near_distance_sq(near_distance * near_distance) {}
+  PlayerNearPositionNode(const char* position_key, float near_distance)
+      : position_key(position_key), near_distance_sq(near_distance * near_distance) {}
+  PlayerNearPositionNode(Vector2f position, float near_distance)
+      : position(position), near_distance_sq(near_distance * near_distance) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto player = ctx.bot->game->player_manager.GetSelf();
+
+    if (player_key) {
+      auto opt_player = ctx.blackboard.Value<Player*>(player_key);
+      if (!opt_player.has_value()) return ExecuteResult::Failure;
+
+      player = opt_player.value();
+    }
+
+    if (!player) return ExecuteResult::Failure;
+
+    Vector2f position = this->position;
+
+    if (position_key) {
+      auto opt_position = ctx.blackboard.Value<Vector2f>(position_key);
+      if (!opt_position.has_value()) return ExecuteResult::Failure;
+
+      position = opt_position.value();
+    }
+
+    bool near = player->position.DistanceSq(position) < near_distance_sq;
+
+    return near ? behavior::ExecuteResult::Success : behavior::ExecuteResult::Failure;
+  }
+
+  const char* player_key = nullptr;
+  const char* position_key = nullptr;
+
+  float near_distance_sq = 0.0f;
+  Vector2f position;
+};
+
 struct PlayerChangeFrequencyNode : public behavior::BehaviorNode {
   PlayerChangeFrequencyNode(u16 frequency) : frequency_key(nullptr), frequency(frequency) {}
   PlayerChangeFrequencyNode(const char* frequency_key) : frequency_key(frequency_key), frequency(0) {}

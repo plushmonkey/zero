@@ -83,7 +83,6 @@ struct NearestTargetNode : public behavior::BehaviorNode {
 
       if (player->ship >= 8) continue;
       if (player->frequency == self.frequency) continue;
-      if (player->frequency == 90 || player->frequency == 91) continue;
       if (player->IsRespawning()) continue;
       if (player->position == Vector2f(0, 0)) continue;
       if (!game.player_manager.IsSynchronized(*player)) continue;
