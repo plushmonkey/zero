@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <zero/game/ArenaSettings.h>
 #include <zero/game/Clock.h>
+#include <zero/game/Logger.h>
 #include <zero/game/Platform.h>
 #include <zero/game/net/Protocol.h>
 #include <zero/game/net/security/Checksum.h>
@@ -149,7 +150,7 @@ Connection::TickResult Connection::Tick() {
       }
 
       if (login_state != LoginState::Quit) {
-        fprintf(stderr, "Unexpected socket error: %d\n", err);
+        Log(LogLevel::Error, "Unexpected socket error: %d", err);
         bool in_game = login_state == LoginState::Complete;
 
         this->Disconnect();
@@ -271,7 +272,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
       case ProtocolCore::EncryptionResponse: {
         if (encrypt_method == EncryptMethod::Subspace) {
           if (!vie_encrypt.Initialize(*(u32*)(pkt + 2))) {
-            fprintf(stderr, "Failed to initialize vie encryption.\n");
+            Log(LogLevel::Error, "Failed to initialize vie encryption.");
           }
         }
 
@@ -339,7 +340,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
         ping = current_ping;
       } break;
       case ProtocolCore::Disconnect: {
-        printf("Server sent disconnect packet.\n");
+        Log(LogLevel::Info, "Server sent disconnect packet.");
         this->connected = false;
       } break;
       case ProtocolCore::SmallChunkBody: {
@@ -367,7 +368,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
         u32 key1 = buffer.ReadU32();
         u32 key2 = buffer.ReadU32();
 
-        printf("Received encryption response with keys %08X, %08X\n", key1, key2);
+        Log(LogLevel::Info, "Received encryption response with keys %08X, %08X", key1, key2);
 
 #pragma pack(push, 1)
         struct {
@@ -391,18 +392,16 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
 
         security_solver.ExpandKey(key2, [this](u32* table) {
           if (table) {
-            printf("Successfully expanded continuum encryption keys.\n");
+            Log(LogLevel::Info, "Successfully expanded continuum encryption keys.");
             memcpy(encrypt.expanded_key, table, sizeof(encrypt.expanded_key));
             encrypt.FinalizeExpansion(encrypt.key1);
           } else {
-            fprintf(stderr, "Failed to expand key.\n");
+            Log(LogLevel::Error, "Failed to expand key.");
           }
         });
       } break;
       case ProtocolCore::ContinuumKeyExpansionRequest: {
         u32 seed = buffer.ReadU32();
-
-        printf("Sending key expansion response for key %08X\n", seed);
 
         security_solver.ExpandKey(seed, [seed, this](u32* table) {
           if (table) {
@@ -417,14 +416,15 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
               buffer.WriteU32(table[i]);
             }
 
+            Log(LogLevel::Info, "Sending key expansion response for key %08X", seed);
             this->Send(buffer);
           } else {
-            fprintf(stderr, "Failed to load table for key expansion request.\n");
+            Log(LogLevel::Error, "Failed to load table for key expansion request.");
           }
         });
       } break;
       default: {
-        printf("Received unhandled core packet of type 0x%02X\n", (int)type);
+        Log(LogLevel::Warning, "Received unhandled core packet of type 0x%02X", (int)type);
       } break;
     }
   } else {
@@ -440,7 +440,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
         this->login_state = LoginState::ArenaLogin;
       } break;
       case ProtocolS2C::JoinGame: {
-        printf("Successfully joined game.\n");
+        Log(LogLevel::Info, "Successfully joined game.");
         weapons_received = 0;
         sync_index = 0;
         joined_arena = true;
@@ -466,12 +466,12 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
       case ProtocolS2C::PasswordResponse: {
         u8 response = buffer.ReadU8();
 
-        printf("Login response: %s\n", kLoginResponses[response]);
+        Log(LogLevel::Info, "Login response: %s", kLoginResponses[response]);
 
         u8 register_request = pkt[19];
 
         if (register_request) {
-          printf("Registration form requested.\n");
+          Log(LogLevel::Info, "Registration form requested.");
 
           // Should display registration form here then send this once complete.
           login_state = LoginState::Registering;
@@ -605,7 +605,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
         u16 version = buffer.ReadU16();
         u32 checksum = buffer.ReadU32();
 
-        printf("Connected to server running Continuum 0.%d with checksum %08X\n", version, checksum);
+        Log(LogLevel::Info, "Connected to server running Continuum 0.%d with checksum %08X", version, checksum);
       } break;
       case ProtocolS2C::SetCoordinates: {
       } break;
@@ -622,7 +622,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
       case ProtocolS2C::BatchedLargePosition: {
       } break;
       default: {
-        printf("Received unhandled non-core packet of type 0x%02X\n", (int)type);
+        Log(LogLevel::Info, "Received unhandled non-core packet of type 0x%02X", (int)type);
       } break;
     }
   }
@@ -656,7 +656,7 @@ void Connection::OnDownloadComplete(struct FileRequest* request, u8* data) {
   map_arena.Reset();
 
   if (!map.Load(map_arena, request->filename)) {
-    fprintf(stderr, "Failed to load map %s.\n", request->filename);
+    Log(LogLevel::Error, "Failed to load map %s.", request->filename);
     return;
   }
 
@@ -697,7 +697,7 @@ void Connection::SendSecurityPacket() {
     u32 map_checksum = map.GetChecksum(security.checksum_key);
     u32 exe_checksum = VieChecksum(security.checksum_key);
 
-    printf("Sending security packet with checksum seed %08X\n", security.checksum_key);
+    Log(LogLevel::Info, "Sending security packet with checksum seed %08X", security.checksum_key);
     SendSecurity(settings_checksum, exe_checksum, map_checksum);
   } else {
     security_solver.GetChecksum(security.checksum_key, [this](u32* checksum) {
@@ -705,10 +705,10 @@ void Connection::SendSecurityPacket() {
         u32 settings_checksum = SettingsChecksum(security.checksum_key, settings);
         u32 map_checksum = map.GetChecksum(security.checksum_key);
 
-        printf("Sending security packet with checksum seed %08X\n", security.checksum_key);
+        Log(LogLevel::Info, "Sending security packet with checksum seed %08X", security.checksum_key);
         SendSecurity(settings_checksum, *checksum, map_checksum);
       } else {
-        fprintf(stderr, "Failed to load checksum from network solver.\n");
+        Log(LogLevel::Error, "Failed to load checksum from network solver.");
       }
     });
   }
@@ -1101,7 +1101,7 @@ struct NetworkInitializer {
     WSADATA wsa;
 
     if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
-      fprintf(stderr, "Error WSAStartup: %d\n", WSAGetLastError());
+      Log(LogLevel::Error, "Error WSAStartup: %d", WSAGetLastError());
       exit(1);
     }
   }

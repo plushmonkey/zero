@@ -21,7 +21,11 @@
 #define closesocket close
 #endif
 
+#include <stdio.h>
+#include <zero/game/Logger.h>
 #include <zero/game/Platform.h>
+
+#define SECURITY_DEBUG_LOG 1
 
 namespace zero {
 
@@ -138,9 +142,12 @@ void ExpansionWorkRun(Work* work) {
   SecurityNetworkWork* expansion_work = (SecurityNetworkWork*)work->user;
   SecurityNetworkService* service = &expansion_work->solver->service;
 
+  Log(LogLevel::Debug, "ExpansionWorkRun(%08X): Starting", expansion_work->expansion.key2);
+
   SocketType socket = service->Connect();
 
   if (socket == -1) {
+    Log(LogLevel::Debug, "ExpansionWorkRun(%08X): Connect failure", expansion_work->expansion.key2);
     return;
   }
 
@@ -151,6 +158,8 @@ void ExpansionWorkRun(Work* work) {
   request.key2 = expansion_work->expansion.key2;
 
   KeystreamResponsePacket response;
+
+  Log(LogLevel::Debug, "ExpansionWorkRun(%08X): ProcessRequest start", expansion_work->expansion.key2);
   int response_size = ProcessRequest(socket, &request, sizeof(request), &response, sizeof(response));
 
   if (response_size == sizeof(response) && response.type == ResponseType::Keystream) {
@@ -160,6 +169,8 @@ void ExpansionWorkRun(Work* work) {
   }
 
   closesocket(socket);
+
+  Log(LogLevel::Debug, "ExpansionWorkRun(%08X) result: %d", expansion_work->expansion.key2, expansion_work->state);
 }
 
 void ExpansionWorkComplete(Work* work) {
@@ -182,9 +193,11 @@ void ChecksumWorkRun(Work* work) {
   SecurityNetworkWork* checksum_work = (SecurityNetworkWork*)work->user;
   SecurityNetworkService* service = &checksum_work->solver->service;
 
+  Log(LogLevel::Debug, "ChecksumWorkRun(%08X): Starting", checksum_work->checksum.key);
   SocketType socket = service->Connect();
 
   if (socket == -1) {
+    Log(LogLevel::Debug, "ChecksumWorkRun(%08X): Connect failure", checksum_work->checksum.key);
     return;
   }
 
@@ -196,6 +209,7 @@ void ChecksumWorkRun(Work* work) {
 
   ChecksumResponsePacket response;
 
+  Log(LogLevel::Debug, "ChecksumWorkRun(%08X): ProcessRequest start", checksum_work->checksum.key);
   int response_size = ProcessRequest(socket, &request, sizeof(request), &response, sizeof(response));
 
   if (response_size == sizeof(response) && response.type == ResponseType::Checksum) {
@@ -204,6 +218,7 @@ void ChecksumWorkRun(Work* work) {
   }
 
   closesocket(socket);
+  Log(LogLevel::Debug, "ChecksumWorkRun(%08X) result: %d", checksum_work->checksum.key, checksum_work->state);
 }
 
 void ChecksumWorkComplete(Work* work) {
@@ -239,6 +254,7 @@ void SecuritySolver::ExpandKey(u32 key2, SecurityCallback callback) {
   work->callback = callback;
   work->solver = this;
 
+  Log(LogLevel::Debug, "Submitting work_queue ExpandKey: %08X", key2);
   work_queue.Submit(kExpansionDefinition, work);
 }
 
@@ -251,6 +267,7 @@ void SecuritySolver::GetChecksum(u32 key, SecurityCallback callback) {
   work->callback = callback;
   work->solver = this;
 
+  Log(LogLevel::Debug, "Submitting work_queue Checksum: %08X", key);
   work_queue.Submit(kChecksumDefinition, work);
 }
 
