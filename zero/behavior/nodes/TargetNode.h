@@ -64,7 +64,7 @@ struct NearestTargetNode : public behavior::BehaviorNode {
     Player* self = ctx.bot->game->player_manager.GetSelf();
     if (!self) return behavior::ExecuteResult::Failure;
 
-    Player* nearest = GetNearestTarget(*ctx.bot->game, *self);
+    Player* nearest = GetNearestTarget(*ctx.bot->game, *self, *ctx.bot->bot_controller->region_registry);
 
     if (!nearest) return behavior::ExecuteResult::Failure;
 
@@ -74,7 +74,7 @@ struct NearestTargetNode : public behavior::BehaviorNode {
   }
 
  private:
-  Player* GetNearestTarget(Game& game, Player& self) {
+  Player* GetNearestTarget(Game& game, Player& self, RegionRegistry& region_registry) {
     Player* best_target = nullptr;
     float closest_dist_sq = std::numeric_limits<float>::max();
 
@@ -86,6 +86,7 @@ struct NearestTargetNode : public behavior::BehaviorNode {
       if (player->IsRespawning()) continue;
       if (player->position == Vector2f(0, 0)) continue;
       if (!game.player_manager.IsSynchronized(*player)) continue;
+      if (!region_registry.IsConnected(self.position, player->position)) continue;
 
       bool in_safe = game.connection.map.GetTileId(player->position) == kTileSafeId;
       if (in_safe) continue;
