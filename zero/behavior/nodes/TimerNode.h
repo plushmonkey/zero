@@ -14,7 +14,7 @@ struct TimerExpiredNode : public BehaviorNode {
     u32 timeout = ctx.blackboard.ValueOr<u32>(key, 0);
     u32 current_tick = GetCurrentTick();
 
-    return TICK_GT(current_tick, timeout) ? ExecuteResult::Success : ExecuteResult::Failure;
+    return TICK_GTE(current_tick, timeout) ? ExecuteResult::Success : ExecuteResult::Failure;
   }
 
   const char* key;

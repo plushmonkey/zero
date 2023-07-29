@@ -38,8 +38,15 @@ struct ShipRequestNode : public BehaviorNode {
 
     s32 last_request_tick = ctx.blackboard.ValueOr<s32>(kLastRequestKey, 0);
     s32 current_tick = GetCurrentTick();
+    s32 next_allowed_tick = MAKE_TICK(last_request_tick + kRequestInterval);
 
-    if (TICK_DIFF(current_tick, last_request_tick) >= kRequestInterval) {
+    bool allowed = TICK_GTE(current_tick, next_allowed_tick);
+
+    if (!ctx.blackboard.Has(kLastRequestKey)) {
+      allowed = true;
+    }
+
+    if (allowed) {
       Log(LogLevel::Info, "Sending ship request");
 
       ctx.bot->game->connection.SendShipRequest(ship);
