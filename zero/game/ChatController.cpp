@@ -7,6 +7,7 @@
 #include <string.h>
 #include <zero/game/Camera.h>
 #include <zero/game/Clock.h>
+#include <zero/game/Logger.h>
 #include <zero/game/Platform.h>
 #include <zero/game/PlayerManager.h>
 #include <zero/game/ShipController.h>
@@ -133,9 +134,9 @@ void ChatController::OnChatPacket(u8* packet, size_t size) {
 
     if (type == ChatType::RemotePrivate || type == ChatType::Arena || type == ChatType::RedWarning ||
         type == ChatType::RedError) {
-      printf("%c %s\n", prefix, entry->message);
+      Log(LogLevel::Info, "%c %s", prefix, entry->message);
     } else {
-      printf("%c %s> %s\n", prefix, entry->sender, entry->message);
+      Log(LogLevel::Info, "%c %s> %s", prefix, entry->sender, entry->message);
     }
   }
 

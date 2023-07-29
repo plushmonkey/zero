@@ -30,7 +30,7 @@
 #include <thread>
 
 //#define PACKET_SHEDDING 20
-#define PACKET_TYPE_OUTPUT 0
+#define PACKET_TYPE_OUTPUT 1
 
 namespace zero {
 
@@ -260,7 +260,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
 
 #if PACKET_TYPE_OUTPUT
     if (type_byte != 0x03) {
-      platform.Log("Got core packet: 0x%02X\n", type_byte);
+      Log(LogLevel::Jabber, "Got core packet: 0x%02X", type_byte);
     }
 #endif
 
@@ -432,7 +432,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
     ProtocolS2C type = (ProtocolS2C)type_byte;
 
 #if PACKET_TYPE_OUTPUT
-    platform.Log("Got non-core packet: 0x%02X\n", type_byte);
+    Log(LogLevel::Jabber, "Got non-core packet: 0x%02X", type_byte);
 #endif
 
     switch (type) {
@@ -931,9 +931,9 @@ size_t Connection::Send(u8* data, size_t size) {
 
 #if PACKET_TYPE_OUTPUT
   if (data[0] == 0 && size > 1) {
-    platform.Log("Sending core type: 0x%02X\n", data[1]);
+    Log(LogLevel::Jabber, "Sending core type: 0x%02X", data[1]);
   } else {
-    platform.Log("Sending non-core type: 0x%02X\n", data[0]);
+    Log(LogLevel::Jabber, "Sending non-core type: 0x%02X", data[0]);
   }
 #endif
 

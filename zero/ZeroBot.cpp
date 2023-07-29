@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <zero/BotController.h>
 #include <zero/game/Game.h>
+#include <zero/game/Logger.h>
 #include <zero/game/Settings.h>
 
 #include <chrono>
@@ -43,7 +44,7 @@ bool ZeroBot::Initialize(const char* name, const char* password) {
 #endif
 
   if (!perm_memory || !trans_memory || !work_memory) {
-    fprintf(stderr, "Failed to allocate memory.\n");
+    Log(LogLevel::Error, "Failed to allocate memory.");
     return false;
   }
 
@@ -60,6 +61,8 @@ bool ZeroBot::Initialize(const char* name, const char* password) {
   strcpy(this->name, name);
   strcpy(this->password, password);
 
+  g_LogPrintLevel = LogLevel::Info;
+
   return true;
 }
 
@@ -73,14 +76,14 @@ bool ZeroBot::JoinZone(ServerInfo& server) {
   bot_controller = memory_arena_construct_type(&perm_arena, BotController);
 
   if (!game->Initialize(input)) {
-    fprintf(stderr, "Failed to create game\n");
+    Log(LogLevel::Error, "Failed to create game");
     return false;
   }
 
   ConnectResult result = game->connection.Connect(server.ipaddr, server.port);
 
   if (result != ConnectResult::Success) {
-    fprintf(stderr, "Failed to connect. Error: %d\n", (int)result);
+    Log(LogLevel::Error, "Failed to connect. Error: %d", (int)result);
     return false;
   }
 
@@ -134,7 +137,7 @@ void ZeroBot::Run() {
 
   if (game && game->connection.connected) {
     game->connection.SendDisconnect();
-    printf("Disconnected from server.\n");
+    Log(LogLevel::Info, "Disconnected from server.");
   }
 }
 

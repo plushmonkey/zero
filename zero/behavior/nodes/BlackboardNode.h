@@ -4,6 +4,7 @@
 #include <zero/ZeroBot.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/game/Game.h>
+#include <zero/game/Logger.h>
 
 namespace zero {
 namespace behavior {
@@ -12,7 +13,7 @@ struct DebugPrintNode : public BehaviorNode {
   DebugPrintNode(const char* message) : message(message) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
-    printf("%s\n", message);
+    Log(LogLevel::Debug, "%s", message);
     return ExecuteResult::Success;
   }
 

@@ -3,6 +3,7 @@
 #include <memory.h>
 #include <stdio.h>
 #include <zero/game/Inflate.h>
+#include <zero/game/Logger.h>
 #include <zero/game/Memory.h>
 #include <zero/game/Platform.h>
 #include <zero/game/net/Connection.h>
@@ -89,7 +90,7 @@ void FileRequester::OnCompressedFile(u8* pkt, size_t size) {
     } while (status == MZ_BUF_ERROR);
 
     if (status != MZ_OK) {
-      fprintf(stderr, "Failed to uncompress map data.\n");
+      Log(LogLevel::Error, "Failed to uncompress map data.");
     } else {
       data = uncompressed;
     }
@@ -102,10 +103,10 @@ void FileRequester::OnCompressedFile(u8* pkt, size_t size) {
     fwrite(data, 1, data_size, f);
     fclose(f);
   } else {
-    fprintf(stderr, "Failed to open %s for writing.\n", current->filename);
+    Log(LogLevel::Error, "Failed to open %s for writing.", current->filename);
   }
 
-  printf("Download complete: %s\n", current->filename);
+  Log(LogLevel::Info, "Download complete: %s", current->filename);
   current->callback(current->user, current, data);
 
   temp_arena.Revert(snapshot);
@@ -171,7 +172,7 @@ void FileRequester::Request(const char* filename, u16 index, u32 size, u32 check
     return;
   }
 
-  printf("Requesting download: %s\n", filename);
+  Log(LogLevel::Info, "Requesting download: %s", filename);
   request->next = requests;
   requests = request;
 

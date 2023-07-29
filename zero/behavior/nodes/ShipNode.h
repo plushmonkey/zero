@@ -3,6 +3,7 @@
 #include <zero/ZeroBot.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/game/Game.h>
+#include <zero/game/Logger.h>
 
 namespace zero {
 namespace behavior {
@@ -39,7 +40,7 @@ struct ShipRequestNode : public BehaviorNode {
     s32 current_tick = GetCurrentTick();
 
     if (TICK_DIFF(current_tick, last_request_tick) >= kRequestInterval) {
-      printf("Sending ship request\n");
+      Log(LogLevel::Info, "Sending ship request");
 
       ctx.bot->game->connection.SendShipRequest(ship);
 

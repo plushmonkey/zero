@@ -2,6 +2,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <zero/game/Logger.h>
 #include <zero/game/Memory.h>
 
 #ifdef _WIN32
@@ -33,7 +34,7 @@ void StandardLog(const char* fmt, ...) {
 
   va_start(args, fmt);
 
-  vfprintf(stderr, fmt, args);
+  LogArgs(LogLevel::Info, fmt, args);
 
   va_end(args);
 }
@@ -43,8 +44,7 @@ void ErrorLog(const char* fmt, ...) {
 
   va_start(args, fmt);
 
-  fprintf(stderr, "Error: ");
-  vfprintf(stderr, fmt, args);
+  LogArgs(LogLevel::Error, fmt, args);
 
   va_end(args);
 }
