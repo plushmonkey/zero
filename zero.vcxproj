@@ -22,6 +22,7 @@
     <ClCompile Include="zero\behavior\BehaviorBuilder.cpp" />
     <ClCompile Include="zero\behavior\BehaviorTree.cpp" />
     <ClCompile Include="zero\BotController.cpp" />
+    <ClCompile Include="zero\commands\CommandSystem.cpp" />
     <ClCompile Include="zero\game\Logger.cpp" />
     <ClCompile Include="zero\ZeroBot.cpp" />
     <ClCompile Include="zero\game\BrickManager.cpp" />
@@ -70,6 +71,7 @@
     <ClInclude Include="zero\behavior\nodes\TimerNode.h" />
     <ClInclude Include="zero\behavior\nodes\WaypointNode.h" />
     <ClInclude Include="zero\BotController.h" />
+    <ClInclude Include="zero\commands\CommandSystem.h" />
     <ClInclude Include="zero\game\Logger.h" />
     <ClInclude Include="zero\path\Path.h" />
     <ClInclude Include="zero\ZeroBot.h" />

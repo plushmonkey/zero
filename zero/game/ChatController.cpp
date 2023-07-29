@@ -231,6 +231,10 @@ void PrivateHistory::RemoveNode(RecentSenderNode* node) {
 
     current = current->next;
   }
+
+  if (node != nullptr && node == recent) {
+    recent = node->next;
+  }
 }
 
 char* PrivateHistory::GetPrevious(char* current) {

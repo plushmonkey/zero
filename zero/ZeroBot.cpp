@@ -75,6 +75,8 @@ bool ZeroBot::JoinZone(ServerInfo& server) {
   game = memory_arena_construct_type(&perm_arena, Game, perm_arena, trans_arena, *work_queue, 1920, 1080);
   bot_controller = memory_arena_construct_type(&perm_arena, BotController);
 
+  commands = memory_arena_construct_type(&perm_arena, CommandSystem, *this, this->game->dispatcher);
+
   if (!game->Initialize(input)) {
     Log(LogLevel::Error, "Failed to create game");
     return false;

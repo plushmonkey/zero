@@ -1,6 +1,7 @@
 #pragma once
 
 #include <zero/behavior/BehaviorTree.h>
+#include <zero/commands/CommandSystem.h>
 #include <zero/game/Game.h>
 #include <zero/game/InputState.h>
 #include <zero/game/Memory.h>
@@ -31,6 +32,7 @@ struct ZeroBot {
   BotController* bot_controller = nullptr;
 
   behavior::ExecuteContext execute_ctx;
+  CommandSystem* commands = nullptr;
 
   char name[20] = {0};
   char password[256] = {0};
