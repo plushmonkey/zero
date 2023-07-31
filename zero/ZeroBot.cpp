@@ -90,6 +90,8 @@ bool ZeroBot::JoinZone(ServerInfo& server) {
   }
 
   game->connection.SendEncryptionRequest(g_Settings.encrypt_method);
+
+  this->server_info = server;
   return true;
 }
 

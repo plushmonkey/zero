@@ -19,7 +19,7 @@ namespace zero {
 
 constexpr int kShip = 0;
 
-std::unique_ptr<behavior::BehaviorNode> BuildHyperspaceWarbirdCenter(int ship) {
+std::unique_ptr<behavior::BehaviorNode> BuildHyperspaceWarbirdCenter() {
   using namespace behavior;
 
   BehaviorBuilder builder;
@@ -30,8 +30,8 @@ std::unique_ptr<behavior::BehaviorNode> BuildHyperspaceWarbirdCenter(int ship) {
   builder
     .Selector()
         .Sequence() // Enter the specified ship if not already in it.
-            .InvertChild<ShipQueryNode>(ship)
-            .Child<ShipRequestNode>(ship)
+            .InvertChild<ShipQueryNode>("request_ship")
+            .Child<ShipRequestNode>("request_ship")
             .End()
         .Sequence() // Warp back to center.
             .InvertChild<RegionContainQueryNode>(center)
@@ -81,7 +81,7 @@ std::unique_ptr<behavior::BehaviorNode> BuildHyperspaceWarbirdCenter(int ship) {
   return builder.Build();
 }
 
-std::unique_ptr<behavior::BehaviorNode> BuildHyperspaceLeviCenter(int ship) {
+std::unique_ptr<behavior::BehaviorNode> BuildHyperspaceLeviCenter() {
   using namespace behavior;
 
   BehaviorBuilder builder;
@@ -92,8 +92,8 @@ std::unique_ptr<behavior::BehaviorNode> BuildHyperspaceLeviCenter(int ship) {
   builder
     .Selector()
         .Sequence() // Enter the specified ship if not already in it.
-            .InvertChild<ShipQueryNode>(ship)
-            .Child<ShipRequestNode>(ship)
+            .InvertChild<ShipQueryNode>("request_ship")
+            .Child<ShipRequestNode>("request_ship")
             .End()
         .Sequence() // Switch to own frequency when possible.
             .Child<PlayerFrequencyCountQueryNode>("self_freq_count")
@@ -218,7 +218,7 @@ std::unique_ptr<behavior::BehaviorNode> BuildHyperspaceLeviCenter(int ship) {
 }
 
 BotController::BotController() {
-  typedef std::unique_ptr<behavior::BehaviorNode> (*ShipBuilder)(int ship);
+  typedef std::unique_ptr<behavior::BehaviorNode> (*ShipBuilder)();
 
   // clang-format off
   ShipBuilder builders[] = {
@@ -259,7 +259,7 @@ BotController::BotController() {
         .End();
   this->behavior_tree = builder.Build();
 #else
-  this->behavior_tree = builders[kShip](kShip);
+  this->behavior_tree = builders[kShip]();
 #endif
   // clang-format on
 
@@ -281,6 +281,7 @@ void BotController::Update(float dt, Game& game, InputState& input, behavior::Ex
 
     pathfinder->CreateMapWeights(game.GetMap(), radius);
 
+    execute_ctx.blackboard.Set("request_ship", kShip);
     execute_ctx.blackboard.Set("leash_distance", 15.0f);
 
     std::vector<Vector2f> waypoints{

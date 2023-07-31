@@ -8,8 +8,103 @@ namespace zero {
 
 constexpr int kArenaSecurityLevel = 5;
 
-class HelpCommand : public CommandExecutor {
+class SayCommand : public CommandExecutor {
 public:
+  void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
+    const char* kFilters[] = {
+      "?password", "?passwd", "?squad"
+    };
+
+    for (size_t i = 0; i < ZERO_ARRAY_SIZE(kFilters); ++i) {
+      if (arg.find(kFilters[i]) != std::string::npos) {
+        Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
+
+        if (player) {
+          bot.game->chat.SendPrivateMessage("Message filtered.", player->id);
+        }
+
+        return;
+      }
+    }
+
+    bot.game->chat.SendMessage(ChatType::Public, arg.c_str());
+  }
+
+  CommandAccessFlags GetAccess() { return CommandAccess_Private; }
+  void SetAccess(CommandAccessFlags flags) { return; }
+  std::vector<std::string> GetAliases() { return { "say" }; }
+  std::string GetDescription() { return "Repeats a message publicly"; }
+  int GetSecurityLevel() { return 10; }
+};
+
+class ZoneCommand : public CommandExecutor {
+ public:
+  void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
+    if (sender.empty()) return;
+
+    Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
+    if (!player) return;
+
+    const char* zone_name = to_string(bot.server_info.zone);
+
+    char zone_message[256];
+    sprintf(zone_message, "Connected to zone '%s'.", zone_name);
+
+    bot.game->chat.SendPrivateMessage(zone_message, player->id);
+  }
+
+  CommandAccessFlags GetAccess() { return CommandAccess_Private; }
+  void SetAccess(CommandAccessFlags flags) { return; }
+  std::vector<std::string> GetAliases() { return {"zone", "z"}; }
+  std::string GetDescription() { return "Prints current zone"; }
+  int GetSecurityLevel() { return 0; }
+};
+
+class SetShipCommand : public CommandExecutor {
+ public:
+  void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
+    if (sender.empty()) return;
+
+    Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
+    if (!player) return;
+
+    int parsed_ship_num = 0;
+
+    auto args = Tokenize(arg, ' ');
+
+    if (args.size() != 1 || args[0].empty()) {
+      SendUsage(bot, *player);
+      return;
+    }
+
+    if (!isdigit(args[0][0])) {
+      SendUsage(bot, *player);
+      return;
+    }
+
+    parsed_ship_num = args[0][0] - '0';
+
+    if (parsed_ship_num < 1 || parsed_ship_num > 9) {
+      SendUsage(bot, *player);
+      return;
+    }
+
+    bot.execute_ctx.blackboard.Set("request_ship", parsed_ship_num - 1);
+  }
+
+  void SendUsage(ZeroBot& bot, Player& player) {
+    bot.game->chat.SendPrivateMessage("Usage: !setship [shipNum 1-9]", player.id);
+  }
+
+  CommandAccessFlags GetAccess() { return CommandAccess_Private | CommandAccess_Public; }
+  void SetAccess(CommandAccessFlags flags) { return; }
+  std::vector<std::string> GetAliases() { return {"setship", "ss"}; }
+  std::string GetDescription() { return "Sets the ship"; }
+  int GetSecurityLevel() { return 0; }
+};
+
+class HelpCommand : public CommandExecutor {
+ public:
   void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
     if (sender.empty()) return;
 
@@ -21,13 +116,13 @@ public:
 
   CommandAccessFlags GetAccess() { return CommandAccess_Private; }
   void SetAccess(CommandAccessFlags flags) { return; }
-  std::vector<std::string> GetAliases() { return { "help", "h" }; }
+  std::vector<std::string> GetAliases() { return {"help", "h"}; }
   std::string GetDescription() { return "Helps"; }
   int GetSecurityLevel() { return 0; }
 };
 
 class CommandsCommand : public CommandExecutor {
-public:
+ public:
   void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
     if (sender.empty()) return;
     Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
@@ -76,7 +171,7 @@ public:
 
     // Sort triggers alphabetically
     std::sort(triggers.begin(), triggers.end(),
-      [](const Trigger& l, const Trigger& r) { return l.triggers.compare(r.triggers) < 0; });
+              [](const Trigger& l, const Trigger& r) { return l.triggers.compare(r.triggers) < 0; });
 
     // Display the stored triggers
     for (Trigger& trigger : triggers) {
@@ -91,7 +186,7 @@ public:
 
   CommandAccessFlags GetAccess() { return CommandAccess_Private; }
   void SetAccess(CommandAccessFlags flags) { return; }
-  std::vector<std::string> GetAliases() { return { "commands", "c" }; }
+  std::vector<std::string> GetAliases() { return {"commands", "c"}; }
   std::string GetDescription() { return "Shows available commands"; }
   int GetSecurityLevel() { return 0; }
 };
@@ -101,7 +196,7 @@ std::string Lowercase(std::string_view str) {
 
   std::string_view name = str;
 
-  //remove "^" that gets placed on names when biller is down
+  // remove "^" that gets placed on names when biller is down
   if (!name.empty() && name[0] == '^') {
     name = name.substr(1);
   }
@@ -114,7 +209,7 @@ std::string Lowercase(std::string_view str) {
 }
 
 const std::unordered_map<std::string, int> kOperators = {
-    {"tm_master", 10}, {"baked cake", 10}, {"x-demo", 10}, {"lyra.", 5}, {"profile", 5}, {"monkey", 5},
+    {"tm_master", 10}, {"baked cake", 10}, {"x-demo", 10}, {"lyra.", 5}, {"profile", 5}, {"monkey", 10},
     {"neostar", 5},    {"geekgrrl", 5},    {"sed", 5},     {"sk", 5},    {"b.o.x.", 10}};
 
 static void RawOnChatPacket(void* user, u8* pkt, size_t size) {
@@ -128,6 +223,9 @@ CommandSystem::CommandSystem(ZeroBot& bot, PacketDispatcher& dispatcher) : bot(b
 
   RegisterCommand(std::make_shared<HelpCommand>());
   RegisterCommand(std::make_shared<CommandsCommand>());
+  RegisterCommand(std::make_shared<SetShipCommand>());
+  RegisterCommand(std::make_shared<ZoneCommand>());
+  RegisterCommand(std::make_shared<SayCommand>());
 }
 
 int CommandSystem::GetSecurityLevel(const std::string& player) {
@@ -200,7 +298,8 @@ void CommandSystem::OnChatPacket(const u8* pkt, size_t size) {
           auto& bb = bot.execute_ctx.blackboard;
 
           // If the command is lockable, bot is locked, and requester isn't an operator then ignore it.
-          if (!(command.GetFlags() & CommandFlag_Lockable) || !bb.ValueOr<bool>("CmdLock", false) || security_level > 0) {
+          if (!(command.GetFlags() & CommandFlag_Lockable) || !bb.ValueOr<bool>("CmdLock", false) ||
+              security_level > 0) {
             command.Execute(*this, bot, std::string(player->name), arg);
           }
         }

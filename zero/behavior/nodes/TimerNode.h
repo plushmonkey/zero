@@ -11,6 +11,8 @@ struct TimerExpiredNode : public BehaviorNode {
   TimerExpiredNode(const char* key) : key(key) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
+    if (!ctx.blackboard.Has(key)) return ExecuteResult::Success;
+
     u32 timeout = ctx.blackboard.ValueOr<u32>(key, 0);
     u32 current_tick = GetCurrentTick();
 
@@ -25,6 +27,7 @@ struct TimerSetNode : public BehaviorNode {
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
     ctx.blackboard.Set<u32>(key, GetCurrentTick() + ticks);
+
     return ExecuteResult::Success;
   }
 
