@@ -8,6 +8,89 @@
 namespace zero {
 namespace behavior {
 
+// This node is very computationally expensive since it does a full simulation of the ball trajectory.
+// Returns success if carrying the ball and pointing in a direction that will fire into a goal.
+struct PowerballGoalPathQuery : public BehaviorNode {
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto& soccer = ctx.bot->game->soccer;
+
+    if (soccer.carry_id == kInvalidBallId) return ExecuteResult::Failure;
+
+    auto player = ctx.bot->game->player_manager.GetSelf();
+    if (!player || player->ship >= 8) return ExecuteResult::Failure;
+
+    Powerball* ball = GetBallById(soccer, soccer.carry_id);
+    if (!ball) return ExecuteResult::Failure;
+
+    Powerball projected_ball = *ball;
+
+    float speed = ctx.bot->game->connection.settings.ShipSettings[player->ship].SoccerBallSpeed / 10.0f / 16.0f;
+    Vector2f position = player->position;
+    Vector2f heading = OrientationToHeading((u8)(player->orientation * 40.0f));
+    Vector2f velocity = player->velocity + heading * speed;
+
+    projected_ball.x = (u32)(position.x * 16000.0f);
+    projected_ball.y = (u32)(position.y * 16000.0f);
+    projected_ball.vel_x = (s32)(velocity.x * 16.0f * 10.0f);
+    projected_ball.vel_y = (s32)(velocity.y * 16.0f * 10.0f);
+
+    projected_ball.friction = 1000000;
+    projected_ball.friction_delta = ctx.bot->game->connection.settings.ShipSettings[player->ship].SoccerBallFriction;
+
+    auto& map = ctx.bot->game->GetMap();
+
+    for (size_t i = 0; i < 1000000; ++i) {
+      SimulateAxis(soccer, projected_ball, map, &projected_ball.x, &projected_ball.vel_x);
+      bool hit_goal = SimulateAxis(soccer, projected_ball, map, &projected_ball.y, &projected_ball.vel_y);
+
+      if (hit_goal) {
+        return ExecuteResult::Success;
+      }
+
+      s32 friction = projected_ball.friction / 1000;
+      projected_ball.vel_x = (projected_ball.vel_x * friction) / 1000;
+      projected_ball.vel_y = (projected_ball.vel_y * friction) / 1000;
+
+      projected_ball.friction -= projected_ball.friction_delta;
+
+      if (projected_ball.friction <= 0) {
+        break;
+      }
+    }
+
+    return ExecuteResult::Failure;
+  }
+
+  inline bool SimulateAxis(Soccer& soccer, Powerball& ball, Map& map, u32* pos, s16* vel) {
+    u32 previous = *pos;
+
+    *pos += *vel;
+
+    float x = floorf(ball.x / 16000.0f);
+    float y = floorf(ball.y / 16000.0f);
+
+    if (map.IsSolid((u16)x, (u16)y, ball.frequency)) {
+      *pos = previous;
+      *vel = -*vel;
+    }
+
+    if (map.GetTileId((u16)x, (u16)y) == 172) {
+      return !soccer.IsTeamGoal(Vector2f(x, y));
+    }
+
+    return false;
+  }
+
+  Powerball* GetBallById(Soccer& soccer, u16 id) {
+    for (size_t i = 0; i < ZERO_ARRAY_SIZE(soccer.balls); ++i) {
+      if (soccer.balls[i].id == id) {
+        return soccer.balls + i;
+      }
+    }
+
+    return nullptr;
+  }
+};
 struct PowerballFireNode : public BehaviorNode {
   ExecuteResult Execute(ExecuteContext& ctx) override {
     auto& soccer = ctx.bot->game->soccer;

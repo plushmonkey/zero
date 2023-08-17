@@ -45,14 +45,20 @@ std::unique_ptr<behavior::BehaviorNode> BuildPowerballChaser() {
             .End()
         .Sequence()
             .Child<PowerballCarryQueryNode>()
-            .Selector() // If the ball is being carried, go toward the goal
-                .Sequence() // If the ball is low on timer, fire it.
-                    .Child<PowerballRemainingTimeQueryNode>("powerball_remaining_time")
-                    .InvertChild<ScalarThresholdNode<float>>("powerball_remaining_time", 0.2f)
+            .Parallel()
+                .Sequence()
+                    .Child<PowerballGoalPathQuery>()
                     .Child<PowerballFireNode>()
                     .End()
-                .Sequence()
-                    .Child<GoToNode>("goal_position")
+                .Selector() // If the ball is being carried, go toward the goal
+                    .Sequence() // If the ball is low on timer, fire it.
+                        .Child<PowerballRemainingTimeQueryNode>("powerball_remaining_time")
+                        .InvertChild<ScalarThresholdNode<float>>("powerball_remaining_time", 0.2f)
+                        .Child<PowerballFireNode>()
+                        .End()
+                    .Sequence()
+                        .Child<GoToNode>("goal_position")
+                        .End()
                     .End()
                 .End()
             .End()
