@@ -33,31 +33,6 @@ inline void SimulateAxis(Powerball& ball, Map& map, u32* pos, s16* vel) {
   }
 }
 
-inline Vector2f GetBallPosition(PlayerManager& player_manager, Powerball& ball, u64 microtick) {
-  if (ball.state == BallState::Carried) {
-    Player* carrier = player_manager.GetPlayerById(ball.carrier_id);
-
-    if (carrier && carrier->ship != 8) {
-      Vector2f heading = OrientationToHeading((u8)(carrier->orientation * 40.0f));
-      float radius = player_manager.connection.settings.ShipSettings[carrier->ship].GetRadius();
-
-      float extension = radius - 0.25f;
-
-      if (extension < 0) {
-        extension = 0.0f;
-      }
-
-      return carrier->position.PixelRounded() + heading * extension;
-    }
-  }
-
-  Vector2f current_position(ball.x / 16000.0f, ball.y / 16000.0f);
-  Vector2f next_position(ball.next_x / 16000.0f, ball.next_y / 16000.0f);
-  float t = (microtick - ball.last_micro_tick) / (float)kTickDurationMicro;
-
-  return current_position * (1 - t) + (t * next_position);
-}
-
 Soccer::Soccer(PlayerManager& player_manager) : player_manager(player_manager), connection(player_manager.connection) {
   connection.dispatcher.Register(ProtocolS2C::PowerballPosition, OnPowerballPositionPkt, this);
 
@@ -91,7 +66,7 @@ void Soccer::Update(float dt) {
 
         if (has_timer && carry_timer < 0) {
           float speed = connection.settings.ShipSettings[self->ship].SoccerBallSpeed / 10.0f / 16.0f;
-          Vector2f position = GetBallPosition(player_manager, *ball, microtick);
+          Vector2f position = GetBallPosition(*ball, microtick);
           Vector2f heading = OrientationToHeading((u8)(self->orientation * 40.0f));
           Vector2f velocity = self->velocity - Vector2f(heading) * speed;
 
@@ -157,11 +132,12 @@ bool Soccer::FireBall(BallFireMethod method) {
   Player* self = player_manager.GetSelf();
 
   if (!self) return false;
+  if (carry_id == kInvalidBallId) return false;
 
   Powerball* ball = balls + carry_id;
 
   float speed = connection.settings.ShipSettings[self->ship].SoccerBallSpeed / 10.0f / 16.0f;
-  Vector2f position = GetBallPosition(player_manager, *ball, GetMicrosecondTick());
+  Vector2f position = GetBallPosition(*ball, GetMicrosecondTick());
   Vector2f heading = OrientationToHeading((u8)(self->orientation * 40.0f));
   Vector2f velocity = self->velocity + Vector2f(heading) * speed;
 
@@ -452,6 +428,31 @@ bool Soccer::IsTeamGoal(const Vector2f& position) {
   }
 
   return true;
+}
+
+Vector2f Soccer::GetBallPosition(Powerball& ball, u64 microtick) const {
+  if (ball.state == BallState::Carried) {
+    Player* carrier = player_manager.GetPlayerById(ball.carrier_id);
+
+    if (carrier && carrier->ship != 8) {
+      Vector2f heading = OrientationToHeading((u8)(carrier->orientation * 40.0f));
+      float radius = player_manager.connection.settings.ShipSettings[carrier->ship].GetRadius();
+
+      float extension = radius - 0.25f;
+
+      if (extension < 0) {
+        extension = 0.0f;
+      }
+
+      return carrier->position.PixelRounded() + heading * extension;
+    }
+  }
+
+  Vector2f current_position(ball.x / 16000.0f, ball.y / 16000.0f);
+  Vector2f next_position(ball.next_x / 16000.0f, ball.next_y / 16000.0f);
+  float t = (microtick - ball.last_micro_tick) / (float)kTickDurationMicro;
+
+  return current_position * (1 - t) + (t * next_position);
 }
 
 }  // namespace zero

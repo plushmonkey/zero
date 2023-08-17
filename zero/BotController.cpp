@@ -9,6 +9,7 @@
 #include <zero/behavior/nodes/MathNode.h>
 #include <zero/behavior/nodes/MoveNode.h>
 #include <zero/behavior/nodes/PlayerNode.h>
+#include <zero/behavior/nodes/PowerballNode.h>
 #include <zero/behavior/nodes/RegionNode.h>
 #include <zero/behavior/nodes/ShipNode.h>
 #include <zero/behavior/nodes/TargetNode.h>
@@ -18,6 +19,48 @@
 namespace zero {
 
 constexpr int kShip = 0;
+
+
+std::unique_ptr<behavior::BehaviorNode> BuildPowerballChaser() {
+  using namespace behavior;
+
+  BehaviorBuilder builder;
+
+  const Vector2f center(512, 512);
+
+   builder
+    .Selector()
+        .Sequence() // Enter the specified ship if not already in it.
+            .InvertChild<ShipQueryNode>("request_ship")
+            .Child<ShipRequestNode>("request_ship")
+            .End()
+        .Sequence() // Warp back to center.
+            .InvertChild<RegionContainQueryNode>(center)
+            .Child<WarpNode>()
+            .End()
+        .Sequence() // If the ball is not being carried, path to nearest ball
+            .InvertChild<PowerballCarryQueryNode>()
+            .Child<PowerballClosestQueryNode>("closest_powerball_position")
+            .Child<GoToNode>("closest_powerball_position")
+            .End()
+        .Sequence()
+            .Child<PowerballCarryQueryNode>()
+            .Selector() // If the ball is being carried, go toward the goal
+                .Sequence() // If the ball is low on timer, fire it.
+                    .Child<PowerballRemainingTimeQueryNode>("powerball_remaining_time")
+                    .InvertChild<ScalarThresholdNode<float>>("powerball_remaining_time", 0.2f)
+                    .Child<PowerballFireNode>()
+                    .End()
+                .Sequence()
+                    .Child<GoToNode>("goal_position")
+                    .End()
+                .End()
+            .End()
+        .End();
+  // clang-format on
+
+  return builder.Build();
+}
 
 std::unique_ptr<behavior::BehaviorNode> BuildHyperspaceWarbirdCenter() {
   using namespace behavior;
@@ -260,6 +303,7 @@ BotController::BotController() {
   this->behavior_tree = builder.Build();
 #else
   this->behavior_tree = builders[kShip]();
+  //this->behavior_tree = BuildPowerballChaser();
 #endif
   // clang-format on
 
@@ -283,6 +327,7 @@ void BotController::Update(float dt, Game& game, InputState& input, behavior::Ex
 
     execute_ctx.blackboard.Set("request_ship", kShip);
     execute_ctx.blackboard.Set("leash_distance", 15.0f);
+    execute_ctx.blackboard.Set("goal_position", Vector2f(511, 328));
 
     std::vector<Vector2f> waypoints{
         Vector2f(440, 460),
