@@ -25,9 +25,9 @@ struct PowerballGoalPathQuery : public BehaviorNode {
     Powerball projected_ball = *ball;
 
     float speed = ctx.bot->game->connection.settings.ShipSettings[player->ship].SoccerBallSpeed / 10.0f / 16.0f;
-    Vector2f position = player->position;
+    Vector2f position = player->position.PixelRounded();
     Vector2f heading = OrientationToHeading((u8)(player->orientation * 40.0f));
-    Vector2f velocity = player->velocity + heading * speed;
+    Vector2f velocity = (player->velocity + heading * speed).PixelRounded();
 
     projected_ball.x = (u32)(position.x * 16000.0f);
     projected_ball.y = (u32)(position.y * 16000.0f);

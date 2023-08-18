@@ -143,7 +143,7 @@ bool Soccer::FireBall(BallFireMethod method) {
 
   u32 timestamp = MAKE_TICK(GetCurrentTick() + connection.time_diff);
 
-  connection.SendBallFire((u8)carry_id, self->position, velocity, self->id, timestamp);
+  connection.SendBallFire((u8)carry_id, self->position.PixelRounded(), velocity.PixelRounded(), self->id, timestamp);
   carry_id = kInvalidBallId;
 
   player_manager.ship_controller->AddBombDelay(50);
