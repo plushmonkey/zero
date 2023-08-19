@@ -239,6 +239,13 @@ void Soccer::OnPowerballPosition(u8* pkt, size_t size) {
 
     if (ball_id == carry_id) {
       carry_id = kInvalidBallId;
+      carry_timer = 0.0f;
+
+      auto self = player_manager.GetSelf();
+
+      if (self) {
+        self->ball_carrier = false;
+      }
     }
 
     u32 current_timestamp = MAKE_TICK(GetCurrentTick() + connection.time_diff);
