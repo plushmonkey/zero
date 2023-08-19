@@ -8,7 +8,6 @@
 namespace zero {
 namespace behavior {
 
-// This node is very computationally expensive since it does a full simulation of the ball trajectory.
 // Returns success if carrying the ball and pointing in a direction that will fire into a goal.
 struct PowerballGoalPathQuery : public BehaviorNode {
   ExecuteResult Execute(ExecuteContext& ctx) override {
@@ -37,9 +36,15 @@ struct PowerballGoalPathQuery : public BehaviorNode {
     projected_ball.friction = 1000000;
     projected_ball.friction_delta = ctx.bot->game->connection.settings.ShipSettings[player->ship].SoccerBallFriction;
 
+    size_t max_iteration_count = 1000000;
+    if (projected_ball.friction_delta <= 0) {
+      projected_ball.friction_delta = 0;
+      max_iteration_count = 3000;
+    }
+
     auto& map = ctx.bot->game->GetMap();
 
-    for (size_t i = 0; i < 1000000; ++i) {
+    for (size_t i = 0; i < max_iteration_count; ++i) {
       SimulateAxis(soccer, projected_ball, map, &projected_ball.x, &projected_ball.vel_x);
       bool hit_goal = SimulateAxis(soccer, projected_ball, map, &projected_ball.y, &projected_ball.vel_y);
 
@@ -53,7 +58,7 @@ struct PowerballGoalPathQuery : public BehaviorNode {
 
       projected_ball.friction -= projected_ball.friction_delta;
 
-      if (projected_ball.friction <= 0) {
+      if (projected_ball.friction <= 0 || (projected_ball.vel_x == 0 && projected_ball.vel_y == 0)) {
         break;
       }
     }
