@@ -471,6 +471,8 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
       } break;
       case ProtocolS2C::PlayerPrize: {
       } break;
+      case ProtocolS2C::ScoreUpdate: {
+      } break;
       case ProtocolS2C::PasswordResponse: {
         u8 response = buffer.ReadU8();
 
@@ -521,6 +523,8 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
           // Send password packet again requesting the registration form
           SendPassword(true);
         }
+      } break;
+      case ProtocolS2C::SoccerGoal: {
       } break;
       case ProtocolS2C::FrequencyChange: {
       } break;

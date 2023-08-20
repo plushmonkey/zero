@@ -53,6 +53,8 @@
     <ClCompile Include="zero\game\WeaponManager.cpp" />
     <ClCompile Include="zero\game\WorkQueue.cpp" />
     <ClCompile Include="zero\zones\hyperspace\BallBehavior.cpp" />
+    <ClCompile Include="zero\zones\hyperspace\CenterLeviBehavior.cpp" />
+    <ClCompile Include="zero\zones\hyperspace\CenterBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\Hyperspace.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -122,6 +124,9 @@
     <ClInclude Include="zero\game\WeaponManager.h" />
     <ClInclude Include="zero\game\WorkQueue.h" />
     <ClInclude Include="zero\zones\hyperspace\BallBehavior.h" />
+    <ClInclude Include="zero\zones\hyperspace\CenterLeviBehavior.h" />
+    <ClInclude Include="zero\zones\hyperspace\CenterBehavior.h" />
+    <ClInclude Include="zero\zones\ZoneController.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

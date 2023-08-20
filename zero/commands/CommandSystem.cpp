@@ -1,6 +1,8 @@
 #include "CommandSystem.h"
 
+#include <zero/BotController.h>
 #include <zero/ZeroBot.h>
+#include <zero/behavior/Behavior.h>
 #include <zero/game/Game.h>
 #include <zero/game/net/PacketDispatcher.h>
 
@@ -8,12 +10,76 @@ namespace zero {
 
 constexpr int kArenaSecurityLevel = 5;
 
-class SayCommand : public CommandExecutor {
-public:
+class BehaviorsCommand : public CommandExecutor {
+ public:
   void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
-    const char* kFilters[] = {
-      "?password", "?passwd", "?squad"
-    };
+    Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
+    if (!player) return;
+
+    auto& map = bot.bot_controller->behaviors.behaviors;
+    std::string output = "none";
+
+    if (map.empty()) {
+      bot.game->chat.SendPrivateMessage(output.data(), player->id);
+      return;
+    }
+
+    for (auto& kv : map) {
+      output += ", " + kv.first;
+    }
+
+    bot.game->chat.SendPrivateMessage(output.data(), player->id);
+  }
+
+  CommandAccessFlags GetAccess() { return CommandAccess_Private; }
+  void SetAccess(CommandAccessFlags flags) {}
+  std::vector<std::string> GetAliases() { return {"behaviors"}; }
+  std::string GetDescription() { return "Lists all possible behaviors."; }
+  int GetSecurityLevel() { return 0; }
+};
+
+class BehaviorCommand : public CommandExecutor {
+ public:
+  void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
+    Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
+    bool success = false;
+
+    behavior::Behavior* find_behavior = nullptr;
+
+    if (arg == "none") {
+      success = true;
+
+      bot.bot_controller->behavior_tree = nullptr;
+    } else {
+      find_behavior = bot.bot_controller->behaviors.Find(arg);
+
+      if (find_behavior) {
+        find_behavior->OnInitialize(bot.execute_ctx);
+
+        bot.bot_controller->behavior_tree = find_behavior->CreateTree(bot.execute_ctx);
+      }
+    }
+
+    if (player) {
+      if (success) {
+        bot.game->chat.SendPrivateMessage("Behavior set.", player->id);
+      } else {
+        bot.game->chat.SendPrivateMessage("Failed to find behavior.", player->id);
+      }
+    }
+  }
+
+  CommandAccessFlags GetAccess() { return CommandAccess_Private; }
+  void SetAccess(CommandAccessFlags flags) {}
+  std::vector<std::string> GetAliases() { return {"behavior", "b"}; }
+  std::string GetDescription() { return "Sets the active behavior."; }
+  int GetSecurityLevel() { return 0; }
+};
+
+class SayCommand : public CommandExecutor {
+ public:
+  void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
+    const char* kFilters[] = {"?password", "?passwd", "?squad"};
 
     for (size_t i = 0; i < ZERO_ARRAY_SIZE(kFilters); ++i) {
       if (arg.find(kFilters[i]) != std::string::npos) {
@@ -32,7 +98,7 @@ public:
 
   CommandAccessFlags GetAccess() { return CommandAccess_Private; }
   void SetAccess(CommandAccessFlags flags) { return; }
-  std::vector<std::string> GetAliases() { return { "say" }; }
+  std::vector<std::string> GetAliases() { return {"say"}; }
   std::string GetDescription() { return "Repeats a message publicly"; }
   int GetSecurityLevel() { return 10; }
 };
@@ -226,6 +292,8 @@ CommandSystem::CommandSystem(ZeroBot& bot, PacketDispatcher& dispatcher) : bot(b
   RegisterCommand(std::make_shared<SetShipCommand>());
   RegisterCommand(std::make_shared<ZoneCommand>());
   RegisterCommand(std::make_shared<SayCommand>());
+  RegisterCommand(std::make_shared<BehaviorCommand>());
+  RegisterCommand(std::make_shared<BehaviorsCommand>());
 }
 
 int CommandSystem::GetSecurityLevel(const std::string& player) {

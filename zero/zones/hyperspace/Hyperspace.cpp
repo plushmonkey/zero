@@ -1,31 +1,34 @@
+#include <zero/BotController.h>
 #include <zero/ZeroBot.h>
 #include <zero/game/GameEvent.h>
 #include <zero/game/Logger.h>
+#include <zero/zones/ZoneController.h>
 #include <zero/zones/hyperspace/BallBehavior.h>
+#include <zero/zones/hyperspace/CenterBehavior.h>
+#include <zero/zones/hyperspace/CenterLeviBehavior.h>
 
 namespace zero {
 namespace hyperspace {
 
-struct HyperspaceController : EventHandler<ZeroBot::JoinRequestEvent>, EventHandler<ArenaNameEvent> {
-  void HandleEvent(const ZeroBot::JoinRequestEvent& event) override {
-    auto zone = event.server.zone;
+struct HyperspaceController : ZoneController {
+  bool IsZone(Zone zone) override { return zone == Zone::Hyperspace || zone == Zone::Local; }
 
-    in_hyperspace = (zone == Zone::Hyperspace || zone == Zone::Local);
-  }
-
-  void HandleEvent(const ArenaNameEvent& event) override {
-    if (!in_hyperspace) return;
-
+  void CreateBehaviors(const char* arena_name) override {
     // Create behaviors depending on arena name
-    if (isdigit(event.name[0])) {
+    if (isdigit(arena_name[0])) {
       Log(LogLevel::Info, "Registering hyperspace behaviors for public arena.");
-      behavior::BehaviorRepository::Get().Add("ball", std::make_unique<BallBehavior>());
+
+      auto& repo = bot->bot_controller->behaviors;
+
+      repo.Add("ball", std::make_unique<BallBehavior>());
+      repo.Add("center-levi", std::make_unique<CenterLeviBehavior>());
+      repo.Add("center", std::make_unique<CenterBehavior>());
+
+      SetBehavior("center");
     } else {
-      Log(LogLevel::Info, "No hyperspace behaviors defined for arena '%s'.", event.name);
+      Log(LogLevel::Info, "No hyperspace behaviors defined for arena '%s'.", arena_name);
     }
   }
-
-  bool in_hyperspace = false;
 };
 
 static HyperspaceController controller;

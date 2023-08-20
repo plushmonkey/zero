@@ -73,7 +73,7 @@ bool ZeroBot::JoinZone(ServerInfo& server) {
   kPlayerPassword = password;
 
   game = memory_arena_construct_type(&perm_arena, Game, perm_arena, trans_arena, *work_queue, 1920, 1080);
-  bot_controller = memory_arena_construct_type(&perm_arena, BotController);
+  bot_controller = memory_arena_construct_type(&perm_arena, BotController, *game);
 
   commands = memory_arena_construct_type(&perm_arena, CommandSystem, *this, this->game->dispatcher);
 
@@ -126,7 +126,7 @@ void ZeroBot::Run() {
       execute_ctx.bot = this;
       execute_ctx.dt = dt;
 
-      bot_controller->Update(dt, *game, input, execute_ctx);
+      bot_controller->Update(dt, input, execute_ctx);
     }
 
     if (!game->Update(input, dt)) {

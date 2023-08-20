@@ -14,12 +14,6 @@ struct Behavior {
 };
 
 struct BehaviorRepository {
-  static BehaviorRepository& Get() {
-    static BehaviorRepository instance;
-
-    return instance;
-  }
-
   inline void Add(const std::string& name, std::unique_ptr<Behavior> tree) { behaviors[name] = std::move(tree); }
 
   inline Behavior* Find(const std::string& name) {
@@ -30,8 +24,7 @@ struct BehaviorRepository {
     return iter->second.get();
   }
 
- private:
-  BehaviorRepository() {}
+  inline void Clear() { behaviors.clear(); }
 
   std::unordered_map<std::string, std::unique_ptr<Behavior>> behaviors;
 };
