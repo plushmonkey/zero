@@ -608,6 +608,8 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
       } break;
       case ProtocolS2C::PowerballPosition: {
       } break;
+      case ProtocolS2C::ArenaDirectoryListing: {
+      } break;
       case ProtocolS2C::PostLogin: {
       } break;
       case ProtocolS2C::Version: {

@@ -78,6 +78,46 @@ static void OnPlayerIdPkt(void* user, u8* pkt, size_t size) {
   game->OnPlayerId(pkt, size);
 }
 
+static void OnJoinGamePkt(void* user, u8* pkt, size_t size) {
+  Game* game = (Game*)user;
+
+  // Send a request for the arena list so we can know the name of the current arena.
+  game->chat.SendMessage(ChatType::Public, "?arena");
+}
+
+static void OnArenaListPkt(void* user, u8* pkt, size_t size) {
+  NetworkBuffer buffer(pkt, kMaxPacketSize);
+  Game* game = (Game*)user;
+
+  buffer.ReadU8();  // Skip type byte
+
+  char* current_name = (char*)buffer.read;
+  bool name_parse = true;
+
+  while (buffer.read < buffer.data + buffer.size) {
+    if (name_parse) {
+      if (!*buffer.read) {
+        name_parse = false;
+      }
+
+      buffer.ReadU8();
+    } else {
+      s16 count = buffer.ReadU16();
+
+      // The current directory is marked with negative count
+      if (count < 0) {
+        strcpy(game->arena_name, current_name);
+        break;
+      }
+
+      current_name = (char*)buffer.read;
+      name_parse = true;
+    }
+  }
+
+  Event::Dispatch(ArenaNameEvent(game->arena_name));
+}
+
 static void OnArenaSettingsPkt(void* user, u8* pkt, size_t size) {
   Game* game = (Game*)user;
   game->RecreateRadar();
@@ -197,6 +237,8 @@ Game::Game(MemoryArena& perm_arena, MemoryArena& temp_arena, WorkQueue& work_que
   dispatcher.Register(ProtocolS2C::FlagPosition, OnFlagPositionPkt, this);
   dispatcher.Register(ProtocolS2C::FlagClaim, OnFlagClaimPkt, this);
   dispatcher.Register(ProtocolS2C::PlayerId, OnPlayerIdPkt, this);
+  dispatcher.Register(ProtocolS2C::JoinGame, OnJoinGamePkt, this);
+  dispatcher.Register(ProtocolS2C::ArenaDirectoryListing, OnArenaListPkt, this);
   dispatcher.Register(ProtocolS2C::ArenaSettings, OnArenaSettingsPkt, this);
   dispatcher.Register(ProtocolS2C::TeamAndShipChange, OnPlayerFreqAndShipChangePkt, this);
   dispatcher.Register(ProtocolS2C::TurfFlagUpdate, OnTurfFlagUpdatePkt, this);

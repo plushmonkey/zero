@@ -22,6 +22,12 @@ struct S2CPacketEvent : public Event {
 struct DisconnectEvent : public Event {};
 struct JoinGameEvent : public Event {};
 
+struct ArenaNameEvent : public Event {
+  const char* name;
+
+  ArenaNameEvent(const char* name) : name(name) {}
+};
+
 struct ArenaSettingsEvent : public Event {
   ArenaSettings& settings;
 
