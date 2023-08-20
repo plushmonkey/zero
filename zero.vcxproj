@@ -52,9 +52,12 @@
     <ClCompile Include="zero\game\Soccer.cpp" />
     <ClCompile Include="zero\game\WeaponManager.cpp" />
     <ClCompile Include="zero\game\WorkQueue.cpp" />
+    <ClCompile Include="zero\zones\hyperspace\BallBehavior.cpp" />
+    <ClCompile Include="zero\zones\hyperspace\Hyperspace.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="zero\Actuator.h" />
+    <ClInclude Include="zero\behavior\Behavior.h" />
     <ClInclude Include="zero\behavior\BehaviorBuilder.h" />
     <ClInclude Include="zero\behavior\BehaviorTree.h" />
     <ClInclude Include="zero\behavior\Blackboard.h" />
@@ -73,6 +76,8 @@
     <ClInclude Include="zero\behavior\nodes\WaypointNode.h" />
     <ClInclude Include="zero\BotController.h" />
     <ClInclude Include="zero\commands\CommandSystem.h" />
+    <ClInclude Include="zero\Event.h" />
+    <ClInclude Include="zero\game\GameEvent.h" />
     <ClInclude Include="zero\game\Logger.h" />
     <ClInclude Include="zero\path\Path.h" />
     <ClInclude Include="zero\ZeroBot.h" />
@@ -116,6 +121,7 @@
     <ClInclude Include="zero\Types.h" />
     <ClInclude Include="zero\game\WeaponManager.h" />
     <ClInclude Include="zero\game\WorkQueue.h" />
+    <ClInclude Include="zero\zones\hyperspace\BallBehavior.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <zero/Event.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/commands/CommandSystem.h>
 #include <zero/game/Game.h>
@@ -71,6 +72,13 @@ struct ZeroBot {
   bool JoinZone(ServerInfo& server);
 
   void Run();
+
+  struct JoinRequestEvent : public Event {
+    ZeroBot& bot;
+    ServerInfo& server;
+
+    JoinRequestEvent(ZeroBot& bot, ServerInfo& server) : bot(bot), server(server) {}
+  };
 };
 
 }  // namespace zero

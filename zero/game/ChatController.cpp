@@ -7,6 +7,7 @@
 #include <string.h>
 #include <zero/game/Camera.h>
 #include <zero/game/Clock.h>
+#include <zero/game/GameEvent.h>
 #include <zero/game/Logger.h>
 #include <zero/game/Platform.h>
 #include <zero/game/PlayerManager.h>
@@ -159,6 +160,8 @@ void ChatController::OnChatPacket(u8* packet, size_t size) {
   }
 
   entry->sound = sound;
+
+  EventDispatcher::Get().Dispatch(ChatEvent(entry->type, entry->sender, entry->message));
 }
 
 ChatEntry* ChatController::PushEntry(const char* mesg, size_t size, ChatType type) {

@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <zero/game/ArenaSettings.h>
 #include <zero/game/Clock.h>
+#include <zero/game/GameEvent.h>
 #include <zero/game/Logger.h>
 #include <zero/game/Platform.h>
 #include <zero/game/net/Protocol.h>
@@ -29,7 +30,7 @@
 #include <chrono>
 #include <thread>
 
-//#define PACKET_SHEDDING 20
+// #define PACKET_SHEDDING 20
 #define PACKET_TYPE_OUTPUT 1
 
 namespace zero {
@@ -344,6 +345,8 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
       case ProtocolCore::Disconnect: {
         Log(LogLevel::Info, "Server sent disconnect packet.");
         this->connected = false;
+
+        EventDispatcher::Get().Dispatch(DisconnectEvent());
       } break;
       case ProtocolCore::SmallChunkBody: {
         packet_sequencer.OnSmallChunkBody(*this, pkt, size);
@@ -446,6 +449,8 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
         weapons_received = 0;
         sync_index = 0;
         joined_arena = true;
+
+        EventDispatcher::Get().Dispatch(JoinGameEvent());
       } break;
       case ProtocolS2C::PlayerEntering: {
         // Skip the entire packet so the next one can be read if it exists
@@ -550,6 +555,8 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
         if (security.checksum_key && map.checksum) {
           SendSecurityPacket();
         }
+
+        EventDispatcher::Get().Dispatch(ArenaSettingsEvent(this->settings));
       } break;
       case ProtocolS2C::FlagPosition: {
       } break;
@@ -630,6 +637,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
   }
 
   dispatcher.Dispatch(pkt, size);
+  EventDispatcher::Get().Dispatch(S2CPacketEvent(pkt, size));
 }
 
 void Connection::SendArenaLogin(u8 ship, u16 audio, u16 xres, u16 yres, u16 arena_number, const char* arena_name) {
@@ -671,6 +679,8 @@ void Connection::OnDownloadComplete(struct FileRequest* request, u8* data) {
 
   login_state = LoginState::Complete;
   login_tick = GetCurrentTick();
+
+  EventDispatcher::Get().Dispatch(MapLoadEvent(map));
 }
 
 void Connection::SendSyncTimeRequestPacket(bool reliable) {
@@ -938,6 +948,8 @@ size_t Connection::Send(u8* data, size_t size) {
     Log(LogLevel::Jabber, "Sending non-core type: 0x%02X", data[0]);
   }
 #endif
+
+  EventDispatcher::Get().Dispatch(C2SPacketEvent(data, size));
 
   // TODO: This should be a proper system, but right now it just needs to handle
   // registration form
