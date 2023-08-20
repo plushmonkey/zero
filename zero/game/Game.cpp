@@ -320,6 +320,7 @@ bool Game::Update(const InputState& input, float dt) {
     GameFlag* flag = flags + i;
 
     if (TICK_GT(flag->hidden_end_tick, tick)) continue;
+    if (!(flag->flags & GameFlag_Dropped)) continue;
 
     Vector2f flag_min = flag->position;
     Vector2f flag_max = flag->position + Vector2f(1, 1);
@@ -332,7 +333,7 @@ bool Game::Update(const InputState& input, float dt) {
       if (player->frequency == flag->owner) continue;
       if (!player_manager.IsSynchronized(*player)) continue;
 
-      float radius = connection.settings.ShipSettings[player->ship].GetRadius();
+      float radius = connection.settings.ShipSettings[player->ship].GetRadius() + (1.0f / 16.0f);
       Vector2f player_min = player->position - Vector2f(radius, radius);
       Vector2f player_max = player->position + Vector2f(radius, radius);
 
@@ -340,7 +341,7 @@ bool Game::Update(const InputState& input, float dt) {
         constexpr u32 kHideFlagDelay = 300;
 
         if (!(flag->flags & GameFlag_Turf)) {
-          flag->hidden_end_tick = tick + kHideFlagDelay;
+          flag->hidden_end_tick = MAKE_TICK(tick + kHideFlagDelay);
         }
 
         u32 carry = connection.settings.CarryFlags;
