@@ -10,6 +10,11 @@ struct EventTypeDispatcherImpl;
 
 struct Event {
   virtual ~Event() {}
+
+  template <typename T>
+  static void Dispatch(const T& event) {
+    EventTypeDispatcherImpl<T>::Get().Dispatch(event);
+  }
 };
 
 // This is an event handler for a specific type of event.
@@ -58,22 +63,6 @@ struct EventTypeDispatcherImpl {
       }
     }
   }
-};
-
-struct EventDispatcher {
- public:
-  static EventDispatcher& Get() {
-    static EventDispatcher instance;
-    return instance;
-  }
-
-  template <typename T>
-  void Dispatch(const T& event) {
-    EventTypeDispatcherImpl<T>::Get().Dispatch(event);
-  }
-
- private:
-  EventDispatcher() {}
 };
 
 }  // namespace zero

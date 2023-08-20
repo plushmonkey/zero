@@ -93,7 +93,7 @@ bool ZeroBot::JoinZone(ServerInfo& server) {
 
   this->server_info = server;
 
-  EventDispatcher::Get().Dispatch(JoinRequestEvent(*this, server));
+  Event::Dispatch(JoinRequestEvent(*this, server));
 
   return true;
 }

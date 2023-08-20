@@ -372,7 +372,7 @@ void PlayerManager::OnPlayerEnter(u8* pkt, size_t size) {
     chat_controller->AddMessage(ChatType::Arena, "%s entered arena", player->name);
   }
 
-  EventDispatcher::Get().Dispatch(PlayerEnterEvent(*player));
+  Event::Dispatch(PlayerEnterEvent(*player));
 }
 
 void PlayerManager::OnPlayerLeave(u8* pkt, size_t size) {
@@ -397,7 +397,7 @@ void PlayerManager::OnPlayerLeave(u8* pkt, size_t size) {
       chat_controller->AddMessage(ChatType::Arena, "%s left arena", player->name);
     }
 
-    EventDispatcher::Get().Dispatch(PlayerLeaveEvent(*player));
+    Event::Dispatch(PlayerLeaveEvent(*player));
 
     // Swap the last player in the list's lookup to point to their new index
     assert(index < 1024);
@@ -448,7 +448,7 @@ void PlayerManager::OnPlayerDeath(u8* pkt, size_t size) {
   }
 
   if (killer && killed) {
-    EventDispatcher::Get().Dispatch(PlayerDeathEvent(*killed, *killer));
+    Event::Dispatch(PlayerDeathEvent(*killed, *killer, bounty, flag_transfer));
   }
 }
 
@@ -567,7 +567,7 @@ void PlayerManager::Spawn(bool reset) {
 
   SendPositionPacket();
 
-  EventDispatcher::Get().Dispatch(SpawnEvent(*self));
+  Event::Dispatch(SpawnEvent(*self));
 }
 
 void PlayerManager::OnPlayerFrequencyChange(u8* pkt, size_t size) {
@@ -597,7 +597,7 @@ void PlayerManager::OnPlayerFrequencyChange(u8* pkt, size_t size) {
 
     weapon_manager->ClearWeapons(*player);
 
-    EventDispatcher::Get().Dispatch(PlayerFreqChangeEvent(*player, old_freq, frequency));
+    Event::Dispatch(PlayerFreqChangeEvent(*player, old_freq, frequency));
 
     if (player->id == player_id) {
       Spawn(true);
@@ -635,7 +635,7 @@ void PlayerManager::OnPlayerFreqAndShipChange(u8* pkt, size_t size) {
 
     weapon_manager->ClearWeapons(*player);
 
-    EventDispatcher::Get().Dispatch(PlayerFreqAndShipChangeEvent(*player, old_freq, freq, old_ship, ship));
+    Event::Dispatch(PlayerFreqAndShipChangeEvent(*player, old_freq, freq, old_ship, ship));
 
     if (player->id == player_id) {
       Spawn(true);
@@ -1090,7 +1090,7 @@ void PlayerManager::OnCreateTurretLink(u8* pkt, size_t size) {
     }
 
     AttachPlayer(*requester, *destination);
-    EventDispatcher::Get().Dispatch(PlayerAttachEvent(*requester, *destination));
+    Event::Dispatch(PlayerAttachEvent(*requester, *destination));
 
     if (requester->id != player_id) {
       requester->position = destination->position;
@@ -1147,7 +1147,7 @@ void PlayerManager::DetachPlayer(Player& player) {
         current = current->next;
       }
 
-      EventDispatcher::Get().Dispatch(PlayerDetachEvent(player, *parent));
+      Event::Dispatch(PlayerDetachEvent(player, *parent));
     }
 
     player.attach_parent = kInvalidPlayerId;

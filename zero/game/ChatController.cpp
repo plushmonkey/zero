@@ -161,7 +161,7 @@ void ChatController::OnChatPacket(u8* packet, size_t size) {
 
   entry->sound = sound;
 
-  EventDispatcher::Get().Dispatch(ChatEvent(entry->type, entry->sender, entry->message));
+  Event::Dispatch(ChatEvent(entry->type, entry->sender, entry->message));
 }
 
 ChatEntry* ChatController::PushEntry(const char* mesg, size_t size, ChatType type) {

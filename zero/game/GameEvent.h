@@ -68,8 +68,11 @@ struct PlayerLeaveEvent : public Event {
 struct PlayerDeathEvent : public Event {
   Player& player;
   Player& killer;
+  u16 bounty;
+  u16 flags;
 
-  PlayerDeathEvent(Player& player, Player& killer) : player(player), killer(killer) {}
+  PlayerDeathEvent(Player& player, Player& killer, u16 bounty, u16 flags)
+      : player(player), killer(killer), bounty(bounty), flags(flags) {}
 };
 
 struct SpawnEvent : public Event {

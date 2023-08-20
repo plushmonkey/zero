@@ -96,7 +96,7 @@ void BrickManager::Update(Map& map, u32 frequency, float dt) {
 
       map.SetTileId(brick->tile.x, brick->tile.y, 0);
 
-      EventDispatcher::Get().Dispatch(BrickTileClearEvent(*brick));
+      Event::Dispatch(BrickTileClearEvent(*brick));
 
       Brick** removed = brick_map.Remove(brick->tile);
       assert(removed);
@@ -133,7 +133,7 @@ void BrickManager::InsertBrick(u16 x, u16 y, u16 team, u16 id, u32 timestamp) {
 
   brick_map.Insert(brick->tile, brick);
 
-  EventDispatcher::Get().Dispatch(BrickTileEvent(*brick));
+  Event::Dispatch(BrickTileEvent(*brick));
 }
 
 void BrickManager::Clear() {
