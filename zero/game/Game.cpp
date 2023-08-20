@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <zero/game/Clock.h>
+#include <zero/game/GameEvent.h>
 #include <zero/game/Memory.h>
 #include <zero/game/Platform.h>
 #include <zero/game/Random.h>
@@ -12,6 +13,8 @@ namespace zero {
 inline void ToggleStatus(Game* game, Player* self, ShipCapabilityFlags capability, StatusFlag status) {
   if (game->ship_controller.ship.capability & capability) {
     self->togglables ^= status;
+
+    Event::Dispatch(ShipToggleEvent(capability, (self->togglables & status) != 0));
   }
 }
 
@@ -25,6 +28,8 @@ static void OnAction(void* user, InputAction action) {
     case InputAction::Multifire: {
       if (game->ship_controller.ship.capability & ShipCapability_Multifire) {
         game->ship_controller.ship.multifire = !game->ship_controller.ship.multifire;
+
+        Event::Dispatch(ShipToggleEvent(ShipCapability_Multifire, game->ship_controller.ship.multifire));
       }
 
     } break;
@@ -307,6 +312,8 @@ bool Game::Update(const InputState& input, float dt) {
             // Send flag pickup
             connection.SendFlagRequest(flag->id);
             flag->last_pickup_request_tick = tick;
+
+            Event::Dispatch(FlagPickupRequestEvent(*flag));
           }
         }
       }
@@ -322,6 +329,7 @@ bool Game::Update(const InputState& input, float dt) {
       if (new_timer <= 0) {
         connection.SendFlagDrop();
         self->flag_timer = 0;
+        Event::Dispatch(FlagTimeoutEvent());
       } else {
         self->flag_timer = (u16)new_timer;
       }
@@ -364,6 +372,8 @@ void Game::UpdateGreens(float dt) {
             // Pick up green
             ship_controller.ApplyPrize(self, green->prize_id, true);
             connection.SendTakeGreen((u16)green->position.x, (u16)green->position.y, green->prize_id);
+
+            Event::Dispatch(GreenPickupEvent(*green));
           }
 
           // Set the end tick to zero so it gets automatically removed next update
@@ -482,8 +492,12 @@ void Game::OnFlagClaim(u8* pkt, size_t size) {
     if (was_dropped && player->id == self_id) {
       player->flag_timer = connection.settings.FlagDropDelay;
     }
+
+    Event::Dispatch(FlagPickupEvent(flags[id], *player));
   } else {
     flags[id].owner = player->frequency;
+
+    Event::Dispatch(FlagTurfClaimEvent(flags[id], *player));
   }
 }
 
@@ -504,6 +518,8 @@ void Game::OnFlagPosition(u8* pkt, size_t size) {
   flags[id].position = Vector2f((float)x, (float)y);
   flags[id].flags |= GameFlag_Dropped;
   flags[id].hidden_end_tick = 0;
+
+  Event::Dispatch(FlagSpawnEvent(flags[id]));
 }
 
 void Game::OnTurfFlagUpdate(u8* pkt, size_t size) {
@@ -532,6 +548,8 @@ void Game::OnTurfFlagUpdate(u8* pkt, size_t size) {
     flags[id].position = Vector2f((float)tile->x, (float)tile->y);
     flags[id].flags |= GameFlag_Dropped | GameFlag_Turf;
     flags[id].hidden_end_tick = 0;
+
+    Event::Dispatch(FlagTurfUpdateEvent(flags[id]));
 
     ++id;
   }

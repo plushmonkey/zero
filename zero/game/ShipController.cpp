@@ -5,6 +5,7 @@
 #include <zero/game/ArenaSettings.h>
 #include <zero/game/Camera.h>
 #include <zero/game/Clock.h>
+#include <zero/game/GameEvent.h>
 #include <zero/game/InputState.h>
 #include <zero/game/PlayerManager.h>
 #include <zero/game/Radar.h>
@@ -214,10 +215,19 @@ void ShipController::Update(const InputState& input, float dt) {
 
   if (ship.emped_time > 0.0f) {
     ship.emped_time -= dt;
+    if (ship.emped_time <= 0) {
+      Event::Dispatch(EmpLossEvent());
+    }
   } else {
+    bool was_below_full = self->energy < (float)ship.energy;
+
     self->energy += (ship.recharge / 10.0f) * dt;
-    if (self->energy > ship.energy) {
+    if (self->energy >= ship.energy) {
       self->energy = (float)ship.energy;
+
+      if (was_below_full) {
+        Event::Dispatch(FullEnergyEvent());
+      }
     }
   }
 
@@ -227,8 +237,16 @@ void ShipController::Update(const InputState& input, float dt) {
   HandleStatusEnergy(*self, Status_Antiwarp, ship_settings.AntiWarpEnergy, dt);
 
   if (player_manager.connection.map.GetTileId(self->position) == kTileSafeId) {
+    if (!(self->togglables & Status_Safety)) {
+      Event::Dispatch(SafeEnterEvent(self->position));
+    }
+
     self->togglables |= Status_Safety;
   } else {
+    if (self->togglables & Status_Safety) {
+      Event::Dispatch(SafeLeaveEvent(self->position));
+    }
+
     self->togglables &= ~Status_Safety;
   }
 
@@ -382,6 +400,8 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
 
       ship.portal_time = portal_time;
       ship.portal_location = self.position;
+
+      Event::Dispatch(PortalDropEvent(self.position, portal_time));
     }
   } else {
     portal_input_cleared = true;
@@ -403,6 +423,8 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
         if (ship.portal_time > 0.0f) {
           ship.portal_time = 0.0f;
 
+          Vector2f from = self.position;
+
           self.togglables |= Status_Flash;
           self.warp_anim_t = 0.0f;
           self.position = ship.portal_location;
@@ -412,11 +434,15 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
           ship.next_bomb_tick = tick + kRepelDelayTicks;
           ship.fake_antiwarp_end_tick = tick + connection.settings.AntiwarpSettleDelay;
           warped = true;
+
+          Event::Dispatch(PortalWarpEvent(from, self.position));
         } else {
           if (TICK_GT(tick, ship.next_bomb_tick)) {
             if (self.energy < ship.energy) {
               // Not enough energy to warp
             } else {
+              Vector2f from = self.position;
+
               self.togglables |= Status_Flash;
               self.warp_anim_t = 0.0f;
               self.energy = 1.0f;
@@ -427,6 +453,8 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
               ship.fake_antiwarp_end_tick = tick + connection.settings.AntiwarpSettleDelay;
 
               warped = true;
+
+              Event::Dispatch(SpawnWarpEvent(from, self.position));
             }
 
             ship.next_bomb_tick = tick + kRepelDelayTicks;
@@ -1185,6 +1213,8 @@ void ShipController::ApplyPrize(Player* self, s32 prize_id, bool notify, bool da
     default: {
     } break;
   }
+
+  Event::Dispatch(PrizeEvent(prize, negative));
 }
 
 s32 ShipController::GeneratePrize(bool negative_allowed) {
@@ -1303,6 +1333,8 @@ void ShipController::ResetShip() {
 
   self->energy = (float)ship.energy;
   self->bounty = ship_settings.InitialBounty;
+
+  Event::Dispatch(ShipResetEvent());
 }
 
 void ShipController::UpdateSettings() {
@@ -1466,6 +1498,8 @@ void ShipController::OnWeaponHit(Weapon& weapon) {
 
   if (damage <= 0) return;
 
+  bool died = false;
+
   if (self->energy < damage) {
     bool is_bomb = (type == WeaponType::Bomb || type == WeaponType::ProximityBomb || type == WeaponType::Thor);
 
@@ -1477,6 +1511,7 @@ void ShipController::OnWeaponHit(Weapon& weapon) {
       self->enter_delay = (connection.settings.EnterDelay / 100.0f) + kAnimDurationShipExplode;
       self->explode_anim_t = 0.0f;
       self->energy = 0;
+      died = true;
     }
   } else {
     u16 factor = connection.settings.ShipSettings[self->ship].DamageFactor;
@@ -1497,6 +1532,8 @@ void ShipController::OnWeaponHit(Weapon& weapon) {
 
     self->energy -= damage;
   }
+
+  Event::Dispatch(WeaponDamageEvent(weapon, *shooter, damage, died));
 }
 
 }  // namespace zero

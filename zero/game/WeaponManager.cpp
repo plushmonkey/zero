@@ -5,6 +5,7 @@
 #include <zero/game/Buffer.h>
 #include <zero/game/Camera.h>
 #include <zero/game/Clock.h>
+#include <zero/game/GameEvent.h>
 #include <zero/game/PlayerManager.h>
 #include <zero/game/Radar.h>
 #include <zero/game/ShipController.h>
@@ -40,6 +41,7 @@ void WeaponManager::Update(float dt) {
     Player* player = player_manager.GetPlayerById(weapon->player_id);
 
     if (player && connection.map.GetTileId(player->position) == kTileSafeId) {
+      Event::Dispatch(WeaponDestroyEvent(*weapon));
       weapons[i--] = weapons[--weapon_count];
       continue;
     }
@@ -57,9 +59,11 @@ void WeaponManager::Update(float dt) {
 
       if (result == WeaponSimulateResult::PlayerExplosion || result == WeaponSimulateResult::WallExplosion) {
         CreateExplosion(*weapon);
+        Event::Dispatch(WeaponDestroyEvent(*weapon));
         weapons[i--] = weapons[--weapon_count];
         break;
       } else if (result == WeaponSimulateResult::TimedOut) {
+        Event::Dispatch(WeaponDestroyEvent(*weapon));
         weapons[i--] = weapons[--weapon_count];
         break;
       }
@@ -87,6 +91,7 @@ void WeaponManager::Update(float dt) {
 
         if (removed) {
           assert(weapon_count > 0);
+          Event::Dispatch(WeaponDestroyEvent(*weapon));
           weapons[i--] = weapons[--weapon_count];
         }
       }
@@ -393,6 +398,7 @@ void WeaponManager::ClearWeapons(Player& player) {
     Weapon* weapon = weapons + i;
 
     if (weapon->player_id == player.id) {
+      Event::Dispatch(WeaponDestroyEvent(*weapon));
       weapons[i--] = weapons[--weapon_count];
     }
   }
@@ -461,7 +467,13 @@ void WeaponManager::CreateExplosion(Weapon& weapon) {
         shrap->last_event_position = shrap->position;
         shrap->last_event_time = GetMicrosecondTick();
 
+        Player* player = player_manager.GetPlayerById(weapon.player_id);
+        if (player) {
+          Event::Dispatch(WeaponSpawnEvent(*shrap, *player));
+        }
+
         if (connection.map.IsSolid((u16)shrap->position.x, (u16)shrap->position.y, shrap->frequency)) {
+          Event::Dispatch(WeaponDestroyEvent(*shrap));
           --weapon_count;
         }
       }
@@ -636,6 +648,7 @@ bool WeaponManager::FireWeapons(Player& player, WeaponData weapon, u32 pos_x, u3
         Weapon* weapon = weapons + i;
         if (weapon->link_id == link_id) {
           CreateExplosion(*weapon);
+          Event::Dispatch(WeaponDestroyEvent(*weapon));
           weapons[i--] = weapons[--weapon_count];
         }
       }
@@ -711,6 +724,8 @@ WeaponSimulateResult WeaponManager::GenerateWeapon(u16 player_id, WeaponData wea
     weapon->velocity = Vector2f(0, 0);
   }
 
+  Event::Dispatch(WeaponSpawnEvent(*weapon, *player));
+
   s32 tick_diff = TICK_DIFF(GetCurrentTick(), local_timestamp);
 
   WeaponSimulateResult result = WeaponSimulateResult::Continue;
@@ -720,6 +735,7 @@ WeaponSimulateResult WeaponManager::GenerateWeapon(u16 player_id, WeaponData wea
 
     if (result != WeaponSimulateResult::Continue) {
       CreateExplosion(*weapon);
+      Event::Dispatch(WeaponDestroyEvent(*weapon));
       --weapon_count;
       return result;
     }
