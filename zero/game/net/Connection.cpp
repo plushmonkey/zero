@@ -443,6 +443,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
     switch (type) {
       case ProtocolS2C::PlayerId: {
         this->login_state = LoginState::ArenaLogin;
+        security.checksum_key = 0;
       } break;
       case ProtocolS2C::JoinGame: {
         Log(LogLevel::Info, "Successfully joined game.");
@@ -714,12 +715,18 @@ void Connection::SendSecurityPacket() {
     Log(LogLevel::Info, "Sending security packet with checksum seed %08X", security.checksum_key);
     SendSecurity(settings_checksum, exe_checksum, map_checksum);
   } else {
-    security_solver.GetChecksum(security.checksum_key, [this](u32* checksum) {
+    u32 request_key = security.checksum_key;
+
+    security_solver.GetChecksum(security.checksum_key, [this, request_key](u32* checksum) {
+      // The checksum key can be different from the requested key if the player changes arena, so just discard this.
+      if (request_key != security.checksum_key) return;
+
       if (checksum) {
         u32 settings_checksum = SettingsChecksum(security.checksum_key, settings);
         u32 map_checksum = map.GetChecksum(security.checksum_key);
 
-        Log(LogLevel::Info, "Sending security packet with checksum seed %08X", security.checksum_key);
+        Log(LogLevel::Info, "Sending security packet with checksum seed %08X", request_key);
+
         SendSecurity(settings_checksum, *checksum, map_checksum);
       } else {
         Log(LogLevel::Error, "Failed to load checksum from network solver.");
