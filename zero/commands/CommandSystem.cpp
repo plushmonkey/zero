@@ -57,6 +57,8 @@ class BehaviorCommand : public CommandExecutor {
         find_behavior->OnInitialize(bot.execute_ctx);
 
         bot.bot_controller->behavior_tree = find_behavior->CreateTree(bot.execute_ctx);
+
+        success = true;
       }
     }
 
