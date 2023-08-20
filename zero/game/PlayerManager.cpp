@@ -6,6 +6,7 @@
 #include <zero/game/Buffer.h>
 #include <zero/game/ChatController.h>
 #include <zero/game/Clock.h>
+#include <zero/game/GameEvent.h>
 #include <zero/game/InputState.h>
 #include <zero/game/Logger.h>
 #include <zero/game/Radar.h>
@@ -370,6 +371,8 @@ void PlayerManager::OnPlayerEnter(u8* pkt, size_t size) {
   if (chat_controller && received_initial_list) {
     chat_controller->AddMessage(ChatType::Arena, "%s entered arena", player->name);
   }
+
+  Event::Dispatch(PlayerEnterEvent(*player));
 }
 
 void PlayerManager::OnPlayerLeave(u8* pkt, size_t size) {
@@ -393,6 +396,8 @@ void PlayerManager::OnPlayerLeave(u8* pkt, size_t size) {
     if (chat_controller) {
       chat_controller->AddMessage(ChatType::Arena, "%s left arena", player->name);
     }
+
+    Event::Dispatch(PlayerLeaveEvent(*player));
 
     // Swap the last player in the list's lookup to point to their new index
     assert(index < 1024);
@@ -440,6 +445,10 @@ void PlayerManager::OnPlayerDeath(u8* pkt, size_t size) {
     if (killer->id == player_id) {
       killer->bounty += connection.settings.BountyIncreaseForKill;
     }
+  }
+
+  if (killer && killed) {
+    Event::Dispatch(PlayerDeathEvent(*killed, *killer, bounty, flag_transfer));
   }
 }
 
@@ -557,6 +566,8 @@ void PlayerManager::Spawn(bool reset) {
   self->warp_anim_t = 0.0f;
 
   SendPositionPacket();
+
+  Event::Dispatch(SpawnEvent(*self));
 }
 
 void PlayerManager::OnPlayerFrequencyChange(u8* pkt, size_t size) {
@@ -573,6 +584,8 @@ void PlayerManager::OnPlayerFrequencyChange(u8* pkt, size_t size) {
     DetachPlayer(*player);
     DetachAllChildren(*player);
 
+    u16 old_freq = player->frequency;
+
     player->frequency = frequency;
     player->velocity = Vector2f(0, 0);
 
@@ -583,6 +596,8 @@ void PlayerManager::OnPlayerFrequencyChange(u8* pkt, size_t size) {
     player->ball_carrier = false;
 
     weapon_manager->ClearWeapons(*player);
+
+    Event::Dispatch(PlayerFreqChangeEvent(*player, old_freq, frequency));
 
     if (player->id == player_id) {
       Spawn(true);
@@ -605,6 +620,9 @@ void PlayerManager::OnPlayerFreqAndShipChange(u8* pkt, size_t size) {
     DetachPlayer(*player);
     DetachAllChildren(*player);
 
+    u16 old_freq = player->frequency;
+    u8 old_ship = player->ship;
+
     player->ship = ship;
     player->frequency = freq;
     player->velocity = Vector2f(0, 0);
@@ -616,6 +634,8 @@ void PlayerManager::OnPlayerFreqAndShipChange(u8* pkt, size_t size) {
     player->ball_carrier = false;
 
     weapon_manager->ClearWeapons(*player);
+
+    Event::Dispatch(PlayerFreqAndShipChangeEvent(*player, old_freq, freq, old_ship, ship));
 
     if (player->id == player_id) {
       Spawn(true);
@@ -1070,6 +1090,7 @@ void PlayerManager::OnCreateTurretLink(u8* pkt, size_t size) {
     }
 
     AttachPlayer(*requester, *destination);
+    Event::Dispatch(PlayerAttachEvent(*requester, *destination));
 
     if (requester->id != player_id) {
       requester->position = destination->position;
@@ -1125,6 +1146,8 @@ void PlayerManager::DetachPlayer(Player& player) {
         prev = current;
         current = current->next;
       }
+
+      Event::Dispatch(PlayerDetachEvent(player, *parent));
     }
 
     player.attach_parent = kInvalidPlayerId;

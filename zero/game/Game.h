@@ -60,6 +60,8 @@ struct Game {
   float jitter_time = 0.0f;
   u32 last_tick = 0;
 
+  char arena_name[17] = {};
+
   size_t flag_count = 0;
   GameFlag flags[256];
 

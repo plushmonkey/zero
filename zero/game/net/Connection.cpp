@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <zero/game/ArenaSettings.h>
 #include <zero/game/Clock.h>
+#include <zero/game/GameEvent.h>
 #include <zero/game/Logger.h>
 #include <zero/game/Platform.h>
 #include <zero/game/net/Protocol.h>
@@ -29,7 +30,7 @@
 #include <chrono>
 #include <thread>
 
-//#define PACKET_SHEDDING 20
+// #define PACKET_SHEDDING 20
 #define PACKET_TYPE_OUTPUT 1
 
 namespace zero {
@@ -344,6 +345,8 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
       case ProtocolCore::Disconnect: {
         Log(LogLevel::Info, "Server sent disconnect packet.");
         this->connected = false;
+
+        Event::Dispatch(DisconnectEvent());
       } break;
       case ProtocolCore::SmallChunkBody: {
         packet_sequencer.OnSmallChunkBody(*this, pkt, size);
@@ -440,12 +443,15 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
     switch (type) {
       case ProtocolS2C::PlayerId: {
         this->login_state = LoginState::ArenaLogin;
+        security.checksum_key = 0;
       } break;
       case ProtocolS2C::JoinGame: {
         Log(LogLevel::Info, "Successfully joined game.");
         weapons_received = 0;
         sync_index = 0;
         joined_arena = true;
+
+        Event::Dispatch(JoinGameEvent());
       } break;
       case ProtocolS2C::PlayerEntering: {
         // Skip the entire packet so the next one can be read if it exists
@@ -550,6 +556,8 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
         if (security.checksum_key && map.checksum) {
           SendSecurityPacket();
         }
+
+        Event::Dispatch(ArenaSettingsEvent(this->settings));
       } break;
       case ProtocolS2C::FlagPosition: {
       } break;
@@ -601,6 +609,8 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
       } break;
       case ProtocolS2C::PowerballPosition: {
       } break;
+      case ProtocolS2C::ArenaDirectoryListing: {
+      } break;
       case ProtocolS2C::PostLogin: {
       } break;
       case ProtocolS2C::Version: {
@@ -630,6 +640,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
   }
 
   dispatcher.Dispatch(pkt, size);
+  Event::Dispatch(S2CPacketEvent(pkt, size));
 }
 
 void Connection::SendArenaLogin(u8 ship, u16 audio, u16 xres, u16 yres, u16 arena_number, const char* arena_name) {
@@ -671,6 +682,8 @@ void Connection::OnDownloadComplete(struct FileRequest* request, u8* data) {
 
   login_state = LoginState::Complete;
   login_tick = GetCurrentTick();
+
+  Event::Dispatch(MapLoadEvent(map));
 }
 
 void Connection::SendSyncTimeRequestPacket(bool reliable) {
@@ -702,12 +715,18 @@ void Connection::SendSecurityPacket() {
     Log(LogLevel::Info, "Sending security packet with checksum seed %08X", security.checksum_key);
     SendSecurity(settings_checksum, exe_checksum, map_checksum);
   } else {
-    security_solver.GetChecksum(security.checksum_key, [this](u32* checksum) {
+    u32 request_key = security.checksum_key;
+
+    security_solver.GetChecksum(security.checksum_key, [this, request_key](u32* checksum) {
+      // The checksum key can be different from the requested key if the player changes arena, so just discard this.
+      if (request_key != security.checksum_key) return;
+
       if (checksum) {
         u32 settings_checksum = SettingsChecksum(security.checksum_key, settings);
         u32 map_checksum = map.GetChecksum(security.checksum_key);
 
-        Log(LogLevel::Info, "Sending security packet with checksum seed %08X", security.checksum_key);
+        Log(LogLevel::Info, "Sending security packet with checksum seed %08X", request_key);
+
         SendSecurity(settings_checksum, *checksum, map_checksum);
       } else {
         Log(LogLevel::Error, "Failed to load checksum from network solver.");
@@ -938,6 +957,8 @@ size_t Connection::Send(u8* data, size_t size) {
     Log(LogLevel::Jabber, "Sending non-core type: 0x%02X", data[0]);
   }
 #endif
+
+  Event::Dispatch(C2SPacketEvent(data, size));
 
   // TODO: This should be a proper system, but right now it just needs to handle
   // registration form

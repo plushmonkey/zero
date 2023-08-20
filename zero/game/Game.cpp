@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <zero/game/Clock.h>
+#include <zero/game/GameEvent.h>
 #include <zero/game/Memory.h>
 #include <zero/game/Platform.h>
 #include <zero/game/Random.h>
@@ -12,6 +13,8 @@ namespace zero {
 inline void ToggleStatus(Game* game, Player* self, ShipCapabilityFlags capability, StatusFlag status) {
   if (game->ship_controller.ship.capability & capability) {
     self->togglables ^= status;
+
+    Event::Dispatch(ShipToggleEvent(capability, (self->togglables & status) != 0));
   }
 }
 
@@ -25,6 +28,8 @@ static void OnAction(void* user, InputAction action) {
     case InputAction::Multifire: {
       if (game->ship_controller.ship.capability & ShipCapability_Multifire) {
         game->ship_controller.ship.multifire = !game->ship_controller.ship.multifire;
+
+        Event::Dispatch(ShipToggleEvent(ShipCapability_Multifire, game->ship_controller.ship.multifire));
       }
 
     } break;
@@ -71,6 +76,46 @@ static void OnPlayerIdPkt(void* user, u8* pkt, size_t size) {
   Game* game = (Game*)user;
 
   game->OnPlayerId(pkt, size);
+}
+
+static void OnJoinGamePkt(void* user, u8* pkt, size_t size) {
+  Game* game = (Game*)user;
+
+  // Send a request for the arena list so we can know the name of the current arena.
+  game->chat.SendMessage(ChatType::Public, "?arena");
+}
+
+static void OnArenaListPkt(void* user, u8* pkt, size_t size) {
+  NetworkBuffer buffer(pkt, kMaxPacketSize);
+  Game* game = (Game*)user;
+
+  buffer.ReadU8();  // Skip type byte
+
+  char* current_name = (char*)buffer.read;
+  bool name_parse = true;
+
+  while (buffer.read < buffer.data + buffer.size) {
+    if (name_parse) {
+      if (!*buffer.read) {
+        name_parse = false;
+      }
+
+      buffer.ReadU8();
+    } else {
+      s16 count = buffer.ReadU16();
+
+      // The current directory is marked with negative count
+      if (count < 0) {
+        strcpy(game->arena_name, current_name);
+        break;
+      }
+
+      current_name = (char*)buffer.read;
+      name_parse = true;
+    }
+  }
+
+  Event::Dispatch(ArenaNameEvent(game->arena_name));
 }
 
 static void OnArenaSettingsPkt(void* user, u8* pkt, size_t size) {
@@ -192,6 +237,8 @@ Game::Game(MemoryArena& perm_arena, MemoryArena& temp_arena, WorkQueue& work_que
   dispatcher.Register(ProtocolS2C::FlagPosition, OnFlagPositionPkt, this);
   dispatcher.Register(ProtocolS2C::FlagClaim, OnFlagClaimPkt, this);
   dispatcher.Register(ProtocolS2C::PlayerId, OnPlayerIdPkt, this);
+  dispatcher.Register(ProtocolS2C::JoinGame, OnJoinGamePkt, this);
+  dispatcher.Register(ProtocolS2C::ArenaDirectoryListing, OnArenaListPkt, this);
   dispatcher.Register(ProtocolS2C::ArenaSettings, OnArenaSettingsPkt, this);
   dispatcher.Register(ProtocolS2C::TeamAndShipChange, OnPlayerFreqAndShipChangePkt, this);
   dispatcher.Register(ProtocolS2C::TurfFlagUpdate, OnTurfFlagUpdatePkt, this);
@@ -273,6 +320,7 @@ bool Game::Update(const InputState& input, float dt) {
     GameFlag* flag = flags + i;
 
     if (TICK_GT(flag->hidden_end_tick, tick)) continue;
+    if (!(flag->flags & GameFlag_Dropped)) continue;
 
     Vector2f flag_min = flag->position;
     Vector2f flag_max = flag->position + Vector2f(1, 1);
@@ -285,7 +333,7 @@ bool Game::Update(const InputState& input, float dt) {
       if (player->frequency == flag->owner) continue;
       if (!player_manager.IsSynchronized(*player)) continue;
 
-      float radius = connection.settings.ShipSettings[player->ship].GetRadius();
+      float radius = connection.settings.ShipSettings[player->ship].GetRadius() + (1.0f / 16.0f);
       Vector2f player_min = player->position - Vector2f(radius, radius);
       Vector2f player_max = player->position + Vector2f(radius, radius);
 
@@ -293,7 +341,7 @@ bool Game::Update(const InputState& input, float dt) {
         constexpr u32 kHideFlagDelay = 300;
 
         if (!(flag->flags & GameFlag_Turf)) {
-          flag->hidden_end_tick = tick + kHideFlagDelay;
+          flag->hidden_end_tick = MAKE_TICK(tick + kHideFlagDelay);
         }
 
         u32 carry = connection.settings.CarryFlags;
@@ -307,6 +355,8 @@ bool Game::Update(const InputState& input, float dt) {
             // Send flag pickup
             connection.SendFlagRequest(flag->id);
             flag->last_pickup_request_tick = tick;
+
+            Event::Dispatch(FlagPickupRequestEvent(*flag));
           }
         }
       }
@@ -322,6 +372,7 @@ bool Game::Update(const InputState& input, float dt) {
       if (new_timer <= 0) {
         connection.SendFlagDrop();
         self->flag_timer = 0;
+        Event::Dispatch(FlagTimeoutEvent());
       } else {
         self->flag_timer = (u16)new_timer;
       }
@@ -364,6 +415,8 @@ void Game::UpdateGreens(float dt) {
             // Pick up green
             ship_controller.ApplyPrize(self, green->prize_id, true);
             connection.SendTakeGreen((u16)green->position.x, (u16)green->position.y, green->prize_id);
+
+            Event::Dispatch(GreenPickupEvent(*green));
           }
 
           // Set the end tick to zero so it gets automatically removed next update
@@ -482,8 +535,12 @@ void Game::OnFlagClaim(u8* pkt, size_t size) {
     if (was_dropped && player->id == self_id) {
       player->flag_timer = connection.settings.FlagDropDelay;
     }
+
+    Event::Dispatch(FlagPickupEvent(flags[id], *player));
   } else {
     flags[id].owner = player->frequency;
+
+    Event::Dispatch(FlagTurfClaimEvent(flags[id], *player));
   }
 }
 
@@ -504,6 +561,8 @@ void Game::OnFlagPosition(u8* pkt, size_t size) {
   flags[id].position = Vector2f((float)x, (float)y);
   flags[id].flags |= GameFlag_Dropped;
   flags[id].hidden_end_tick = 0;
+
+  Event::Dispatch(FlagSpawnEvent(flags[id]));
 }
 
 void Game::OnTurfFlagUpdate(u8* pkt, size_t size) {
@@ -533,6 +592,8 @@ void Game::OnTurfFlagUpdate(u8* pkt, size_t size) {
     flags[id].flags |= GameFlag_Dropped | GameFlag_Turf;
     flags[id].hidden_end_tick = 0;
 
+    Event::Dispatch(FlagTurfUpdateEvent(flags[id]));
+
     ++id;
   }
 }
@@ -540,7 +601,10 @@ void Game::OnTurfFlagUpdate(u8* pkt, size_t size) {
 void Game::OnPlayerId(u8* pkt, size_t size) {
   Cleanup();
 
-  // TODO: Handle and display errors
+  flag_count = 0;
+  green_count = 0;
+
+  memset(flags, 0, sizeof(flags));
 
   soccer.Clear();
 }

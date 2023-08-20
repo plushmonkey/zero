@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <zero/game/Clock.h>
+#include <zero/game/GameEvent.h>
 #include <zero/game/PlayerManager.h>
 #include <zero/game/Radar.h>
 #include <zero/game/ShipController.h>
@@ -17,6 +18,21 @@ static void OnPowerballPositionPkt(void* user, u8* pkt, size_t size) {
   Soccer* soccer = (Soccer*)user;
 
   soccer->OnPowerballPosition(pkt, size);
+}
+
+static void OnPowerballGoalPkt(void* user, u8* pkt, size_t size) {
+  if (size < 2) return;
+
+  u8 ball_id = pkt[1];
+
+  Soccer* soccer = (Soccer*)user;
+
+  for (size_t i = 0; i < ZERO_ARRAY_SIZE(soccer->balls); ++i) {
+    if (soccer->balls[i].id == ball_id) {
+      Event::Dispatch(BallGoalEvent(soccer->balls[i]));
+      return;
+    }
+  }
 }
 
 inline void SimulateAxis(Powerball& ball, Map& map, u32* pos, s16* vel) {
@@ -35,6 +51,7 @@ inline void SimulateAxis(Powerball& ball, Map& map, u32* pos, s16* vel) {
 
 Soccer::Soccer(PlayerManager& player_manager) : player_manager(player_manager), connection(player_manager.connection) {
   connection.dispatcher.Register(ProtocolS2C::PowerballPosition, OnPowerballPositionPkt, this);
+  connection.dispatcher.Register(ProtocolS2C::SoccerGoal, OnPowerballGoalPkt, this);
 
   Clear();
 }
@@ -74,6 +91,8 @@ void Soccer::Update(float dt) {
 
           connection.SendBallFire((u8)ball->id, position, velocity, self->id, timestamp);
           carry_id = kInvalidBallId;
+
+          Event::Dispatch(BallTimeoutEvent(*ball, position, velocity));
         }
       }
     }
@@ -110,6 +129,8 @@ void Soccer::Update(float dt) {
           // Send pickup
           connection.SendBallPickup((u8)ball->id, ball->timestamp);
           last_pickup_request = tick;
+
+          Event::Dispatch(BallRequestPickupEvent(*ball));
         }
 
         ball->last_touch_timestamp = GetCurrentTick();
@@ -148,6 +169,8 @@ bool Soccer::FireBall(BallFireMethod method) {
 
   player_manager.ship_controller->AddBombDelay(50);
   player_manager.ship_controller->AddBulletDelay(50);
+
+  Event::Dispatch(BallFireEvent(*ball, self, position, velocity));
 
   return true;
 }
@@ -270,8 +293,10 @@ void Soccer::OnPowerballPosition(u8* pkt, size_t size) {
 
     u8 ship = 0;
 
+    Player* carrier = nullptr;
+
     if (owner_id != kInvalidPlayerId) {
-      Player* carrier = player_manager.GetPlayerById(owner_id);
+      carrier = player_manager.GetPlayerById(owner_id);
 
       if (carrier) {
         carrier->ball_carrier = false;
@@ -299,6 +324,9 @@ void Soccer::OnPowerballPosition(u8* pkt, size_t size) {
     }
 
     ball->carrier_id = owner_id;
+
+    Event::Dispatch(BallFireEvent(*ball, carrier, Vector2f(x / 16.0f, y / 16.0f),
+                                  Vector2f(velocity_x / 160.0f, velocity_y / 160.0f)));
 
     for (s32 i = 0; i < sim_ticks; ++i) {
       Simulate(*ball, false);
@@ -329,6 +357,8 @@ void Soccer::OnPowerballPosition(u8* pkt, size_t size) {
         player_manager.ship_controller->AddBombDelay(ship_settings.BombFireDelay);
         player_manager.ship_controller->AddBulletDelay(ship_settings.BombFireDelay);
       }
+
+      Event::Dispatch(BallPickupEvent(*ball, *carrier));
     }
   }
 }
