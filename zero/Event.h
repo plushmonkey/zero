@@ -6,14 +6,14 @@
 namespace zero {
 
 template <typename T>
-struct EventTypeDispatcherImpl;
+struct EventTypeDispatcher;
 
 struct Event {
   virtual ~Event() {}
 
   template <typename T>
   static void Dispatch(const T& event) {
-    EventTypeDispatcherImpl<T>::Get().Dispatch(event);
+    EventTypeDispatcher<T>::Get().Dispatch(event);
   }
 };
 
@@ -23,25 +23,25 @@ struct Event {
 template <typename T>
 struct EventHandler {
  protected:
-  EventHandler() { EventTypeDispatcherImpl<T>::Get().RegisterHandler(this); }
+  EventHandler() { EventTypeDispatcher<T>::Get().RegisterHandler(this); }
 
  public:
-  virtual ~EventHandler() { EventTypeDispatcherImpl<T>::Get().UnregisterHandler(this); }
+  virtual ~EventHandler() { EventTypeDispatcher<T>::Get().UnregisterHandler(this); }
 
   virtual void HandleEvent(const T& event) = 0;
 };
 
 // This class stores the handlers for the given Event type T.
 template <typename T>
-struct EventTypeDispatcherImpl {
+struct EventTypeDispatcher {
  private:
   std::vector<EventHandler<T>*> handlers;
 
-  virtual ~EventTypeDispatcherImpl() {}
+  virtual ~EventTypeDispatcher() {}
 
  public:
-  static EventTypeDispatcherImpl& Get() {
-    static EventTypeDispatcherImpl instance;
+  static EventTypeDispatcher& Get() {
+    static EventTypeDispatcher instance;
     return instance;
   }
 
