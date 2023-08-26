@@ -53,6 +53,7 @@
     <ClCompile Include="zero\game\WeaponManager.cpp" />
     <ClCompile Include="zero\game\WorkQueue.cpp" />
     <ClCompile Include="zero\zones\hyperspace\BallBehavior.cpp" />
+    <ClCompile Include="zero\zones\hyperspace\CenterJavBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\CenterLeviBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\CenterBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\Hyperspace.cpp" />
@@ -74,6 +75,7 @@
     <ClInclude Include="zero\behavior\nodes\RegionNode.h" />
     <ClInclude Include="zero\behavior\nodes\ShipNode.h" />
     <ClInclude Include="zero\behavior\nodes\TargetNode.h" />
+    <ClInclude Include="zero\behavior\nodes\ThreatNode.h" />
     <ClInclude Include="zero\behavior\nodes\TimerNode.h" />
     <ClInclude Include="zero\behavior\nodes\WaypointNode.h" />
     <ClInclude Include="zero\BotController.h" />
@@ -124,6 +126,7 @@
     <ClInclude Include="zero\game\WeaponManager.h" />
     <ClInclude Include="zero\game\WorkQueue.h" />
     <ClInclude Include="zero\zones\hyperspace\BallBehavior.h" />
+    <ClInclude Include="zero\zones\hyperspace\CenterJavBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\CenterLeviBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\CenterBehavior.h" />
     <ClInclude Include="zero\zones\ZoneController.h" />

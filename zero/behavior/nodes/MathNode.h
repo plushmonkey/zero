@@ -370,5 +370,32 @@ struct NormalizeNode : public BehaviorNode {
   const char* output_vector_key;
 };
 
+struct DistanceNode : public BehaviorNode {
+  DistanceNode(const char* vector_a_key, const char* vector_b_key, const char* output_float_key, bool squared = false)
+      : vector_a_key(vector_a_key), vector_b_key(vector_b_key), output_float_key(output_float_key), squared(squared) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto opt_vector_a = ctx.blackboard.Value<Vector2f>(vector_a_key);
+    if (!opt_vector_a.has_value()) return ExecuteResult::Failure;
+
+    Vector2f vector_a = opt_vector_a.value();
+
+    auto opt_vector_b = ctx.blackboard.Value<Vector2f>(vector_b_key);
+    if (!opt_vector_b.has_value()) return ExecuteResult::Failure;
+
+    Vector2f vector_b = opt_vector_b.value();
+
+    float distance = squared ? vector_a.DistanceSq(vector_b) : vector_a.Distance(vector_b);
+    ctx.blackboard.Set(output_float_key, distance);
+
+    return ExecuteResult::Success;
+  }
+
+  const char* vector_a_key;
+  const char* vector_b_key;
+  const char* output_float_key;
+  bool squared = false;
+};
+
 }  // namespace behavior
 }  // namespace zero

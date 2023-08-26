@@ -74,7 +74,6 @@ class SuccessNode : public BehaviorNode {
 
   void Child(std::unique_ptr<BehaviorNode> child) { child_ = std::move(child); }
 
- protected:
   std::unique_ptr<BehaviorNode> child_;
 };
 
@@ -87,7 +86,6 @@ class InvertNode : public BehaviorNode {
 
   void Child(std::unique_ptr<BehaviorNode> child) { child_ = std::move(child); }
 
- protected:
   std::unique_ptr<BehaviorNode> child_;
 };
 

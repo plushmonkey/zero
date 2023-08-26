@@ -10,14 +10,15 @@ namespace zero {
 namespace behavior {
 
 struct DebugPrintNode : public BehaviorNode {
-  DebugPrintNode(const char* message) : message(message) {}
+  DebugPrintNode(const char* message, LogLevel level = LogLevel::Debug) : message(message), level(level) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
-    Log(LogLevel::Debug, "%s", message);
+    Log(level, "%s", message);
     return ExecuteResult::Success;
   }
 
   const char* message;
+  LogLevel level;
 };
 
 struct BlackboardSetQueryNode : public BehaviorNode {

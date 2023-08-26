@@ -225,6 +225,9 @@ struct Rectangle {
 struct Ray {
   Vector2f origin;
   Vector2f direction;
+
+  Ray() {}
+  Ray(Vector2f origin, Vector2f direction) : origin(origin), direction(direction) {}
 };
 
 inline bool PointInsideBox(const Vector2f& min, const Vector2f& max, const Vector2f& point) {

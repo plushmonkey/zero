@@ -29,7 +29,7 @@ void BotController::HandleEvent(const JoinGameEvent& event) {
 }
 
 void BotController::HandleEvent(const PlayerFreqAndShipChangeEvent& event) {
-  if (event.new_ship >= 8) return;
+  if (event.new_ship >= 8 || event.old_ship == event.new_ship) return;
 
   Log(LogLevel::Info, "Creating new registry and pathfinder.");
 

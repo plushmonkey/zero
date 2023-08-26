@@ -56,7 +56,7 @@ struct Steering {
     Seek(game, target);
   }
 
-  void Arrive(Game& game, const Vector2f& target, float deceleration) {
+  void Arrive(Game& game, const Vector2f& target, float slow_radius) {
     Player* self = game.player_manager.GetSelf();
 
     Vector2f to_target = target - self->position;
@@ -64,11 +64,13 @@ struct Steering {
     float max_speed = game.ship_controller.ship.speed / 16.0f / 10.0f;
 
     if (distance > 0) {
-      float speed = distance / deceleration;
+      float multiplier = 1.0f;
 
-      speed = fminf(speed, max_speed);
+      if (distance < slow_radius) {
+        multiplier = distance / slow_radius;
+      }
 
-      Vector2f desired = to_target * (speed / distance);
+      Vector2f desired = Normalize(to_target) * max_speed * multiplier;
 
       force += desired - self->velocity;
     }

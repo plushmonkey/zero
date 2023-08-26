@@ -7,11 +7,11 @@
 namespace zero {
 namespace hyperspace {
 
-struct CenterBehavior : public behavior::Behavior {
+struct CenterJavBehavior : public behavior::Behavior {
   void OnInitialize(behavior::ExecuteContext& ctx) override {
     // Setup blackboard here for this specific behavior
-    ctx.blackboard.Set("request_ship", 0);
-    ctx.blackboard.Set("leash_distance", 45.0f);
+    ctx.blackboard.Set("request_ship", 1);
+    ctx.blackboard.Set("leash_distance", 65.0f);
 
     std::vector<Vector2f> waypoints{
         Vector2f(440, 460),

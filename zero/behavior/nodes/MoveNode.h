@@ -30,7 +30,14 @@ struct SeekNode : public BehaviorNode {
     }
 
     if (target_distance > 0.0f) {
-      ctx.bot->bot_controller->steering.Seek(*ctx.bot->game, position, target_distance);
+      auto self = ctx.bot->game->player_manager.GetSelf();
+      Vector2f to_target = position - self->position;
+
+      if (to_target.LengthSq() <= target_distance * target_distance) {
+        ctx.bot->bot_controller->steering.SeekZero(*ctx.bot->game);
+      } else {
+        ctx.bot->bot_controller->steering.Seek(*ctx.bot->game, position, target_distance);
+      }
     } else {
       ctx.bot->bot_controller->steering.Seek(*ctx.bot->game, position);
     }

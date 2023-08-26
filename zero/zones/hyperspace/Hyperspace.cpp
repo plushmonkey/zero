@@ -5,6 +5,7 @@
 #include <zero/zones/ZoneController.h>
 #include <zero/zones/hyperspace/BallBehavior.h>
 #include <zero/zones/hyperspace/CenterBehavior.h>
+#include <zero/zones/hyperspace/CenterJavBehavior.h>
 #include <zero/zones/hyperspace/CenterLeviBehavior.h>
 
 namespace zero {
@@ -22,9 +23,10 @@ struct HyperspaceController : ZoneController {
 
       repo.Add("ball", std::make_unique<BallBehavior>());
       repo.Add("center-levi", std::make_unique<CenterLeviBehavior>());
+      repo.Add("center-jav", std::make_unique<CenterJavBehavior>());
       repo.Add("center", std::make_unique<CenterBehavior>());
 
-      SetBehavior("center");
+      SetBehavior("center-jav");
     } else {
       Log(LogLevel::Info, "No hyperspace behaviors defined for arena '%s'.", arena_name);
     }
