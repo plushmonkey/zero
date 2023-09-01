@@ -2,23 +2,11 @@
 
 #include <zero/behavior/BehaviorBuilder.h>
 #include <zero/behavior/BehaviorTree.h>
-#include <zero/behavior/nodes/AimNode.h>
-#include <zero/behavior/nodes/BlackboardNode.h>
-#include <zero/behavior/nodes/InputActionNode.h>
-#include <zero/behavior/nodes/MapNode.h>
-#include <zero/behavior/nodes/MathNode.h>
-#include <zero/behavior/nodes/MoveNode.h>
-#include <zero/behavior/nodes/PlayerNode.h>
-#include <zero/behavior/nodes/PowerballNode.h>
-#include <zero/behavior/nodes/RegionNode.h>
-#include <zero/behavior/nodes/ShipNode.h>
-#include <zero/behavior/nodes/TargetNode.h>
-#include <zero/behavior/nodes/TimerNode.h>
-#include <zero/behavior/nodes/WaypointNode.h>
+#include <zero/game/Logger.h>
 
 namespace zero {
 
-BotController::BotController(Game& game) : game(game) {
+BotController::BotController(Game& game) : game(game), chat_queue(game.chat) {
   this->input = nullptr;
 }
 
@@ -26,9 +14,11 @@ void BotController::HandleEvent(const JoinGameEvent& event) {
   Log(LogLevel::Info, "Clearing bot behaviors from JoinGameEvent.");
 
   behaviors.Clear();
+  chat_queue.Reset();
 }
 
 void BotController::HandleEvent(const PlayerFreqAndShipChangeEvent& event) {
+  if (event.player.id != game.player_manager.player_id) return;
   if (event.new_ship >= 8 || event.old_ship == event.new_ship) return;
 
   Log(LogLevel::Info, "Creating new registry and pathfinder.");
@@ -56,6 +46,7 @@ void BotController::Update(float dt, InputState& input, behavior::ExecuteContext
   }
 
   actuator.Update(game, input, steering.force, steering.rotation);
+  chat_queue.Update();
 }
 
 }  // namespace zero

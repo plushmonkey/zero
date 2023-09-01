@@ -22,6 +22,7 @@
     <ClCompile Include="zero\behavior\BehaviorBuilder.cpp" />
     <ClCompile Include="zero\behavior\BehaviorTree.cpp" />
     <ClCompile Include="zero\BotController.cpp" />
+    <ClCompile Include="zero\ChatQueue.cpp" />
     <ClCompile Include="zero\commands\CommandSystem.cpp" />
     <ClCompile Include="zero\game\Logger.cpp" />
     <ClCompile Include="zero\ZeroBot.cpp" />
@@ -65,6 +66,7 @@
     <ClInclude Include="zero\behavior\BehaviorTree.h" />
     <ClInclude Include="zero\behavior\Blackboard.h" />
     <ClInclude Include="zero\behavior\nodes\AimNode.h" />
+    <ClInclude Include="zero\behavior\nodes\BehaviorNode.h" />
     <ClInclude Include="zero\behavior\nodes\BlackboardNode.h" />
     <ClInclude Include="zero\behavior\nodes\MathNode.h" />
     <ClInclude Include="zero\behavior\nodes\MoveNode.h" />
@@ -79,6 +81,7 @@
     <ClInclude Include="zero\behavior\nodes\TimerNode.h" />
     <ClInclude Include="zero\behavior\nodes\WaypointNode.h" />
     <ClInclude Include="zero\BotController.h" />
+    <ClInclude Include="zero\ChatQueue.h" />
     <ClInclude Include="zero\commands\CommandSystem.h" />
     <ClInclude Include="zero\Event.h" />
     <ClInclude Include="zero\game\GameEvent.h" />

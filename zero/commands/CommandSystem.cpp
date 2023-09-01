@@ -1,10 +1,13 @@
 #include "CommandSystem.h"
 
 #include <zero/BotController.h>
+#include <zero/ChatQueue.h>
 #include <zero/ZeroBot.h>
 #include <zero/behavior/Behavior.h>
 #include <zero/game/Game.h>
 #include <zero/game/net/PacketDispatcher.h>
+
+#include <format>
 
 namespace zero {
 
@@ -24,11 +27,25 @@ class BehaviorsCommand : public CommandExecutor {
       return;
     }
 
+    // The max size of a message combining the behaviors. This will cause it to split into new messages when it would go
+    // over this limit.
+    constexpr size_t kMaxMessageSize = 200;
+
     for (auto& kv : map) {
-      output += ", " + kv.first;
+      size_t total_size = output.size() + kv.first.size() + 2;
+
+      if (total_size >= kMaxMessageSize) {
+        Event::Dispatch(ChatQueueEvent::Private(player->name, output.data()));
+        output.clear();
+        output = kv.first;
+      } else {
+        output += ", " + kv.first;
+      }
     }
 
-    bot.game->chat.SendPrivateMessage(output.data(), player->id);
+    if (!output.empty()) {
+      Event::Dispatch(ChatQueueEvent::Private(player->name, output.data()));
+    }
   }
 
   CommandAccessFlags GetAccess() { return CommandAccess_Private; }
@@ -64,14 +81,16 @@ class BehaviorCommand : public CommandExecutor {
 
     if (player) {
       if (success) {
-        bot.game->chat.SendPrivateMessage("Behavior set.", player->id);
+        std::string response = std::format("Behavior set to '{}'.", arg);
+        Event::Dispatch(ChatQueueEvent::Private(player->name, response.data()));
       } else {
-        bot.game->chat.SendPrivateMessage("Failed to find behavior.", player->id);
+        std::string response = std::format("Failed to find behavior '{}'. PM !behaviors to see the full list.", arg);
+        Event::Dispatch(ChatQueueEvent::Private(player->name, response.data()));
       }
     }
   }
 
-  CommandAccessFlags GetAccess() { return CommandAccess_Private; }
+  CommandAccessFlags GetAccess() { return CommandAccess_Public | CommandAccess_Private; }
   void SetAccess(CommandAccessFlags flags) {}
   std::vector<std::string> GetAliases() { return {"behavior", "b"}; }
   std::string GetDescription() { return "Sets the active behavior."; }
@@ -88,14 +107,14 @@ class SayCommand : public CommandExecutor {
         Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
 
         if (player) {
-          bot.game->chat.SendPrivateMessage("Message filtered.", player->id);
+          Event::Dispatch(ChatQueueEvent::Private(player->name, "Message filtered."));
         }
 
         return;
       }
     }
 
-    bot.game->chat.SendMessage(ChatType::Public, arg.c_str());
+    Event::Dispatch(ChatQueueEvent::Public(arg.data()));
   }
 
   CommandAccessFlags GetAccess() { return CommandAccess_Private; }
@@ -118,7 +137,7 @@ class ZoneCommand : public CommandExecutor {
     char zone_message[256];
     sprintf(zone_message, "Connected to zone '%s'.", zone_name);
 
-    bot.game->chat.SendPrivateMessage(zone_message, player->id);
+    Event::Dispatch(ChatQueueEvent::Private(player->name, zone_message));
   }
 
   CommandAccessFlags GetAccess() { return CommandAccess_Private; }
@@ -161,7 +180,7 @@ class SetShipCommand : public CommandExecutor {
   }
 
   void SendUsage(ZeroBot& bot, Player& player) {
-    bot.game->chat.SendPrivateMessage("Usage: !setship [shipNum 1-9]", player.id);
+    Event::Dispatch(ChatQueueEvent::Private(player.name, "Usage: !setship [shipNum 1-9]"));
   }
 
   CommandAccessFlags GetAccess() { return CommandAccess_Private | CommandAccess_Public; }
@@ -179,7 +198,7 @@ class HelpCommand : public CommandExecutor {
     Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
     if (!player) return;
 
-    bot.game->chat.SendPrivateMessage("-- !commands {.c} -- see command list (pm)", player->id);
+    Event::Dispatch(ChatQueueEvent::Private(player->name, "-- !commands {.c} -- see command list (pm)"));
   }
 
   CommandAccessFlags GetAccess() { return CommandAccess_Private; }
@@ -248,7 +267,7 @@ class CommandsCommand : public CommandExecutor {
 
       std::string output = trigger.triggers + " - " + desc + " [" + std::to_string(security) + "]";
 
-      bot.game->chat.SendPrivateMessage(output.c_str(), player->id);
+      Event::Dispatch(ChatQueueEvent::Private(player->name, output.data()));
     }
   }
 

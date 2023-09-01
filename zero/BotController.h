@@ -1,6 +1,7 @@
 #pragma once
 
 #include <zero/Actuator.h>
+#include <zero/ChatQueue.h>
 #include <zero/Steering.h>
 #include <zero/behavior/Behavior.h>
 #include <zero/game/Game.h>
@@ -26,6 +27,7 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>, EventHandler<
   std::unique_ptr<behavior::BehaviorNode> behavior_tree;
   InputState* input;
 
+  ChatQueue chat_queue;
   behavior::BehaviorRepository behaviors;
   Steering steering;
   Actuator actuator;
