@@ -107,9 +107,6 @@ void ChatQueue::Update() {
     size_t next_send_index = (send_index + 1) % ZERO_ARRAY_SIZE(entries);
     QueueEntry* entry = entries + send_index;
 
-    if (next_send_index < send_index) {
-      Log(LogLevel::Info, "ChatQueue rolled");
-    }
     send_index = next_send_index;
 
     u16 target_pid = 0;

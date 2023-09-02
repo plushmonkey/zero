@@ -24,7 +24,7 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>, EventHandler<
 
   std::unique_ptr<path::Pathfinder> pathfinder;
   std::unique_ptr<RegionRegistry> region_registry;
-  std::unique_ptr<behavior::BehaviorNode> behavior_tree;
+  std::string behavior_name;
   InputState* input;
 
   ChatQueue chat_queue;
@@ -46,6 +46,14 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>, EventHandler<
 
     UpdateEvent(BotController& controller, behavior::ExecuteContext& ctx) : controller(controller), ctx(ctx) {}
   };
+
+  void SetBehavior(const std::string& name, std::unique_ptr<behavior::BehaviorNode> tree) {
+    behavior_name = name;
+    behavior_tree = std::move(tree);
+  }
+
+ private:
+  std::unique_ptr<behavior::BehaviorNode> behavior_tree;
 };
 
 }  // namespace zero

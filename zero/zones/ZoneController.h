@@ -21,6 +21,7 @@ struct ZoneController : EventHandler<ZeroBot::JoinRequestEvent>,
   void HandleEvent(const ArenaNameEvent& event) override {
     if (!in_zone) return;
 
+    bot->commands->Reset();
     CreateBehaviors(event.name);
   }
 
@@ -39,7 +40,7 @@ struct ZoneController : EventHandler<ZeroBot::JoinRequestEvent>,
 
     if (default_behavior) {
       default_behavior->OnInitialize(ctx);
-      bot->bot_controller->behavior_tree = default_behavior->CreateTree(ctx);
+      bot->bot_controller->SetBehavior(name, default_behavior->CreateTree(ctx));
     }
   }
 

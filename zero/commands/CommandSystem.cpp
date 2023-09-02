@@ -19,6 +19,9 @@ class BehaviorsCommand : public CommandExecutor {
     Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
     if (!player) return;
 
+    std::string current = std::format("Current: {}", bot.bot_controller->behavior_name);
+    Event::Dispatch(ChatQueueEvent::Private(player->name, current.data()));
+
     auto& map = bot.bot_controller->behaviors.behaviors;
     std::string output = "none";
 
@@ -61,19 +64,25 @@ class BehaviorCommand : public CommandExecutor {
     Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
     bool success = false;
 
+    if (arg.empty()) {
+      std::string current = std::format("Current: {}", bot.bot_controller->behavior_name);
+      Event::Dispatch(ChatQueueEvent::Private(player->name, current.data()));
+      return;
+    }
+
     behavior::Behavior* find_behavior = nullptr;
 
     if (arg == "none") {
       success = true;
 
-      bot.bot_controller->behavior_tree = nullptr;
+      bot.bot_controller->SetBehavior("none", nullptr);
     } else {
       find_behavior = bot.bot_controller->behaviors.Find(arg);
 
       if (find_behavior) {
         find_behavior->OnInitialize(bot.execute_ctx);
 
-        bot.bot_controller->behavior_tree = find_behavior->CreateTree(bot.execute_ctx);
+        bot.bot_controller->SetBehavior(arg, find_behavior->CreateTree(bot.execute_ctx));
 
         success = true;
       }
@@ -308,13 +317,23 @@ static void RawOnChatPacket(void* user, u8* pkt, size_t size) {
 CommandSystem::CommandSystem(ZeroBot& bot, PacketDispatcher& dispatcher) : bot(bot) {
   dispatcher.Register(ProtocolS2C::Chat, RawOnChatPacket, this);
 
-  RegisterCommand(std::make_shared<HelpCommand>());
-  RegisterCommand(std::make_shared<CommandsCommand>());
-  RegisterCommand(std::make_shared<SetShipCommand>());
-  RegisterCommand(std::make_shared<ZoneCommand>());
-  RegisterCommand(std::make_shared<SayCommand>());
-  RegisterCommand(std::make_shared<BehaviorCommand>());
-  RegisterCommand(std::make_shared<BehaviorsCommand>());
+  default_commands_.emplace_back(std::make_shared<HelpCommand>());
+  default_commands_.emplace_back(std::make_shared<CommandsCommand>());
+  default_commands_.emplace_back(std::make_shared<SetShipCommand>());
+  default_commands_.emplace_back(std::make_shared<ZoneCommand>());
+  default_commands_.emplace_back(std::make_shared<SayCommand>());
+  default_commands_.emplace_back(std::make_shared<BehaviorCommand>());
+  default_commands_.emplace_back(std::make_shared<BehaviorsCommand>());
+
+  Reset();
+}
+
+void CommandSystem::Reset() {
+  commands_.clear();
+
+  for (auto& cmd : default_commands_) {
+    RegisterCommand(cmd);
+  }
 }
 
 int CommandSystem::GetSecurityLevel(const std::string& player) {

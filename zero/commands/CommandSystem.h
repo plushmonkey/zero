@@ -57,6 +57,8 @@ class CommandSystem {
  public:
   CommandSystem(ZeroBot& bot, PacketDispatcher& dispatcher);
 
+  void Reset();
+
   void OnChatPacket(const u8* pkt, size_t size);
 
   void RegisterCommand(std::shared_ptr<CommandExecutor> executor) {
@@ -73,6 +75,8 @@ class CommandSystem {
  private:
   Commands commands_;
   ZeroBot& bot;
+
+  std::vector<std::shared_ptr<CommandExecutor>> default_commands_;
 };
 
 std::vector<std::string_view> Tokenize(std::string_view message, char delim);

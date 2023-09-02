@@ -57,6 +57,7 @@
     <ClCompile Include="zero\zones\hyperspace\CenterJavBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\CenterLeviBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\CenterBehavior.cpp" />
+    <ClCompile Include="zero\zones\hyperspace\CommandBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\Hyperspace.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -132,6 +133,8 @@
     <ClInclude Include="zero\zones\hyperspace\CenterJavBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\CenterLeviBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\CenterBehavior.h" />
+    <ClInclude Include="zero\zones\hyperspace\CommandBehavior.h" />
+    <ClInclude Include="zero\zones\hyperspace\nodes\CommandNode.h" />
     <ClInclude Include="zero\zones\ZoneController.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
