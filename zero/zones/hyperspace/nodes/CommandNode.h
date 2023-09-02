@@ -6,15 +6,19 @@
 #include <zero/game/Clock.h>
 #include <zero/game/Logger.h>
 
+#include <format>
+
 namespace zero {
 namespace hyperspace {
 
-enum class CommandType { None, ShipItems, Count };
+enum class CommandType { None, ShipItems, Buy, Sell, Count };
 inline const char* to_string(CommandType type) {
-  const char* kValues[] = {"None", "ShipItems"};
+  const char* kValues[] = {"None", "ShipItems", "Buy", "Sell"};
   static_assert(ZERO_ARRAY_SIZE(kValues) == (size_t)CommandType::Count);
   return kValues[(size_t)type];
 }
+
+enum class Store { Center, Depot };
 
 struct CommandExecuteState {
   CommandType type;
@@ -51,6 +55,169 @@ struct CommandTypeQuery : public behavior::BehaviorNode {
 
   CommandType type = CommandType::None;
 };
+
+template <CommandType command_type, size_t store_prefix_size>
+struct ItemTransactionNode : public behavior::BehaviorNode {
+  static constexpr const char* kMatchVector[] = {
+      "You purchased ",
+      "You sold ",
+      "You cannot buy item",
+      "You cannot sell item",
+      "No item ",
+      "You do not have enough free",
+      "No items can be loaded onto a",
+      "You cannot buy or sell items",
+      "Too many partial matches!",
+      "You may only have",
+      "more experience to buy item",
+      "You do not have enough money to ",
+      "is not for sale",
+      "is not allowed on a",
+      "You do not have any of item",
+      "You do not have that many of item",
+      "cannot be sold."
+  };
+
+  enum class ResponseType {
+    Failure,
+    Success,
+    Store,
+  };
+
+  struct TransactionResponse {
+    ResponseType type;
+    std::string message;
+  };
+
+  struct State {
+    // This is the list of items that should be bought/sold.
+    std::vector<std::string> request_items;
+
+    // This is the list of items waiting to get a response from server.
+    std::vector<std::string> pending_items;
+
+    // This is the list of responses from the commands.
+    std::vector<TransactionResponse> responses;
+
+    static const char* Key() { return "transaction_state"; }
+    static const char* StoreKey() { return "transaction_store_key"; }
+  };
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto opt_execute_state = ctx.blackboard.Value<CommandExecuteState>(CommandExecuteState::Key());
+    if (!opt_execute_state.has_value()) return behavior::ExecuteResult::Failure;
+
+    CommandExecuteState& command_state = opt_execute_state.value();
+    if (command_state.type != command_type) return behavior::ExecuteResult::Failure;
+
+    if (!command_state.IsPending()) {
+      // TODO: Should report exact outcome.
+      std::string result = std::format("Failed to execute {}: Timeout.", to_string(command_type));
+      Event::Dispatch(ChatQueueEvent::Private(command_state.sender.data(), result.data()));
+
+      ctx.blackboard.Erase(CommandExecuteState::Key());
+      ctx.blackboard.Erase(State::Key());
+      ctx.blackboard.Erase(State::StoreKey());
+
+      return behavior::ExecuteResult::Failure;
+    }
+
+    auto opt_parse_state = ctx.blackboard.Value<State>(State::Key());
+    if (!opt_parse_state.has_value()) return behavior::ExecuteResult::Failure;
+
+    State& parse_state = opt_parse_state.value();
+
+    // If there are still items in the request_items list, send the commands.
+    if (!parse_state.request_items.empty()) {
+      std::string command = "?";
+
+      for (auto& item : parse_state.request_items) {
+        if (command_type == CommandType::Buy) {
+          command += "|buy " + item;
+        } else {
+          command += "|sell " + item;
+        }
+
+        parse_state.pending_items.push_back(item);
+      }
+
+      Event::Dispatch(ChatQueueEvent::Public(command.data()));
+      parse_state.request_items.clear();
+    }
+
+    // Check the message queue to see if there were any results.
+    for (auto& mesg : ctx.bot->bot_controller->chat_queue.recv_queue) {
+      if (mesg.type != ChatType::Arena) continue;
+
+      std::string_view mesg_view(mesg.message);
+
+      for (size_t i = 0; i < ZERO_ARRAY_SIZE(kMatchVector); ++i) {
+        if (mesg_view.find(kMatchVector[i]) != std::string::npos) {
+          TransactionResponse response;
+
+          if (i <= 1) {
+            response.type = ResponseType::Success;
+
+            Event::Dispatch(ChatQueueEvent::Private(command_state.sender.data(), mesg.message));
+          } else if (i == 2 || i == 3) {
+            response.type = ResponseType::Store;
+          } else {
+            response.type = ResponseType::Failure;
+
+            Event::Dispatch(ChatQueueEvent::Private(command_state.sender.data(), mesg.message));
+          }
+
+          response.message = mesg.message;
+
+          parse_state.responses.push_back(response);
+          break;
+        }
+      }
+    }
+
+    // All responses received. Check if there's any other store reponses.
+    if (parse_state.responses.size() == parse_state.pending_items.size()) {
+      // Enough responses came in to match the pending items, so clear pending in case we need to move to another store.
+      parse_state.pending_items.clear();
+
+      for (auto& response : parse_state.responses) {
+        if (response.type == ResponseType::Store) {
+          size_t kNameOffset = store_prefix_size;
+
+          std::string_view item_view(response.message.data() + kNameOffset);
+          size_t end = item_view.find(" here.");
+
+          if (end != std::string::npos) {
+            item_view = item_view.substr(0, end);
+
+            parse_state.request_items.emplace_back(item_view.data(), item_view.size());
+
+            // TODO: The store should be parsed here, but not important since only center and depot exist right now.
+            ctx.blackboard.Set(State::StoreKey(), Store::Depot);
+          }
+        }
+      }
+
+      parse_state.responses.clear();
+
+      // None of the responses told us to go to another store, so end the entire command.
+      if (parse_state.request_items.empty()) {
+        ctx.blackboard.Erase(CommandExecuteState::Key());
+        ctx.blackboard.Erase(State::Key());
+        ctx.blackboard.Erase(State::StoreKey());
+
+        return behavior::ExecuteResult::Success;
+      }
+    }
+
+    ctx.blackboard.Set(State::Key(), parse_state);
+
+    return behavior::ExecuteResult::Success;
+  }
+};
+
+using BuyNode = ItemTransactionNode<CommandType::Buy, 20>;
+using SellNode = ItemTransactionNode<CommandType::Sell, 21>;
 
 struct ShipItemsParseNode : public behavior::BehaviorNode {
   struct State {

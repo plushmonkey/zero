@@ -57,6 +57,22 @@ CompositeBuilder& CompositeBuilder::Parallel(CompositeDecorator decorator) {
   return *current_builder;
 }
 
+CompositeBuilder& CompositeBuilder::Composite(std::unique_ptr<BehaviorNode> node, CompositeDecorator decorator) {
+  switch (decorator) {
+    case CompositeDecorator::None: {
+      children.emplace_back(std::move(node));
+    } break;
+    case CompositeDecorator::Success: {
+      children.emplace_back(std::make_unique<SuccessNode>(std::move(node)));
+    } break;
+    case CompositeDecorator::Invert: {
+      children.emplace_back(std::make_unique<InvertNode>(std::move(node)));
+    } break;
+  }
+
+  return *this;
+}
+
 CompositeBuilder& CompositeBuilder::End() {
   if (parent) {
     CompositeNode* composite_node = (CompositeNode*)parent->children.back().get();

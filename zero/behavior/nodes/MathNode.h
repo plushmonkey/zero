@@ -208,6 +208,42 @@ struct RectangleNode : public BehaviorNode {
   Vector2f half_extent;
 };
 
+struct RectangleContainsNode : public BehaviorNode {
+  RectangleContainsNode(const char* rect_key, const char* position_key)
+      : rect_key(rect_key), position_key(position_key) {}
+  RectangleContainsNode(const char* rect_key, Vector2f position) : rect_key(rect_key), position(position) {}
+  RectangleContainsNode(Rectangle rect, const char* position_key) : rect(rect), position_key(position_key) {}
+  RectangleContainsNode(Rectangle rect, Vector2f position) : rect(rect), position(position) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    Vector2f check_position = position;
+
+    if (position_key) {
+      auto opt_position = ctx.blackboard.Value<Vector2f>(position_key);
+      if (!opt_position.has_value()) return ExecuteResult::Failure;
+
+      check_position = opt_position.value();
+    }
+
+    Rectangle check_rect = rect;
+
+    if (rect_key) {
+      auto opt_rect = ctx.blackboard.Value<Rectangle>(rect_key);
+      if (!opt_rect.has_value()) return ExecuteResult::Failure;
+
+      check_rect = opt_rect.value();
+    }
+
+    return check_rect.Contains(check_position) ? ExecuteResult::Success : ExecuteResult::Failure;
+  }
+
+  const char* position_key = nullptr;
+  Vector2f position;
+
+  const char* rect_key = nullptr;
+  Rectangle rect;
+};
+
 struct RayNode : public BehaviorNode {
   RayNode(const char* origin_key, const char* direction_key, const char* output_key)
       : origin_key(origin_key), direction_key(direction_key), output_key(output_key) {}
@@ -374,11 +410,18 @@ struct DistanceNode : public BehaviorNode {
   DistanceNode(const char* vector_a_key, const char* vector_b_key, const char* output_float_key, bool squared = false)
       : vector_a_key(vector_a_key), vector_b_key(vector_b_key), output_float_key(output_float_key), squared(squared) {}
 
-  ExecuteResult Execute(ExecuteContext& ctx) override {
-    auto opt_vector_a = ctx.blackboard.Value<Vector2f>(vector_a_key);
-    if (!opt_vector_a.has_value()) return ExecuteResult::Failure;
+  DistanceNode(Vector2f vector_a, const char* vector_b_key, const char* output_float_key, bool squared = false)
+      : vector_a_static(vector_a), vector_b_key(vector_b_key), output_float_key(output_float_key), squared(squared) {}
 
-    Vector2f vector_a = opt_vector_a.value();
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    Vector2f vector_a = vector_a_static;
+
+    if (vector_a_key) {
+      auto opt_vector_a = ctx.blackboard.Value<Vector2f>(vector_a_key);
+      if (!opt_vector_a.has_value()) return ExecuteResult::Failure;
+
+      vector_a = opt_vector_a.value();
+    }
 
     auto opt_vector_b = ctx.blackboard.Value<Vector2f>(vector_b_key);
     if (!opt_vector_b.has_value()) return ExecuteResult::Failure;
@@ -391,9 +434,12 @@ struct DistanceNode : public BehaviorNode {
     return ExecuteResult::Success;
   }
 
-  const char* vector_a_key;
-  const char* vector_b_key;
-  const char* output_float_key;
+  Vector2f vector_a_static;
+
+  const char* vector_a_key = nullptr;
+  const char* vector_b_key = nullptr;
+
+  const char* output_float_key = nullptr;
   bool squared = false;
 };
 
