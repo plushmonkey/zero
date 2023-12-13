@@ -41,8 +41,27 @@ void BotController::Update(float dt, InputState& input, behavior::ExecuteContext
 
   Event::Dispatch(UpdateEvent(*this, execute_ctx));
 
+  static u32 last_print = 0;
+  static behavior::TreePrinter tree_printer;
+
   if (behavior_tree) {
+    bool should_print = TICK_GT(GetCurrentTick(), MAKE_TICK(last_print + 50));
+    //bool should_print = false;
+
+    if (should_print) {
+      tree_printer.render_brackets = true;
+      behavior::gDebugTreePrinter = &tree_printer;
+      last_print = GetCurrentTick();
+    }
+
     behavior_tree->Execute(execute_ctx);
+
+    if (should_print) {
+      behavior::gDebugTreePrinter = nullptr;
+
+      tree_printer.Render(stdout);
+      tree_printer.Reset();
+    }
   }
 
   actuator.Update(game, input, steering.force, steering.rotation);
