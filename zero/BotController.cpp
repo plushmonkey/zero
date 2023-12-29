@@ -41,15 +41,23 @@ void BotController::Update(float dt, InputState& input, behavior::ExecuteContext
 
   Event::Dispatch(UpdateEvent(*this, execute_ctx));
 
+  // Used to set a delay on stdout tree printing so it doesn't constantly flicker.
   static u32 last_print = 0;
   static behavior::TreePrinter tree_printer;
 
+  constexpr u32 kPrintTickDelay = 50;
+
   if (behavior_tree) {
-    bool should_print = TICK_GT(GetCurrentTick(), MAKE_TICK(last_print + 50));
-    //bool should_print = false;
+#if 0 // Switch this to toggle tree printing.
+    bool should_print = TICK_GT(GetCurrentTick(), MAKE_TICK(last_print + kPrintTickDelay));
+#else
+    bool should_print = false;
+#endif
 
     if (should_print) {
+      // Set to true to render { and } for each composite node.
       tree_printer.render_brackets = true;
+
       behavior::gDebugTreePrinter = &tree_printer;
       last_print = GetCurrentTick();
     }
@@ -59,6 +67,7 @@ void BotController::Update(float dt, InputState& input, behavior::ExecuteContext
     if (should_print) {
       behavior::gDebugTreePrinter = nullptr;
 
+      // Prints the tree to the FILE*. You can pass stdout or a fopen file to this.
       tree_printer.Render(stdout);
       tree_printer.Reset();
     }

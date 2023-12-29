@@ -59,6 +59,9 @@
     <ClCompile Include="zero\zones\hyperspace\CenterBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\CommandBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\Hyperspace.cpp" />
+    <ClCompile Include="zero\zones\metalgear\GunnerBehavior.cpp" />
+    <ClCompile Include="zero\zones\metalgear\JuggBehavior.cpp" />
+    <ClCompile Include="zero\zones\metalgear\MetalGear.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="zero\Actuator.h" />
@@ -136,6 +139,8 @@
     <ClInclude Include="zero\zones\hyperspace\CenterBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\CommandBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\nodes\CommandNode.h" />
+    <ClInclude Include="zero\zones\metalgear\GunnerBehavior.h" />
+    <ClInclude Include="zero\zones\metalgear\JuggBehavior.h" />
     <ClInclude Include="zero\zones\ZoneController.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

@@ -111,6 +111,14 @@ void ShipController::Update(const InputState& input, float dt) {
         }
       }
     }
+
+    if (ship.shield_time > 0.0f) {
+      ship.shield_time -= dt;
+
+      if (ship.shield_time < 0.0f) {
+        ship.shield_time = 0.0f;
+      }
+    }
   }
 
   if (self->attach_parent == kInvalidPlayerId) {
@@ -1445,7 +1453,6 @@ void ShipController::OnWeaponHit(Weapon& weapon) {
 
           if (shooter_distance < explode_pixels) {
             damage -= (int)(((bomb_dmg / explode_pixels) * (explode_pixels - shooter_distance)) / 2.0f);
-
             if (damage < 0) {
               damage = 0;
             }

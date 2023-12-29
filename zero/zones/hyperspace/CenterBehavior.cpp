@@ -63,7 +63,7 @@ std::unique_ptr<behavior::BehaviorNode> CenterBehavior::CreateTree(behavior::Exe
                                         .Child<FindTerritoryPosition>("nearest_target", "leash_distance", "territory_position", true)
                                         .End()
                                     .Sequence(CompositeDecorator::Success)
-                                        .InvertChild<ScalarThresholdNode<float>>("self_threat", 0.1f)
+                                        .InvertChild<ScalarThresholdNode<float>>("self_threat", 0.2f)
                                         .Child<FaceNode>("aimshot")
                                         .End()
                                     .Child<ArriveNode>("territory_position", 25.0f)

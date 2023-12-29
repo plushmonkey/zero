@@ -699,6 +699,10 @@ WeaponSimulateResult WeaponManager::GenerateWeapon(u16 player_id, WeaponData wea
     case WeaponType::Thor:
     case WeaponType::Bomb:
     case WeaponType::ProximityBomb: {
+      if (connection.settings.ShipSettings[player->ship].EmpBomb) {
+        weapon->flags |= WEAPON_FLAG_EMP;
+      }
+
       if (!weapon->data.alternate) {
         speed = (s16)connection.settings.ShipSettings[player->ship].BombSpeed;
         weapon->bounces_remaining = connection.settings.ShipSettings[player->ship].BombBounceCount;

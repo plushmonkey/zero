@@ -36,7 +36,7 @@ class FlagCommand : public CommandExecutor {
     Event::Dispatch(ChatQueueEvent::Private(player->name, output.data()));
   }
 
-  CommandAccessFlags GetAccess() { return CommandAccess_Public | CommandAccess_Private; }
+  CommandAccessFlags GetAccess() { return CommandAccess_Private; }
   void SetAccess(CommandAccessFlags flags) {}
   std::vector<std::string> GetAliases() { return {"flag"}; }
   std::string GetDescription() { return "Enables flagging."; }
@@ -208,7 +208,7 @@ void HyperspaceController::CreateBehaviors(const char* arena_name) {
 
     command_behavior = std::make_unique<CommandBehavior>();
 
-    SetBehavior("center-jav");
+    SetBehavior("center");
 
     bot->commands->RegisterCommand(std::make_shared<FlagCommand>());
     bot->commands->RegisterCommand(std::make_shared<ShipItemsCommand>());

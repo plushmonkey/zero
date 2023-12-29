@@ -6,7 +6,7 @@
 
 namespace zero {
 
-std::vector<std::string_view> SplitString(std::string_view string, std::string_view delim) {
+inline std::vector<std::string_view> SplitString(std::string_view string, std::string_view delim) {
   std::vector<std::string_view> result;
 
   size_t offset = 0;
