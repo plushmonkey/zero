@@ -34,8 +34,8 @@ namespace zero {
 const char* kSecurityServiceIp = "127.0.0.1";
 
 ServerInfo kServers[] = {
-    {"local", "192.168.0.169", 5000, Zone::Local},
-    {"subgame", "192.168.0.169", 5002, Zone::Subgame},
+    {"local", "127.0.0.1", 5000, Zone::Local},
+    {"subgame", "127.0.0.1", 5002, Zone::Subgame},
     {"SSCE Hyperspace", "162.248.95.143", 5005, Zone::Hyperspace},
     {"SSCJ Devastation", "69.164.220.203", 7022, Zone::Devastation},
     {"SSCJ MetalGear CTF", "69.164.220.203", 14000, Zone::MetalGear},
