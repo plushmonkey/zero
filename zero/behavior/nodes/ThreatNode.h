@@ -1,16 +1,206 @@
 #pragma once
 
 #include <stdio.h>
+#include <zero/InfluenceMap.h>
 #include <zero/ZeroBot.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/game/Game.h>
 
 #include <random>
 
-// These nodes are pretty bad. They could be improved by projecting weapons through an influence map and finding a nearby tile on the map that is safe.
+// These nodes are pretty bad. They could be improved by projecting weapons through an influence map and finding a
+// nearby tile on the map that is safe.
 
 namespace zero {
 namespace behavior {
+
+struct InfluenceMapGradientDodge : public BehaviorNode {
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    bool dodged = Dodge(ctx);
+
+    return dodged ? ExecuteResult::Success : ExecuteResult::Failure;
+  }
+
+  bool Dodge(behavior::ExecuteContext& ctx) {
+    Game& game = *ctx.bot->game;
+    Player* self = game.player_manager.GetSelf();
+
+    if (!self || self->ship >= 8) return false;
+
+    float radius = game.connection.settings.ShipSettings[self->ship].GetRadius();
+    float energy_pct = self->energy / (float)game.ship_controller.ship.energy;
+
+    size_t search = 3;
+
+    if (energy_pct < 0.25f) {
+      search += 2;
+    } else if (energy_pct < 0.5f) {
+      search += 1;
+    }
+
+    Vector2f pos = self->position;
+    // Check the corners of the ship to see if it's touching any influenced tiles
+    Vector2f positions[] = {
+        pos,
+        pos + Vector2f(radius, radius),
+        pos + Vector2f(-radius, -radius),
+        pos + Vector2f(radius, -radius),
+        pos + Vector2f(-radius, radius),
+    };
+
+    float best_value = 1000000.0f;
+    Vector2f best_position;
+
+    for (size_t i = 0; i < sizeof(positions) / sizeof(*positions); ++i) {
+      Vector2f check = positions[i];
+
+      if (ctx.bot->bot_controller->influence_map.GetValue(check) > 0.0f) {
+        Vector2f offsets[] = {
+            Vector2f(0, -1), Vector2f(0, 1),  Vector2f(-1, 0), Vector2f(1, 0),
+            Vector2f(1, 1),  Vector2f(1, -1), Vector2f(-1, 1), Vector2f(-1, -1),
+        };
+
+        for (size_t i = 0; i < sizeof(offsets) / sizeof(*offsets); ++i) {
+          float value = 0.0f;
+#if 0
+          float heading_value = std::abs(Normalize(offsets[i]).Dot(Normalize(self->GetHeading())));
+#else
+          float heading_value = 1.0f;
+#endif
+
+          for (size_t j = 1; j <= search; ++j) {
+            if (!game.GetMap().CanOccupy(check + offsets[i] * (float)j, radius, 0xFFFF)) {
+              value += 10000.0f;
+            }
+            value += ctx.bot->bot_controller->influence_map.GetValue(check + offsets[i] * (float)j) * heading_value;
+          }
+
+          if (value < best_value && game.GetMap().CanOccupy(check + offsets[i], radius, 0xFFFF)) {
+            best_value = value;
+            best_position = check + offsets[i];
+          }
+        }
+      }
+    }
+
+    if (best_value < 1000000.0f) {
+      ctx.bot->bot_controller->steering.force = (best_position - self->position) * 10000.0f;
+      return true;
+    }
+
+    return false;
+  }
+};
+
+struct InfluenceMapPopulateWeapons : public BehaviorNode {
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto& weapon_manager = ctx.bot->game->weapon_manager;
+    auto& player_manager = ctx.bot->game->player_manager;
+    Player* self = player_manager.GetSelf();
+
+    auto& influence_map = ctx.bot->bot_controller->influence_map;
+
+    influence_map.Clear();
+
+    if (!self) return ExecuteResult::Failure;
+
+    u32 tick = GetCurrentTick();
+
+    for (size_t i = 0; i < weapon_manager.weapon_count; ++i) {
+      Weapon* weapon = weapon_manager.weapons + i;
+
+      Player* player = player_manager.GetPlayerById(weapon->player_id);
+
+      if (!player || player->frequency == self->frequency) continue;
+
+      float dmg = (float)GetEstimatedWeaponDamage(*weapon, ctx.bot->game->connection);
+      Vector2f direction = Normalize(weapon->velocity);
+
+      constexpr s32 kForwardThinkingTicks = 500;
+
+      s32 remaining_ticks = TICK_DIFF(weapon->end_tick, tick);
+      if (remaining_ticks > kForwardThinkingTicks) remaining_ticks = kForwardThinkingTicks;
+
+      float speed = weapon->velocity.Length();
+      float remaining_dist = (remaining_ticks / 100.0f) * speed;
+
+      CastInfluence(influence_map, ctx.bot->game->connection.map, weapon->position, direction, remaining_dist, dmg);
+
+      if (weapon->data.type == WeaponType::Bomb || weapon->data.type == WeaponType::ProximityBomb) {
+        Vector2f side = Normalize(Perpendicular(weapon->velocity));
+
+        for (int i = 1; i <= 2; ++i) {
+          CastInfluence(influence_map, ctx.bot->game->connection.map, weapon->position + side * (float)i, direction, remaining_dist, dmg);
+          CastInfluence(influence_map, ctx.bot->game->connection.map, weapon->position - side * (float)i, direction, remaining_dist, dmg);
+        }
+      }
+    }
+
+    return ExecuteResult::Success;
+  }
+
+  void CastInfluence(InfluenceMap& influence_map, const Map& map, const Vector2f& from, const Vector2f& direction,
+                     float max_length, float value) {
+    Vector2f vMapSize = {1024.0f, 1024.0f};
+
+    if (map.IsSolid(from, 0xFFFF)) {
+      return;
+    }
+
+    Vector2f vRayUnitStepSize(std::sqrt(1 + (direction.y / direction.x) * (direction.y / direction.x)),
+                              std::sqrt(1 + (direction.x / direction.y) * (direction.x / direction.y)));
+
+    Vector2f vRayStart = from;
+
+    Vector2f vMapCheck = Vector2f(std::floor(vRayStart.x), std::floor(vRayStart.y));
+    Vector2f vRayLength1D;
+
+    Vector2f vStep;
+
+    if (direction.x < 0) {
+      vStep.x = -1.0f;
+      vRayLength1D.x = (vRayStart.x - float(vMapCheck.x)) * vRayUnitStepSize.x;
+    } else {
+      vStep.x = 1.0f;
+      vRayLength1D.x = (float(vMapCheck.x + 1) - vRayStart.x) * vRayUnitStepSize.x;
+    }
+
+    if (direction.y < 0) {
+      vStep.y = -1.0f;
+      vRayLength1D.y = (vRayStart.y - float(vMapCheck.y)) * vRayUnitStepSize.y;
+    } else {
+      vStep.y = 1.0f;
+      vRayLength1D.y = (float(vMapCheck.y + 1) - vRayStart.y) * vRayUnitStepSize.y;
+    }
+
+    // Perform "Walk" until collision or range check
+    bool bTileFound = false;
+    float fMaxDistance = max_length;
+    float fDistance = 0.0f;
+
+    while (!bTileFound && fDistance < fMaxDistance) {
+      // Walk along shortest path
+      if (vRayLength1D.x < vRayLength1D.y) {
+        vMapCheck.x += vStep.x;
+        fDistance = vRayLength1D.x;
+        vRayLength1D.x += vRayUnitStepSize.x;
+      } else {
+        vMapCheck.y += vStep.y;
+        fDistance = vRayLength1D.y;
+        vRayLength1D.y += vRayUnitStepSize.y;
+      }
+
+      // Test tile at new test point
+      if (vMapCheck.x >= 0 && vMapCheck.x < vMapSize.x && vMapCheck.y >= 0 && vMapCheck.y < vMapSize.y) {
+        if (map.IsSolid((unsigned short)vMapCheck.x, (unsigned short)vMapCheck.y, 0xFFFF)) {
+          bTileFound = true;
+        } else {
+          influence_map.AddValue((u16)vMapCheck.x, (u16)vMapCheck.y, value * (1.0f - (fDistance / fMaxDistance)));
+        }
+      }
+    }
+  }
+};
 
 // Tries to find a position near the enemy for camping around.
 struct FindTerritoryPosition : public BehaviorNode {
@@ -155,62 +345,9 @@ struct PositionThreatQueryNode : public BehaviorNode {
       }
     }
 
+    if (energy < 0) energy = 0;
+
     return (self->energy - energy) / ctx.bot->game->ship_controller.ship.energy;
-  }
-
-  int GetEstimatedWeaponDamage(Weapon& weapon, Connection& connection) {
-    // This might be a dangerous weapon.
-    // Estimate damage from this weapon.
-    int damage = 0;
-
-    switch (weapon.data.type) {
-      case WeaponType::Bullet:
-      case WeaponType::BouncingBullet: {
-        if (weapon.data.shrap > 0) {
-          s32 remaining = weapon.end_tick - GetCurrentTick();
-          s32 duration = connection.settings.BulletAliveTime - remaining;
-
-          if (duration <= 25) {
-            damage = connection.settings.InactiveShrapDamage / 1000;
-          } else {
-            float multiplier = connection.settings.ShrapnelDamagePercent / 1000.0f;
-
-            damage = (connection.settings.BulletDamageLevel / 1000) +
-                     (connection.settings.BulletDamageUpgrade / 1000) * weapon.data.level;
-
-            damage = (int)(damage * multiplier);
-          }
-        } else {
-          damage = (connection.settings.BulletDamageLevel / 1000) +
-                   (connection.settings.BulletDamageUpgrade / 1000) * weapon.data.level;
-        }
-      } break;
-      case WeaponType::Thor:
-      case WeaponType::Bomb:
-      case WeaponType::ProximityBomb: {
-        int bomb_dmg = connection.settings.BombDamageLevel;
-        int level = weapon.data.level;
-
-        if (weapon.data.type == WeaponType::Thor) {
-          // Weapon level should always be 0 for thor in normal gameplay, I believe, but this is how it's done
-          bomb_dmg = bomb_dmg + bomb_dmg * weapon.data.level * weapon.data.level;
-          level = 3 + weapon.data.level;
-        }
-
-        bomb_dmg = bomb_dmg / 1000;
-
-        if (weapon.flags & WEAPON_FLAG_EMP) {
-          bomb_dmg = (int)(bomb_dmg * (connection.settings.EBombDamagePercent / 1000.0f));
-        }
-
-        damage = bomb_dmg;
-      } break;
-      case WeaponType::Burst: {
-        damage = connection.settings.BurstDamageLevel;
-      } break;
-    }
-
-    return damage;
   }
 
   Vector2f set_position;

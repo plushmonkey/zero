@@ -103,7 +103,13 @@ struct AimNode : public BehaviorNode {
     float weapon_speed = ctx.bot->game->connection.settings.ShipSettings[self->ship].BulletSpeed / 16.0f / 10.0f;
 
     Player* target = opt_target.value();
-    Vector2f aimshot = CalculateShot(self->position, target->position, self->velocity, target->velocity, weapon_speed);
+
+    Vector2f direction = Normalize(target->position - self->position);
+    float amount = target->velocity.Dot(direction);
+    // Remove the "away" velocity from the target so it's only moving side to side.
+    Vector2f horizontal_vel = target->velocity - direction * amount;
+
+    Vector2f aimshot = CalculateShot(self->position, target->position, self->velocity, horizontal_vel, weapon_speed);
 
     // Set the aimshot directly to the player position if the calculated position was way off.
     if (aimshot.DistanceSq(target->position) > 20.0f * 20.0f) {

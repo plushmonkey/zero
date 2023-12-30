@@ -91,6 +91,7 @@
     <ClInclude Include="zero\Event.h" />
     <ClInclude Include="zero\game\GameEvent.h" />
     <ClInclude Include="zero\game\Logger.h" />
+    <ClInclude Include="zero\InfluenceMap.h" />
     <ClInclude Include="zero\path\Path.h" />
     <ClInclude Include="zero\Utility.h" />
     <ClInclude Include="zero\ZeroBot.h" />

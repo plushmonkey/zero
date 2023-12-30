@@ -133,6 +133,46 @@ class SayCommand : public CommandExecutor {
   int GetSecurityLevel() { return 10; }
 };
 
+class GoCommand : public CommandExecutor {
+ public:
+  void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
+    auto& connection = bot.game->connection;
+
+    int ship = 8;
+
+    if (arg.empty()) {
+      connection.SendArenaLogin(ship, 0, 1920, 1080, 0xFFFF, "");
+      return;
+    }
+
+    bool is_number = true;
+    for (size_t i = 0; i < arg.size(); ++i) {
+      if (arg[i] < '0' || arg[i] > '9') {
+        is_number = false;
+        break;
+      }
+    }
+
+    if (is_number) {
+      int number = atoi(arg.data());
+
+      if (number > 0xFFFF) {
+        number = 0xFFFF;
+      }
+
+      connection.SendArenaLogin(ship, 0, 1920, 1080, number, "");
+    } else {
+      connection.SendArenaLogin(ship, 0, 1920, 1080, 0xFFFD, arg.data());
+    }
+  }
+
+  CommandAccessFlags GetAccess() { return CommandAccess_Private; }
+  void SetAccess(CommandAccessFlags flags) { return; }
+  std::vector<std::string> GetAliases() { return {"go"}; }
+  std::string GetDescription() { return "Moves to another arena."; }
+  int GetSecurityLevel() { return 5; }
+};
+
 class ZoneCommand : public CommandExecutor {
  public:
   void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
@@ -322,6 +362,7 @@ CommandSystem::CommandSystem(ZeroBot& bot, PacketDispatcher& dispatcher) : bot(b
   default_commands_.emplace_back(std::make_shared<SetShipCommand>());
   default_commands_.emplace_back(std::make_shared<ZoneCommand>());
   default_commands_.emplace_back(std::make_shared<SayCommand>());
+  default_commands_.emplace_back(std::make_shared<GoCommand>());
   default_commands_.emplace_back(std::make_shared<BehaviorCommand>());
   default_commands_.emplace_back(std::make_shared<BehaviorsCommand>());
 

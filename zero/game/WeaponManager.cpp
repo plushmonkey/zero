@@ -824,4 +824,59 @@ void WeaponManager::GetMineCounts(Player& player, const Vector2f& check, size_t*
   }
 }
 
+int GetEstimatedWeaponDamage(Weapon& weapon, Connection& connection) {
+  // This might be a dangerous weapon.
+  // Estimate damage from this weapon.
+  int damage = 0;
+
+  switch (weapon.data.type) {
+    case WeaponType::Bullet:
+    case WeaponType::BouncingBullet: {
+      if (weapon.data.shrap > 0) {
+        s32 remaining = weapon.end_tick - GetCurrentTick();
+        s32 duration = connection.settings.BulletAliveTime - remaining;
+
+        if (duration <= 25) {
+          damage = connection.settings.InactiveShrapDamage / 1000;
+        } else {
+          float multiplier = connection.settings.ShrapnelDamagePercent / 1000.0f;
+
+          damage = (connection.settings.BulletDamageLevel / 1000) +
+                   (connection.settings.BulletDamageUpgrade / 1000) * weapon.data.level;
+
+          damage = (int)(damage * multiplier);
+        }
+      } else {
+        damage = (connection.settings.BulletDamageLevel / 1000) +
+                 (connection.settings.BulletDamageUpgrade / 1000) * weapon.data.level;
+      }
+    } break;
+    case WeaponType::Thor:
+    case WeaponType::Bomb:
+    case WeaponType::ProximityBomb: {
+      int bomb_dmg = connection.settings.BombDamageLevel;
+      int level = weapon.data.level;
+
+      if (weapon.data.type == WeaponType::Thor) {
+        // Weapon level should always be 0 for thor in normal gameplay, I believe, but this is how it's done
+        bomb_dmg = bomb_dmg + bomb_dmg * weapon.data.level * weapon.data.level;
+        level = 3 + weapon.data.level;
+      }
+
+      bomb_dmg = bomb_dmg / 1000;
+
+      if (weapon.flags & WEAPON_FLAG_EMP) {
+        bomb_dmg = (int)(bomb_dmg * (connection.settings.EBombDamagePercent / 1000.0f));
+      }
+
+      damage = bomb_dmg;
+    } break;
+    case WeaponType::Burst: {
+      damage = connection.settings.BurstDamageLevel;
+    } break;
+  }
+
+  return damage;
+}
+
 }  // namespace zero

@@ -2,6 +2,7 @@
 
 #include <zero/Actuator.h>
 #include <zero/ChatQueue.h>
+#include <zero/InfluenceMap.h>
 #include <zero/Steering.h>
 #include <zero/behavior/Behavior.h>
 #include <zero/game/Game.h>
@@ -32,6 +33,8 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>, EventHandler<
   Steering steering;
   Actuator actuator;
   path::Path current_path;
+
+  InfluenceMap influence_map;
 
   BotController(Game& game);
 

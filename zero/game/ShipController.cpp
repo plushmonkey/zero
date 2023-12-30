@@ -1443,7 +1443,9 @@ void ShipController::OnWeaponHit(Weapon& weapon) {
           (float)(connection.settings.BombExplodePixels + connection.settings.BombExplodePixels * level);
 
       if (delta.LengthSq() < explode_pixels * explode_pixels) {
-        float distance = delta.Length();
+        float constexpr kBombSize = 2.0f;
+        float distance = delta.Length() - kBombSize;
+        if (distance < 0.0f) distance = 0.0f;
 
         damage = (int)((explode_pixels - distance) * (bomb_dmg / explode_pixels));
 

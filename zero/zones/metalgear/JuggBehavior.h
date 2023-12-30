@@ -11,7 +11,7 @@ struct JuggBehavior : public behavior::Behavior {
   void OnInitialize(behavior::ExecuteContext& ctx) override {
     // Setup blackboard here for this specific behavior
     ctx.blackboard.Set("request_ship", 5);
-    ctx.blackboard.Set("leash_distance", 65.0f);
+    ctx.blackboard.Set("leash_distance", 45.0f);
 
     std::vector<Vector2f> waypoints{
         Vector2f(445, 425),

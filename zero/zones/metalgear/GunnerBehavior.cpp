@@ -46,6 +46,11 @@ std::unique_ptr<behavior::BehaviorNode> GunnerBehavior::CreateTree(behavior::Exe
                     .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
                     .End()
                 .Selector()
+                    .Sequence()
+                        .Child<InfluenceMapPopulateWeapons>()
+                        .Child<InfluenceMapGradientDodge>()
+                        .Child<InputActionNode>(InputAction::Bullet)
+                        .End()
                     .Sequence() // Path to target if they aren't immediately visible.
                         .InvertChild<VisibilityQueryNode>("nearest_target_position")
                         .Child<GoToNode>("nearest_target_position")

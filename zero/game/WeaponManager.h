@@ -127,6 +127,8 @@ struct WeaponManager {
   Vector2f GetExtrapolatedPos(Weapon& weapon);
 };
 
+int GetEstimatedWeaponDamage(Weapon& weapon, Connection& connection);
+
 }  // namespace zero
 
 #endif

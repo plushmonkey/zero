@@ -14,7 +14,7 @@ namespace zero {
 namespace mg {
 
 struct MetalGearController : ZoneController {
-  bool IsZone(Zone zone) override { return zone == Zone::MetalGear; }
+  bool IsZone(Zone zone) override { return zone == Zone::MetalGear || zone == Zone::Local; }
 
   void CreateBehaviors(const char* arena_name) override;
 };
@@ -22,20 +22,15 @@ struct MetalGearController : ZoneController {
 static MetalGearController controller;
 
 void MetalGearController::CreateBehaviors(const char* arena_name) {
-  // Create behaviors depending on arena name
-  if (isdigit(arena_name[0])) {
-    Log(LogLevel::Info, "Registering mg behaviors for public arena.");
+  Log(LogLevel::Info, "Registering mg behaviors.");
 
-    auto& repo = bot->bot_controller->behaviors;
+  auto& repo = bot->bot_controller->behaviors;
 
-    repo.Add("jugg", std::make_unique<JuggBehavior>());
-    repo.Add("sniper", std::make_unique<SniperBehavior>());
-    repo.Add("gunner", std::make_unique<GunnerBehavior>());
+  repo.Add("jugg", std::make_unique<JuggBehavior>());
+  repo.Add("sniper", std::make_unique<SniperBehavior>());
+  repo.Add("gunner", std::make_unique<GunnerBehavior>());
 
-    SetBehavior("jugg");
-  } else {
-    Log(LogLevel::Info, "No mg behaviors defined for arena '%s'.", arena_name);
-  }
+  SetBehavior("jugg");
 }
 
 }  // namespace mg

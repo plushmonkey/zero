@@ -11,7 +11,7 @@ struct SniperBehavior : public behavior::Behavior {
   void OnInitialize(behavior::ExecuteContext& ctx) override {
     // Setup blackboard here for this specific behavior
     ctx.blackboard.Set("request_ship", 6);
-    ctx.blackboard.Set("leash_distance", 75.0f);
+    ctx.blackboard.Set("leash_distance", 55.0f);
 
     std::vector<Vector2f> waypoints{
         Vector2f(445, 425),
