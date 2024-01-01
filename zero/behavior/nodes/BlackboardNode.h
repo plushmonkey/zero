@@ -34,6 +34,17 @@ struct BlackboardSetQueryNode : public BehaviorNode {
   const char* key;
 };
 
+struct BlackboardEraseNode : public BehaviorNode {
+  BlackboardEraseNode(const char* key) : key(key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    ctx.blackboard.Erase(key);
+    return ExecuteResult::Success;
+  }
+
+  const char* key;
+};
+
 template <typename T>
 struct ValueCompareQuery : public behavior::BehaviorNode {
   ValueCompareQuery(const char* key, T compare_value) : key(key), compare_value(compare_value) {}

@@ -8,6 +8,37 @@
 namespace zero {
 namespace behavior {
 
+// Returns success if the weapon is on cooldown
+struct ShipWeaponCooldownQueryNode : public BehaviorNode {
+  ShipWeaponCooldownQueryNode(WeaponType type) : type(type) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    u32 current_tick = GetCurrentTick();
+    u32 cooldown_tick = current_tick;
+
+    switch (type) {
+      case WeaponType::Bullet:
+      case WeaponType::BouncingBullet: {
+        cooldown_tick = ctx.bot->game->ship_controller.ship.next_bullet_tick;
+      } break;
+      case WeaponType::Bomb:
+      case WeaponType::ProximityBomb:
+      case WeaponType::Thor:
+      case WeaponType::Burst:
+      case WeaponType::Decoy: {
+        cooldown_tick = ctx.bot->game->ship_controller.ship.next_bomb_tick;
+      } break;
+      case WeaponType::Repel: {
+        cooldown_tick = ctx.bot->game->ship_controller.ship.next_repel_tick;
+      } break;
+    }
+
+    return TICK_GT(cooldown_tick, current_tick) ? ExecuteResult::Success : ExecuteResult::Failure;
+  }
+
+  WeaponType type;
+};
+
 struct ShipQueryNode : public BehaviorNode {
   ShipQueryNode(int ship) : ship(ship) {}
   ShipQueryNode(const char* ship_key) : ship_key(ship_key) {}

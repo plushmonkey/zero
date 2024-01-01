@@ -166,7 +166,7 @@ class GoCommand : public CommandExecutor {
     }
   }
 
-  CommandAccessFlags GetAccess() { return CommandAccess_Private; }
+  CommandAccessFlags GetAccess() { return CommandAccess_Public | CommandAccess_Private; }
   void SetAccess(CommandAccessFlags flags) { return; }
   std::vector<std::string> GetAliases() { return {"go"}; }
   std::string GetDescription() { return "Moves to another arena."; }

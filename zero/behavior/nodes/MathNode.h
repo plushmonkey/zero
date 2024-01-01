@@ -128,6 +128,54 @@ struct VectorNode : public BehaviorNode {
   Vector2f vector;
 };
 
+struct PerpendicularNode : public BehaviorNode {
+  PerpendicularNode(Vector2f position1, Vector2f position2, const char* output_key, bool normalize = false)
+      : position1(position1), position2(position2), output_key(output_key), normalize(normalize) {}
+  PerpendicularNode(const char* position_key1, Vector2f position2, const char* output_key, bool normalize = false)
+      : position_key1(position_key1), position2(position2), output_key(output_key), normalize(normalize) {}
+  PerpendicularNode(Vector2f position1, const char* position_key2, const char* output_key, bool normalize = false)
+      : position1(position1), position_key2(position_key2), output_key(output_key), normalize(normalize) {}
+  PerpendicularNode(const char* position_key1, const char* position_key2, const char* output_key,
+                    bool normalize = false)
+      : position_key1(position_key1), position_key2(position_key2), output_key(output_key), normalize(normalize) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    Vector2f pos1 = position1;
+    Vector2f pos2 = position2;
+
+    if (position_key1) {
+      auto opt_pos = ctx.blackboard.Value<Vector2f>(position_key1);
+      if (!opt_pos.has_value()) return ExecuteResult::Failure;
+      pos1 = opt_pos.value();
+    }
+
+    if (position_key2) {
+      auto opt_pos = ctx.blackboard.Value<Vector2f>(position_key2);
+      if (!opt_pos.has_value()) return ExecuteResult::Failure;
+      pos2 = opt_pos.value();
+    }
+
+    Vector2f result = Perpendicular(pos1 - pos2);
+
+    if (normalize) {
+      result = Normalize(result);
+    }
+
+    ctx.blackboard.Set<Vector2f>(output_key, result);
+
+    return ExecuteResult::Success;
+  }
+
+  Vector2f position1;
+  Vector2f position2;
+
+  bool normalize = false;
+
+  const char* position_key1 = nullptr;
+  const char* position_key2 = nullptr;
+  const char* output_key = nullptr;
+};
+
 struct MoveRectangleNode : public BehaviorNode {
   MoveRectangleNode(const char* rectangle_key, const Vector2f& new_position, const char* output_key)
       : rectangle_key(rectangle_key), new_position(new_position), output_key(output_key) {}
@@ -343,6 +391,38 @@ struct VectorDotNode : public BehaviorNode {
     }
 
     float result = vector_a.Dot(vector_b);
+
+    ctx.blackboard.Set(output_key, result);
+
+    return ExecuteResult::Success;
+  }
+
+  const char* vector_a_key;
+  const char* vector_b_key;
+  const char* output_key;
+  bool normalize;
+};
+
+// Computes vector_a_key + vector_b_key and stores in output_key.
+struct VectorAddNode : public BehaviorNode {
+  VectorAddNode(const char* vector_a_key, const char* vector_b_key, const char* output_key, bool normalize = false)
+    : vector_a_key(vector_a_key), vector_b_key(vector_b_key), output_key(output_key), normalize(normalize) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto opt_vector_a = ctx.blackboard.Value<Vector2f>(vector_a_key);
+    if (!opt_vector_a.has_value()) return ExecuteResult::Failure;
+
+    auto opt_vector_b = ctx.blackboard.Value<Vector2f>(vector_b_key);
+    if (!opt_vector_b.has_value()) return ExecuteResult::Failure;
+
+    Vector2f vector_a = opt_vector_a.value();
+    Vector2f vector_b = opt_vector_b.value();
+
+    Vector2f result = vector_a + vector_b;
+
+    if (normalize) {
+      result = Normalize(result);
+    }
 
     ctx.blackboard.Set(output_key, result);
 
