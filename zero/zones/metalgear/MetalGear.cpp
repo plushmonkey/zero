@@ -13,10 +13,20 @@
 namespace zero {
 namespace mg {
 
-struct MetalGearController : ZoneController {
+struct MetalGearController : ZoneController, public EventHandler<PlayerDeathEvent> {
   bool IsZone(Zone zone) override { return zone == Zone::MetalGear || zone == Zone::Local; }
 
   void CreateBehaviors(const char* arena_name) override;
+
+  void HandleEvent(const PlayerDeathEvent& event) override {
+    auto self = this->bot->game->player_manager.GetSelf();
+
+    if (!self) return;
+
+    if (event.player.id == self->id || event.killer.id == self->id) {
+      Log(LogLevel::Info, "%s (%d) killed by %s (%d)", event.player.name, event.bounty, event.killer.name, event.killer.bounty);
+    }
+  }
 };
 
 static MetalGearController controller;
