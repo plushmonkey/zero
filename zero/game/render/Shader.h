@@ -17,7 +17,7 @@ struct ShaderProgram {
 
   void Cleanup();
 
-  GLuint program;
+  GLuint program = -1;
 };
 
 }  // namespace zero

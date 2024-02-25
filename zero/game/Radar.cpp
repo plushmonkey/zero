@@ -250,7 +250,7 @@ void Radar::RenderTime(Camera& ui_camera, SpriteRenderer& renderer, const Vector
 
   sprintf(output, "%d:%02d%s  %c%d", hour, ti->tm_min, pm ? "pm" : "am", map_coord_x + 'A', map_coord_y);
 
-  renderer.DrawText(ui_camera, output, TextColor::White, Vector2f(ui_camera.surface_dim.x - 5, radar_position.y - 16),
+  renderer.PushText(ui_camera, output, TextColor::White, Vector2f(ui_camera.surface_dim.x - 5, radar_position.y - 16),
                     Layer::TopMost, TextAlignment::Right);
 }
 

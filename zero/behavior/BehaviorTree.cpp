@@ -1,35 +1,15 @@
 #include "BehaviorTree.h"
 
 #include <Windows.h>
+#include <zero/RenderContext.h>
+#include <zero/game/Game.h>
 
 namespace zero {
 namespace behavior {
 
 TreePrinter* gDebugTreePrinter = nullptr;
 
-static void ClearScreen() {
-  static const HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-
-  CONSOLE_SCREEN_BUFFER_INFO csbi;
-  COORD topLeft = {0, 0};
-
-  fflush(stdout);
-
-  if (!GetConsoleScreenBufferInfo(hOut, &csbi)) {
-    return;
-  }
-
-  DWORD length = csbi.dwSize.X * csbi.dwSize.Y;
-  DWORD written;
-
-  // Flood-fill the console with spaces to clear it
-  FillConsoleOutputCharacter(hOut, TEXT(' '), length, topLeft, &written);
-  SetConsoleCursorPosition(hOut, topLeft);
-}
-
-void TreePrinter::Render(FILE* f) {
-  ClearScreen();
-
+void TreePrinter::Render(RenderContext& rc) {
   if (render_brackets) {
     --depth;
     int remaining_depth = depth;
@@ -40,7 +20,12 @@ void TreePrinter::Render(FILE* f) {
     }
   }
 
-  fprintf(f, "%s\n", output.data());
+  float y = 0.0f;
+  for (auto& line : output) {
+    rc.renderer->PushText(*rc.ui_camera, line.data(), TextColor::Pink, Vector2f(0, y), Layer::TopMost);
+    y += 12.0f;
+  }
+  rc.renderer->Render(*rc.ui_camera);
 }
 
 void Print(std::string_view str) {
@@ -62,7 +47,19 @@ void Print(std::unique_ptr<BehaviorNode>& node) {
     if (IsNodeType<SuccessNode>(node)) return;
     if (IsNodeType<InvertNode>(node)) return;
 
-    gDebugTreePrinter->Print(typeid(*node.get()).name());
+    const char* type_name = typeid(*node.get()).name();
+    int type_name_len = (int)strlen(type_name);
+    int first_index = 0;
+
+    // Find the last ':' character in the name so the string can start there.
+    for (int i = type_name_len - 1; i >= 0; --i) {
+      if (type_name[i] == ':') {
+        first_index = i + 1;
+        break;
+      }
+    }
+
+    gDebugTreePrinter->Print(type_name + first_index);
   }
 }
 

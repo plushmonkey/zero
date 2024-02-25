@@ -19,7 +19,7 @@ bool DebugRenderer::Initialize(s32 surface_width, s32 surface_height) {
   return true;
 }
 
-bool DebugRenderer::Render(Game& game, float dt) {
+bool DebugRenderer::Begin() {
   if (!window) return true;
   if (glfwWindowShouldClose(window)) return false;
 
@@ -28,10 +28,11 @@ bool DebugRenderer::Render(Game& game, float dt) {
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-  game.Render(dt);
-  glfwSwapBuffers(window);
-
   return true;
+}
+
+void DebugRenderer::Present() {
+  glfwSwapBuffers(window);
 }
 
 void DebugRenderer::Close() {

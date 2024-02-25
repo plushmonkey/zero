@@ -14,7 +14,8 @@ struct DebugRenderer {
   void Close();
 
   // Returns false if the window is closed and should be terminated.
-  bool Render(Game& game, float dt);
+  bool Begin();
+  void Present();
 };
 
 }  // namespace zero

@@ -876,7 +876,7 @@ inline void RenderTimedIndicator(Camera& ui_camera, SpriteRenderer& renderer, An
     sprintf(duration_text, "%.1f", duration);
   }
 
-  renderer.DrawText(ui_camera, duration_text, color, position + Vector2f(0, 4), Layer::Gauges, TextAlignment::Right);
+  renderer.PushText(ui_camera, duration_text, color, position + Vector2f(0, 4), Layer::Gauges, TextAlignment::Right);
 }
 
 void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& renderer) {

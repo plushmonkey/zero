@@ -11,23 +11,25 @@
 namespace zero {
 
 struct ZeroBot;
+struct RenderContext;
 
 namespace behavior {
 
 struct TreePrinter {
   int depth = 0;
-  std::string output;
+  std::vector<std::string> output;
   bool render_brackets = false;
 
   void Print(std::string_view str) {
     int depth_size = depth * 2;
+    std::string buffer;
 
     for (int i = 0; i < depth_size; ++i) {
-      output.push_back(' ');
+      buffer.push_back(' ');
     }
 
-    output += str;
-    output += '\n';
+    buffer += str;
+    output.push_back(buffer);
   }
 
   void Reset() {
@@ -35,7 +37,7 @@ struct TreePrinter {
     output.clear();
   }
 
-  void Render(FILE* f);
+  void Render(RenderContext& rc);
 };
 extern TreePrinter* gDebugTreePrinter;
 

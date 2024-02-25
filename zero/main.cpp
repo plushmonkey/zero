@@ -1,5 +1,3 @@
-#define NOMINMAX
-
 #include <stdio.h>
 #include <zero/ZeroBot.h>
 #include <zero/game/Buffer.h>
@@ -15,7 +13,6 @@
 #undef APIENTRY
 #endif
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 zero::ZeroBot* g_Bot = nullptr;

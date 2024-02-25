@@ -11,10 +11,10 @@
 #define CREATE_RENDER_WINDOW 0
 #define SURFACE_WIDTH 1360
 #define SURFACE_HEIGHT 768
+
 //
 
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
 #ifdef APIENTRY
 #undef APIENTRY
 #endif
@@ -78,7 +78,8 @@ bool ZeroBot::JoinZone(ServerInfo& server) {
   kPlayerName = name;
   kPlayerPassword = password;
 
-  game = memory_arena_construct_type(&perm_arena, Game, perm_arena, trans_arena, *work_queue, SURFACE_WIDTH, SURFACE_HEIGHT);
+  game = memory_arena_construct_type(&perm_arena, Game, perm_arena, trans_arena, *work_queue, SURFACE_WIDTH,
+                                     SURFACE_HEIGHT);
   bot_controller = memory_arena_construct_type(&perm_arena, BotController, *game);
 
   commands = memory_arena_construct_type(&perm_arena, CommandSystem, *this, this->game->dispatcher);
@@ -141,11 +142,18 @@ void ZeroBot::Run() {
 
     input.Clear();
 
+    if (game->render_enabled && !debug_renderer.Begin()) {
+      game->Cleanup();
+      break;
+    }
+
     if (bot_controller && game->connection.login_state == Connection::LoginState::Complete) {
       execute_ctx.bot = this;
       execute_ctx.dt = dt;
 
-      bot_controller->Update(dt, input, execute_ctx);
+      RenderContext rc(&game->camera, &game->ui_camera, &game->sprite_renderer);
+
+      bot_controller->Update(rc, dt, input, execute_ctx);
     }
 
     if (!game->Update(input, dt)) {
@@ -153,14 +161,10 @@ void ZeroBot::Run() {
       break;
     }
 
+    game->Render(dt);
+
     if (game->render_enabled) {
-      if (!debug_renderer.Render(*game, dt)) {
-        game->Cleanup();
-        break;
-      }
-    } else {
-      // Manually call game render when renderer is disabled so it can flush the buffers.
-      game->Render(dt);
+      debug_renderer.Present();
     }
 
 #if CREATE_RENDER_WINDOW == 0

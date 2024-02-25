@@ -197,7 +197,7 @@ void SpriteRenderer::FreeSheet(unsigned int texture_id) {
   glDeleteTextures(1, &texture_id);
 }
 
-void SpriteRenderer::DrawText(Camera& camera, const char* text, TextColor color, const Vector2f& position, Layer layer,
+void SpriteRenderer::PushText(Camera& camera, const char* text, TextColor color, const Vector2f& position, Layer layer,
                               TextAlignment alignment) {
   constexpr size_t kCountPerColor = 96;
   constexpr size_t kForeignCountPerColor = 24 * 3;
@@ -274,48 +274,50 @@ void SpriteRenderer::Draw(Camera& camera, const SpriteRenderable& renderable, co
 }
 
 void SpriteRenderer::Render(Camera& camera) {
-  shader.Use();
-  glBindVertexArray(vao);
+  if (shader.program != -1) {
+    shader.Use();
+    glBindVertexArray(vao);
 
-  glActiveTexture(GL_TEXTURE0);
-  glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glActiveTexture(GL_TEXTURE0);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
-  mat4 proj = camera.GetProjection();
-  mat4 view = camera.GetView();
-  mat4 mvp = proj * view;
+    mat4 proj = camera.GetProjection();
+    mat4 view = camera.GetView();
+    mat4 mvp = proj * view;
 
-  glUniformMatrix4fv(mvp_uniform, 1, GL_FALSE, (const GLfloat*)mvp.data);
+    glUniformMatrix4fv(mvp_uniform, 1, GL_FALSE, (const GLfloat*)mvp.data);
 
-  SpritePushElement* element = (SpritePushElement*)push_buffer.base;
-  GLuint* texture_ptr = (GLuint*)texture_push_buffer.base;
+    SpritePushElement* element = (SpritePushElement*)push_buffer.base;
+    GLuint* texture_ptr = (GLuint*)texture_push_buffer.base;
 
-  GLuint current_texture = *texture_ptr;
-  GLsizei vertex_count = 0;
-  glBindTexture(GL_TEXTURE_2D, current_texture);
+    GLuint current_texture = *texture_ptr;
+    GLsizei vertex_count = 0;
+    glBindTexture(GL_TEXTURE_2D, current_texture);
 
-  void* draw_base = push_buffer.base;
+    void* draw_base = push_buffer.base;
 
-  while (element < (SpritePushElement*)push_buffer.current) {
-    GLuint element_texture = *texture_ptr;
+    while (element < (SpritePushElement*)push_buffer.current) {
+      GLuint element_texture = *texture_ptr;
 
-    if (element_texture != current_texture) {
-      glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_count * sizeof(SpriteVertex), draw_base);
-      glDrawArrays(GL_TRIANGLES, 0, vertex_count);
-      glBindTexture(GL_TEXTURE_2D, element_texture);
+      if (element_texture != current_texture) {
+        glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_count * sizeof(SpriteVertex), draw_base);
+        glDrawArrays(GL_TRIANGLES, 0, vertex_count);
+        glBindTexture(GL_TEXTURE_2D, element_texture);
 
-      current_texture = element_texture;
-      draw_base = element;
-      vertex_count = 0;
+        current_texture = element_texture;
+        draw_base = element;
+        vertex_count = 0;
+      }
+
+      vertex_count += 6;
+      ++element;
+      ++texture_ptr;
     }
 
-    vertex_count += 6;
-    ++element;
-    ++texture_ptr;
-  }
-
-  if (vertex_count > 0) {
-    glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_count * sizeof(SpriteVertex), draw_base);
-    glDrawArrays(GL_TRIANGLES, 0, vertex_count);
+    if (vertex_count > 0) {
+      glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_count * sizeof(SpriteVertex), draw_base);
+      glDrawArrays(GL_TRIANGLES, 0, vertex_count);
+    }
   }
 
   push_buffer.Reset();

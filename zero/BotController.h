@@ -3,6 +3,7 @@
 #include <zero/Actuator.h>
 #include <zero/ChatQueue.h>
 #include <zero/InfluenceMap.h>
+#include <zero/RenderContext.h>
 #include <zero/Steering.h>
 #include <zero/behavior/Behavior.h>
 #include <zero/game/Game.h>
@@ -38,7 +39,7 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>, EventHandler<
 
   BotController(Game& game);
 
-  void Update(float dt, InputState& input, behavior::ExecuteContext& execute_ctx);
+  void Update(RenderContext& rc, float dt, InputState& input, behavior::ExecuteContext& execute_ctx);
 
   void HandleEvent(const JoinGameEvent& event) override;
   void HandleEvent(const PlayerFreqAndShipChangeEvent& event) override;

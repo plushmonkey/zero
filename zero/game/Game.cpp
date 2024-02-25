@@ -436,7 +436,7 @@ void Game::Render(float dt) {
 
   char fps_text[32];
   sprintf(fps_text, "FPS: %d", (int)(fps + 0.5f));
-  sprite_renderer.DrawText(ui_camera, fps_text, TextColor::Pink, Vector2f(ui_camera.surface_dim.x, 24), Layer::TopMost,
+  sprite_renderer.PushText(ui_camera, fps_text, TextColor::Pink, Vector2f(ui_camera.surface_dim.x, 24), Layer::TopMost,
                            TextAlignment::Right);
 
   sprite_renderer.Render(ui_camera);
@@ -518,10 +518,10 @@ void Game::RenderJoin(float dt) {
       Vector2f position(ui_camera.surface_dim.x * 0.5f, (float)(u32)(ui_camera.surface_dim.y * 0.8f));
 
       if (connection.packets_received > 0) {
-        sprite_renderer.DrawText(ui_camera, "Entering arena", TextColor::Blue, position, Layer::TopMost,
+        sprite_renderer.PushText(ui_camera, "Entering arena", TextColor::Blue, position, Layer::TopMost,
                                  TextAlignment::Center);
       } else {
-        sprite_renderer.DrawText(ui_camera, "Connecting to server", TextColor::Blue, position, Layer::TopMost,
+        sprite_renderer.PushText(ui_camera, "Connecting to server", TextColor::Blue, position, Layer::TopMost,
                                  TextAlignment::Center);
       }
     } break;
@@ -533,7 +533,7 @@ void Game::RenderJoin(float dt) {
 
       Vector2f download_pos(ui_camera.surface_dim.x * 0.5f, ui_camera.surface_dim.y * 0.8f);
 
-      sprite_renderer.DrawText(ui_camera, downloading, TextColor::Blue, download_pos, Layer::TopMost,
+      sprite_renderer.PushText(ui_camera, downloading, TextColor::Blue, download_pos, Layer::TopMost,
                                TextAlignment::Center);
       sprite_renderer.Render(ui_camera);
     } break;
@@ -544,7 +544,7 @@ void Game::RenderJoin(float dt) {
 
       Vector2f position(ui_camera.surface_dim.x * 0.5f, (float)(u32)(ui_camera.surface_dim.y * 0.8f));
 
-      sprite_renderer.DrawText(ui_camera, "Failed to connect to server", TextColor::DarkRed, position, Layer::TopMost,
+      sprite_renderer.PushText(ui_camera, "Failed to connect to server", TextColor::DarkRed, position, Layer::TopMost,
                                TextAlignment::Center);
     } break;
     default: {

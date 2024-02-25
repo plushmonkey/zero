@@ -256,7 +256,7 @@ void PlayerManager::Render(Camera& camera, SpriteRenderer& renderer) {
     } else if (player == self && player->enter_delay > 0 && !explode_animation.IsAnimating(player->explode_anim_t)) {
       char output[256];
       sprintf(output, "%.1f", player->enter_delay);
-      renderer.DrawText(camera, output, TextColor::DarkRed, camera.position, Layer::TopMost, TextAlignment::Center);
+      renderer.PushText(camera, output, TextColor::DarkRed, camera.position, Layer::TopMost, TextAlignment::Center);
     }
   }
 
@@ -350,7 +350,7 @@ void PlayerManager::RenderPlayerName(Camera& camera, SpriteRenderer& renderer, P
 
         sprintf(ball_time_output, "%.1f", soccer->carry_timer);
 
-        renderer.DrawText(camera, ball_time_output, TextColor::Red, current_position, Layer::Ships);
+        renderer.PushText(camera, ball_time_output, TextColor::Red, current_position, Layer::Ships);
         current_position.y += (12.0f / 16.0f);
       }
 
@@ -361,7 +361,7 @@ void PlayerManager::RenderPlayerName(Camera& camera, SpriteRenderer& renderer, P
         char energy_output[16];
         sprintf(energy_output, "%d", (u32)player.energy);
 
-        renderer.DrawText(camera, energy_output, energy_color, current_position, Layer::Ships);
+        renderer.PushText(camera, energy_output, energy_color, current_position, Layer::Ships);
 
         current_position.y += (12.0f / 16.0f);
       } else if (player.id != player_id && TICK_DIFF(tick, player.last_extra_timestamp) < kExtraDataTimeout) {
@@ -378,11 +378,11 @@ void PlayerManager::RenderPlayerName(Camera& camera, SpriteRenderer& renderer, P
           color = TextColor::Yellow;
         }
 
-        renderer.DrawText(camera, energy_output, color, energy_p, Layer::Ships, TextAlignment::Right);
+        renderer.PushText(camera, energy_output, color, energy_p, Layer::Ships, TextAlignment::Right);
       }
     }
 
-    renderer.DrawText(camera, display, color, current_position.PixelRounded(), Layer::Ships);
+    renderer.PushText(camera, display, color, current_position.PixelRounded(), Layer::Ships);
   }
 }
 

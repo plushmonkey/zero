@@ -1,8 +1,6 @@
 #include "Connection.h"
 
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
 #include <WS2tcpip.h>
 #include <Windows.h>
 #else
