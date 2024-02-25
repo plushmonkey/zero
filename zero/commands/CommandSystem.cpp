@@ -12,6 +12,7 @@
 namespace zero {
 
 constexpr int kArenaSecurityLevel = 5;
+const char* kOwner = "monkey";
 
 class BehaviorsCommand : public CommandExecutor {
  public:
@@ -236,7 +237,7 @@ class SetShipCommand : public CommandExecutor {
   void SetAccess(CommandAccessFlags flags) { return; }
   std::vector<std::string> GetAliases() { return {"setship", "ss"}; }
   std::string GetDescription() { return "Sets the ship"; }
-  int GetSecurityLevel() { return 0; }
+  int GetSecurityLevel() { return 5; }
 };
 
 class HelpCommand : public CommandExecutor {
@@ -248,6 +249,9 @@ class HelpCommand : public CommandExecutor {
     if (!player) return;
 
     Event::Dispatch(ChatQueueEvent::Private(player->name, "-- !commands {.c} -- see command list (pm)"));
+    Event::Dispatch(ChatQueueEvent::Private(player->name, "Code: https://github.com/plushmonkey/zero"));
+    auto owner_msg = std::format("Owner: {}", kOwner);
+    Event::Dispatch(ChatQueueEvent::Private(player->name, owner_msg.data()));
   }
 
   CommandAccessFlags GetAccess() { return CommandAccess_Private; }

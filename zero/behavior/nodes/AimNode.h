@@ -4,11 +4,13 @@
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/game/Game.h>
 
+#include <optional>
+
 namespace zero {
 namespace behavior {
 
-inline Vector2f CalculateShot(const Vector2f& pShooter, const Vector2f& pTarget, const Vector2f& vShooter,
-                              const Vector2f& vTarget, float sProjectile) {
+inline std::optional<Vector2f> CalculateShot(const Vector2f& pShooter, const Vector2f& pTarget,
+                                             const Vector2f& vShooter, const Vector2f& vTarget, float sProjectile) {
   Vector2f totarget = pTarget - pShooter;
   Vector2f v = vTarget - vShooter;
 
@@ -28,11 +30,13 @@ inline Vector2f CalculateShot(const Vector2f& pShooter, const Vector2f& pTarget,
       t = t1;
     else
       t = t2;
+  } else {
+    return std::nullopt;
   }
 
   solution = pTarget + (v * t);
 
-  return solution;
+  return std::optional(solution);
 }
 
 struct ShotVelocityQueryNode : public BehaviorNode {
@@ -109,11 +113,19 @@ struct AimNode : public BehaviorNode {
     // Remove the "away" velocity from the target so it's only moving side to side.
     Vector2f horizontal_vel = target->velocity - direction * amount;
 
-    Vector2f aimshot = CalculateShot(self->position, target->position, self->velocity, horizontal_vel, weapon_speed);
+    std::optional<Vector2f> calculated_shot =
+        CalculateShot(self->position, target->position, self->velocity, horizontal_vel, weapon_speed);
 
-    // Set the aimshot directly to the player position if the calculated position was way off.
-    if (aimshot.DistanceSq(target->position) > 20.0f * 20.0f) {
-      aimshot = target->position;
+    // Default to target's position if the calculated shot fails.
+    Vector2f aimshot = target->position;
+
+    if (calculated_shot.has_value()) {
+      aimshot = *calculated_shot;
+
+      // Set the aimshot directly to the player position if it is too far away.
+      if (aimshot.DistanceSq(target->position) > 20.0f * 20.0f) {
+        aimshot = target->position;
+      }
     }
 
     ctx.blackboard.Set(position_key, aimshot);
