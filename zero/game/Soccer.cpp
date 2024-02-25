@@ -11,6 +11,8 @@
 #include <zero/game/ShipController.h>
 #include <zero/game/WeaponManager.h>
 #include <zero/game/net/Connection.h>
+#include <zero/game/render/Animation.h>
+#include <zero/game/render/Graphics.h>
 
 namespace zero {
 
@@ -54,6 +56,62 @@ Soccer::Soccer(PlayerManager& player_manager) : player_manager(player_manager), 
   connection.dispatcher.Register(ProtocolS2C::SoccerGoal, OnPowerballGoalPkt, this);
 
   Clear();
+}
+
+void Soccer::Render(Camera& camera, SpriteRenderer& renderer) {
+  Animation animation;
+
+  animation.t = anim_t;
+
+  u64 microtick = GetMicrosecondTick();
+  u32 tick = GetCurrentTick();
+
+  for (size_t i = 0; i < ZERO_ARRAY_SIZE(balls); ++i) {
+    Powerball* ball = balls + i;
+
+    if (ball->id != kInvalidBallId) {
+      animation.sprite = &Graphics::anim_powerball;
+
+      if (ball->state == BallState::World &&
+          TICK_DIFF(tick, ball->last_touch_timestamp) < connection.settings.PassDelay) {
+        animation.sprite = &Graphics::anim_powerball_phased;
+      }
+
+      SpriteRenderable& renderable = animation.GetFrame();
+
+      Vector2f position = GetBallPosition(*ball, microtick);
+      Vector2f render_position = position - renderable.dimensions * (0.5f / 16.0f);
+
+      renderer.Draw(camera, renderable, Vector3f(render_position, (float)Layer::AfterWeapons + kAnimationLayerTop));
+      RenderIndicator(*ball, position);
+    }
+  }
+}
+
+void Soccer::RenderIndicator(Powerball& ball, const Vector2f& position) {
+  if (ball.state == BallState::Carried) {
+    Player* carrier = player_manager.GetPlayerById(ball.carrier_id);
+    Player* self = player_manager.GetSelf();
+
+    if (carrier) {
+      u32 self_freq = self->frequency;
+
+      if (carrier->frequency == self_freq) {
+        RadarIndicatorFlags flags =
+            carrier->id == player_manager.player_id ? RadarIndicatorFlag_FullMap : RadarIndicatorFlag_All;
+
+        player_manager.radar->AddTemporaryIndicator(position, 0, Vector2f(3, 3), ColorType::RadarTeam, flags);
+      } else {
+        player_manager.radar->AddTemporaryIndicator(position, 0, Vector2f(3, 3), ColorType::RadarEnemyFlag,
+                                                    RadarIndicatorFlag_FullMap);
+      }
+
+      return;
+    }
+  }
+
+  player_manager.radar->AddTemporaryIndicator(position, 0, Vector2f(2, 2), ColorType::RadarTeamFlag,
+                                              RadarIndicatorFlag_All);
 }
 
 void Soccer::Update(float dt) {

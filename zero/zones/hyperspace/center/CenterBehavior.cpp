@@ -1,4 +1,4 @@
-#include "CenterJavBehavior.h"
+#include "CenterBehavior.h"
 
 #include <zero/behavior/BehaviorBuilder.h>
 #include <zero/behavior/BehaviorTree.h>
@@ -20,7 +20,7 @@
 namespace zero {
 namespace hyperspace {
 
-std::unique_ptr<behavior::BehaviorNode> CenterJavBehavior::CreateTree(behavior::ExecuteContext& ctx) {
+std::unique_ptr<behavior::BehaviorNode> CenterBehavior::CreateTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
   BehaviorBuilder builder;
@@ -51,22 +51,22 @@ std::unique_ptr<behavior::BehaviorNode> CenterJavBehavior::CreateTree(behavior::
                         .Child<GoToNode>("nearest_target_position")
                         .End()
                     .Sequence() // Aim at target and shoot while seeking them.
-                        .Child<AimNode>("nearest_target", "aimshot")
+                        .Child<AimNode>(WeaponType::Bullet, "nearest_target", "aimshot")
                         .Parallel()
                             .Selector() // Select between hovering around a territory position and seeking to enemy.
                                 .Sequence()
                                     .Child<FindTerritoryPosition>("nearest_target", "leash_distance", "territory_position")
                                     .Sequence(CompositeDecorator::Success)
-                                        .Child<PositionThreatQueryNode>("self_position", "self_threat", 15.0f, 3.0f)
-                                        .Child<PositionThreatQueryNode>("territory_position", "territory_threat", 15.0f, 3.0f)
+                                        .Child<PositionThreatQueryNode>("self_position", "self_threat", 8.0f, 3.0f)
+                                        .Child<PositionThreatQueryNode>("territory_position", "territory_threat", 8.0f, 3.0f)
                                         .Child<ScalarThresholdNode<float>>("territory_threat", 0.2f)
                                         .Child<FindTerritoryPosition>("nearest_target", "leash_distance", "territory_position", true)
                                         .End()
                                     .Sequence(CompositeDecorator::Success)
-                                        .InvertChild<ScalarThresholdNode<float>>("self_threat", 0.1f)
+                                        .InvertChild<ScalarThresholdNode<float>>("self_threat", 0.2f)
                                         .Child<FaceNode>("aimshot")
                                         .End()
-                                    .Child<ArriveNode>("territory_position", 15.0f)
+                                    .Child<ArriveNode>("territory_position", 25.0f)
                                     .End()
                                 .Sequence()
                                     .Child<FaceNode>("aimshot")
@@ -75,25 +75,11 @@ std::unique_ptr<behavior::BehaviorNode> CenterJavBehavior::CreateTree(behavior::
                                 .End()
                             .Sequence(CompositeDecorator::Success)
                                 .InvertChild<TileQueryNode>(kTileSafeId)
-                                .Selector()
-                                        .Sequence()
-                                            .Child<DistanceNode>("self_position", "nearest_target_position", "dist_sq", true)
-                                            .InvertChild<ScalarThresholdNode<float>>("dist_sq", 20.0f * 20.0f)
-                                            .Child<ShotVelocityQueryNode>(WeaponType::Bullet, "bullet_fire_velocity")
-                                            .Child<RayNode>("self_position", "bullet_fire_velocity", "bullet_fire_ray")
-                                            .Child<PlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 4.0f)
-                                            .Child<RayRectangleInterceptNode>("bullet_fire_ray", "target_bounds")
-                                            .Child<InputActionNode>(InputAction::Bullet)
-                                            .End()
-                                        .Sequence()
-                                            .Child<ShotVelocityQueryNode>(WeaponType::Bomb, "bomb_fire_velocity")
-                                            .Child<RayNode>("self_position", "bomb_fire_velocity", "bomb_fire_ray")
-                                            .Child<PlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 3.0f)
-                                            .Child<RayRectangleInterceptNode>("bomb_fire_ray", "target_bounds")
-                                            .Child<InputActionNode>(InputAction::Bomb)
-                                            .End()
-                                    .End()
-                                
+                                .Child<ShotVelocityQueryNode>(WeaponType::Bullet, "bullet_fire_velocity")
+                                .Child<RayNode>("self_position", "bullet_fire_velocity", "bullet_fire_ray")
+                                .Child<PlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 3.0f)
+                                .Child<RayRectangleInterceptNode>("bullet_fire_ray", "target_bounds")
+                                .Child<InputActionNode>(InputAction::Bullet)
                                 .End()
                             .End()
                         .End()

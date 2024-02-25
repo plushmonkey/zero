@@ -55,7 +55,7 @@ std::unique_ptr<behavior::BehaviorNode> SniperBehavior::CreateTree(behavior::Exe
                         .Child<GoToNode>("nearest_target_position")
                         .End()
                     .Sequence() // Aim at target and shoot while seeking them.
-                        .Child<AimNode>("nearest_target", "aimshot")
+                        .Child<AimNode>(WeaponType::Bomb, "nearest_target", "aimshot")
                         .Parallel()
                             .Selector() // Select between hovering around a territory position and seeking to enemy.
                                 .Sequence()

@@ -14,6 +14,9 @@
 #include <zero/game/WeaponManager.h>
 #include <zero/game/net/Connection.h>
 #include <zero/game/net/PacketDispatcher.h>
+#include <zero/game/render/AnimatedTileRenderer.h>
+#include <zero/game/render/SpriteRenderer.h>
+#include <zero/game/render/TileRenderer.h>
 
 namespace zero {
 
@@ -41,6 +44,15 @@ struct PrizeGreen {
   s32 prize_id;
 };
 
+enum class GameInitializeResult {
+  // The game failed to start completely and can't even be simulated.
+  Failure,
+  // The game is loaded enough to do simulation but not render.
+  Simulation,
+  // The game can do full simulation and rendering.
+  Full
+};
+
 struct Game {
   MemoryArena& perm_arena;
   MemoryArena& temp_arena;
@@ -60,6 +72,13 @@ struct Game {
   float jitter_time = 0.0f;
   u32 last_tick = 0;
 
+  bool render_enabled = false;
+  Camera ui_camera;
+  AnimationSystem animation;
+  TileRenderer tile_renderer;
+  AnimatedTileRenderer animated_tile_renderer;
+  SpriteRenderer sprite_renderer;
+
   char arena_name[17] = {};
 
   size_t flag_count = 0;
@@ -74,7 +93,7 @@ struct Game {
 
   Game(MemoryArena& perm_arena, MemoryArena& temp_arena, WorkQueue& work_queue, int width, int height);
 
-  bool Initialize(InputState& input);
+  GameInitializeResult Initialize(InputState& input);
   void Cleanup();
 
   bool Update(const InputState& input, float dt);
@@ -87,7 +106,6 @@ struct Game {
   void RenderJoin(float dt);
 
   void RenderMenu();
-  bool HandleMenuKey(int codepoint, int mods);
 
   void RecreateRadar();
 

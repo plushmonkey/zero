@@ -57,7 +57,7 @@ std::unique_ptr<behavior::BehaviorNode> GunnerBehavior::CreateTree(behavior::Exe
                         .Child<InputActionNode>(InputAction::Bullet)
                         .End()
                     .Sequence() // Aim at target and shoot while seeking them.
-                        .Child<AimNode>("nearest_target", "aimshot")
+                        .Child<AimNode>(WeaponType::Bullet, "nearest_target", "aimshot")
                         .Parallel()
                             .Selector() // Select between hovering around a territory position and seeking to enemy.
                                 .Sequence()

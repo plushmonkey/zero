@@ -1,5 +1,6 @@
 #pragma once
 
+#include <zero/DebugRenderer.h>
 #include <zero/Event.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/commands/CommandSystem.h>
@@ -54,6 +55,7 @@ struct ZeroBot {
   WorkQueue* work_queue;
   Worker* worker;
   Game* game = nullptr;
+  DebugRenderer debug_renderer;
 
   ServerInfo server_info = {};
 

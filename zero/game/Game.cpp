@@ -4,9 +4,11 @@
 #include <stdio.h>
 #include <zero/game/Clock.h>
 #include <zero/game/GameEvent.h>
+#include <zero/game/Logger.h>
 #include <zero/game/Memory.h>
 #include <zero/game/Platform.h>
 #include <zero/game/Random.h>
+#include <zero/game/render/Graphics.h>
 
 namespace zero {
 
@@ -223,12 +225,14 @@ Game::Game(MemoryArena& perm_arena, MemoryArena& temp_arena, WorkQueue& work_que
     : perm_arena(perm_arena),
       temp_arena(temp_arena),
       work_queue(work_queue),
+      animation(),
       dispatcher(),
       connection(perm_arena, temp_arena, work_queue, dispatcher),
       player_manager(perm_arena, connection, dispatcher),
-      weapon_manager(temp_arena, connection, player_manager, dispatcher),
+      weapon_manager(temp_arena, connection, player_manager, dispatcher, animation),
       brick_manager(perm_arena, connection, player_manager, dispatcher),
       camera(Vector2f((float)width, (float)height), Vector2f(0, 0), 1.0f / 16.0f),
+      ui_camera(Vector2f((float)width, (float)height), Vector2f(0, 0), 1.0f),
       fps(60.0f),
       chat(dispatcher, connection, player_manager),
       soccer(player_manager),
@@ -246,6 +250,9 @@ Game::Game(MemoryArena& perm_arena, MemoryArena& temp_arena, WorkQueue& work_que
   dispatcher.Register(ProtocolS2C::Security, OnSecurityRequestPkt, this);
   dispatcher.Register(ProtocolS2C::PlayerPrize, OnPlayerPrizePkt, this);
 
+  float zmax = (float)Layer::Count;
+  ui_camera.projection = Orthographic(0, ui_camera.surface_dim.x, ui_camera.surface_dim.y, 0, -zmax, zmax);
+
   player_manager.Initialize(&weapon_manager, &ship_controller, &chat, &radar, &soccer);
   weapon_manager.Initialize(&ship_controller, &radar);
 
@@ -255,15 +262,29 @@ Game::Game(MemoryArena& perm_arena, MemoryArena& temp_arena, WorkQueue& work_que
   ship_controller.explosion_report.user = this;
 }
 
-bool Game::Initialize(InputState& input) {
+GameInitializeResult Game::Initialize(InputState& input) {
   input.user = this;
   input.action_callback = OnAction;
 
-  return true;
+  if (render_enabled) {
+    if (sprite_renderer.Initialize(perm_arena)) {
+      if (Graphics::Initialize(sprite_renderer)) {
+        return GameInitializeResult::Full;
+      } else {
+        Log(LogLevel::Error, "Failed to initialize graphics. Debug display disabled.");
+      }
+    } else {
+      Log(LogLevel::Error, "Failed to initialize sprite renderer. Debug display disabled.");
+    }
+  }
+
+  return GameInitializeResult::Simulation;
 }
 
 bool Game::Update(const InputState& input, float dt) {
   Player* self = player_manager.GetSelf();
+
+  Graphics::colors.Update(dt);
 
   connection.map.UpdateDoors(connection.settings);
 
@@ -279,8 +300,16 @@ bool Game::Update(const InputState& input, float dt) {
 
   connection.map.brick_manager = &brick_manager;
 
-  // This must be updated after position update
-  RecreateRadar();
+  if (render_enabled && tile_renderer.tilemap_texture == -1 &&
+      connection.login_state == Connection::LoginState::Complete) {
+    if (!tile_renderer.CreateMapBuffer(temp_arena, connection.map.filename, ui_camera.surface_dim)) {
+      Log(LogLevel::Error, "Failed to create renderable map.");
+    }
+
+    RecreateRadar();
+
+    animated_tile_renderer.InitializeDoors(tile_renderer);
+  }
 
   // Cap player and spectator camera to playable area
   if (self) {
@@ -309,7 +338,9 @@ bool Game::Update(const InputState& input, float dt) {
     }
   }
 
-  radar.Update(camera, connection.settings.MapZoomFactor, self->frequency, self->id);
+  animated_tile_renderer.Update(dt);
+
+  radar.Update(ui_camera, connection.settings.MapZoomFactor, self->frequency, self->id);
 
   UpdateGreens(dt);
 
@@ -382,6 +413,143 @@ bool Game::Update(const InputState& input, float dt) {
   }
 
   return true;
+}
+
+void Game::Render(float dt) {
+  if (dt > 0) {
+    fps = fps * 0.99f + (1.0f / dt) * 0.01f;
+  }
+
+  if (!render_enabled) {
+    sprite_renderer.push_buffer.Reset();
+    sprite_renderer.texture_push_buffer.Reset();
+    return;
+  }
+
+  animation.Update(dt);
+
+  if (connection.login_state == Connection::LoginState::Complete) {
+    RenderGame(dt);
+  } else {
+    RenderJoin(dt);
+  }
+
+  char fps_text[32];
+  sprintf(fps_text, "FPS: %d", (int)(fps + 0.5f));
+  sprite_renderer.DrawText(ui_camera, fps_text, TextColor::Pink, Vector2f(ui_camera.surface_dim.x, 24), Layer::TopMost,
+                           TextAlignment::Right);
+
+  sprite_renderer.Render(ui_camera);
+}
+
+void Game::RenderGame(float dt) {
+  Player* self = player_manager.GetSelf();
+
+  tile_renderer.Render(camera);
+
+  u32 self_freq = self->frequency;
+
+  size_t viewable_flag_count = flag_count;
+  u32 tick = GetCurrentTick();
+  bool hide_spec_flags = self && self->ship == 8 && connection.settings.HideFlags;
+
+  if (hide_spec_flags || !TICK_GT(tick, connection.login_tick + connection.settings.EnterGameFlaggingDelay)) {
+    viewable_flag_count = 0;
+  }
+
+  animated_tile_renderer.Render(sprite_renderer, connection.map, camera, ui_camera.surface_dim, flags,
+                                viewable_flag_count, greens, green_count, self_freq, soccer);
+  brick_manager.Render(camera, sprite_renderer, ui_camera.surface_dim, self_freq);
+  soccer.Render(camera, sprite_renderer);
+
+  if (self) {
+    animation.Render(camera, sprite_renderer);
+
+    u8 visibility_ship = self->ship;
+
+    RadarVisibility radar_visibility;
+    if (visibility_ship != 8) {
+      radar_visibility.see_mines = connection.settings.ShipSettings[visibility_ship].SeeMines;
+      radar_visibility.see_bomb_level = connection.settings.ShipSettings[visibility_ship].SeeBombLevel;
+    } else {
+      radar_visibility.see_mines = false;
+      radar_visibility.see_bomb_level = 0;
+    }
+
+    weapon_manager.Render(camera, ui_camera, sprite_renderer, dt, radar_visibility);
+    player_manager.Render(camera, sprite_renderer);
+
+    sprite_renderer.Render(camera);
+
+    ship_controller.Render(ui_camera, camera, sprite_renderer);
+
+    sprite_renderer.Render(camera);
+
+    for (size_t i = 0; i < flag_count; ++i) {
+      GameFlag* flag = flags + i;
+
+      if (flag->owner == self->frequency) {
+        radar.AddTemporaryIndicator(flag->position, 0, Vector2f(2, 2), ColorType::RadarTeamFlag);
+      }
+    }
+
+    radar.Render(ui_camera, sprite_renderer, tile_renderer, connection.settings.MapZoomFactor, greens, green_count);
+
+    chat.Render(ui_camera, sprite_renderer);
+  }
+
+  sprite_renderer.Render(ui_camera);
+}
+
+void Game::RenderJoin(float dt) {
+  // TODO: Moving stars during load
+
+  sprite_renderer.Draw(ui_camera, Graphics::ship_sprites[0],
+                       ui_camera.surface_dim * 0.5f - Graphics::ship_sprites[0].dimensions * 0.5f, Layer::TopMost);
+
+  switch (connection.login_state) {
+    case Connection::LoginState::EncryptionRequested:
+    case Connection::LoginState::Authentication:
+    case Connection::LoginState::Registering:
+    case Connection::LoginState::ArenaLogin: {
+      sprite_renderer.Draw(ui_camera, Graphics::ship_sprites[0],
+                           ui_camera.surface_dim * 0.5f - Graphics::ship_sprites[0].dimensions * 0.5f, Layer::TopMost);
+
+      Vector2f position(ui_camera.surface_dim.x * 0.5f, (float)(u32)(ui_camera.surface_dim.y * 0.8f));
+
+      if (connection.packets_received > 0) {
+        sprite_renderer.DrawText(ui_camera, "Entering arena", TextColor::Blue, position, Layer::TopMost,
+                                 TextAlignment::Center);
+      } else {
+        sprite_renderer.DrawText(ui_camera, "Connecting to server", TextColor::Blue, position, Layer::TopMost,
+                                 TextAlignment::Center);
+      }
+    } break;
+    case Connection::LoginState::MapDownload: {
+      int percent = (int)(connection.packet_sequencer.huge_chunks.size * 100 / (float)connection.map.compressed_size);
+      char downloading[64];
+
+      sprintf(downloading, "Downloading level: %d%%", percent);
+
+      Vector2f download_pos(ui_camera.surface_dim.x * 0.5f, ui_camera.surface_dim.y * 0.8f);
+
+      sprite_renderer.DrawText(ui_camera, downloading, TextColor::Blue, download_pos, Layer::TopMost,
+                               TextAlignment::Center);
+      sprite_renderer.Render(ui_camera);
+    } break;
+    case Connection::LoginState::Quit:
+    case Connection::LoginState::ConnectTimeout: {
+      sprite_renderer.Draw(ui_camera, Graphics::ship_sprites[0],
+                           ui_camera.surface_dim * 0.5f - Graphics::ship_sprites[0].dimensions * 0.5f, Layer::TopMost);
+
+      Vector2f position(ui_camera.surface_dim.x * 0.5f, (float)(u32)(ui_camera.surface_dim.y * 0.8f));
+
+      sprite_renderer.DrawText(ui_camera, "Failed to connect to server", TextColor::DarkRed, position, Layer::TopMost,
+                               TextAlignment::Center);
+    } break;
+    default: {
+    } break;
+  }
 }
 
 void Game::UpdateGreens(float dt) {
@@ -511,6 +679,12 @@ void Game::RecreateRadar() {
   }
 
   mapzoom = connection.settings.MapZoomFactor;
+
+  if (render_enabled) {
+    if (!tile_renderer.CreateRadar(temp_arena, connection.map, ui_camera.surface_dim, mapzoom, soccer)) {
+      Log(LogLevel::Error, "Failed to create radar.");
+    }
+  }
 }
 
 void Game::OnFlagClaim(u8* pkt, size_t size) {
@@ -551,6 +725,7 @@ void Game::OnFlagPosition(u8* pkt, size_t size) {
   u16 owner = *(u16*)(pkt + 7);
 
   assert(id < ZERO_ARRAY_SIZE(flags));
+  if (id >= ZERO_ARRAY_SIZE(flags)) return;
 
   if (id + 1 > (u16)flag_count) {
     flag_count = id + 1;
@@ -607,12 +782,39 @@ void Game::OnPlayerId(u8* pkt, size_t size) {
   memset(flags, 0, sizeof(flags));
 
   soccer.Clear();
+
+  if (render_enabled) {
+    if (!sprite_renderer.Initialize(perm_arena)) {
+      Log(LogLevel::Error, "Failed to initialize sprite renderer. Debug display disabled.");
+      render_enabled = false;
+      return;
+    }
+
+    if (!tile_renderer.Initialize()) {
+      Log(LogLevel::Error, "Failed to initialize tile renderer. Debug display disabled.");
+      render_enabled = false;
+      return;
+    }
+
+    if (!Graphics::Initialize(sprite_renderer)) {
+      Log(LogLevel::Error, "Failed to initialize graphics. Debug display disabled.");
+      render_enabled = false;
+      return;
+    }
+
+    animated_tile_renderer.Initialize();
+  }
 }
 
 void Game::Cleanup() {
   connection.security_solver.ClearWork();
   brick_manager.Clear();
   work_queue.Clear();
+
+  if (render_enabled) {
+    sprite_renderer.Cleanup();
+    tile_renderer.Cleanup();
+  }
 }
 
 }  // namespace zero

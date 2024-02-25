@@ -4,15 +4,19 @@
 #include <zero/Types.h>
 #include <zero/game/Player.h>
 #include <zero/game/net/Connection.h>
+#include <zero/game/render/Animation.h>
+#include <zero/game/render/Graphics.h>
 
 namespace zero {
 
+struct Camera;
 struct ChatController;
 struct InputState;
 struct PacketDispatcher;
 struct Radar;
 struct ShipController;
 struct Soccer;
+struct SpriteRenderer;
 struct WeaponManager;
 
 enum class AttachRequestResponse {
@@ -50,6 +54,10 @@ struct PlayerManager {
 
   AttachInfo* attach_free = nullptr;
 
+  Animation explode_animation;
+  Animation warp_animation;
+  Animation bombflash_animation;
+
   size_t player_count = 0;
   Player players[1024];
 
@@ -65,9 +73,17 @@ struct PlayerManager {
     this->chat_controller = chat_controller;
     this->radar = radar;
     this->soccer = soccer;
+
+    warp_animation.sprite = &Graphics::anim_ship_warp;
+    explode_animation.sprite = &Graphics::anim_ship_explode;
+    bombflash_animation.sprite = &Graphics::anim_bombflash;
   }
 
   void Update(float dt);
+  void Render(Camera& camera, SpriteRenderer& renderer);
+
+  void RenderPlayerName(Camera& camera, SpriteRenderer& renderer, Player& self, Player& player,
+    const Vector2f& position, bool is_decoy);
 
   void Spawn(bool reset = true);
 

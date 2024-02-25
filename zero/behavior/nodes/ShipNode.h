@@ -131,5 +131,31 @@ struct ShipRequestNode : public BehaviorNode {
   const char* ship_key = nullptr;
 };
 
+struct ShipCapabilityQueryNode : public BehaviorNode {
+  ShipCapabilityQueryNode(ShipCapabilityFlags cap) : cap(cap) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    Player* player = ctx.bot->game->player_manager.GetSelf();
+    if (!player || player->ship >= 8) return ExecuteResult::Failure;
+
+    if (ctx.bot->game->ship_controller.ship.capability & cap) {
+      return ExecuteResult::Success;
+    }
+
+    return ExecuteResult::Failure;
+  }
+
+  ShipCapabilityFlags cap;
+};
+
+struct ShipMultifireQueryNode : public BehaviorNode {
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    Player* player = ctx.bot->game->player_manager.GetSelf();
+    if (!player || player->ship >= 8) return ExecuteResult::Failure;
+
+    return ctx.bot->game->ship_controller.ship.multifire ? ExecuteResult::Success : ExecuteResult::Failure;
+  }
+};
+
 }  // namespace behavior
 }  // namespace zero

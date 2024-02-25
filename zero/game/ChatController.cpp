@@ -17,6 +17,75 @@
 
 namespace zero {
 
+constexpr float kFontWidth = 8.0f;
+constexpr float kFontHeight = 12.0f;
+
+struct ChatSpan {
+  const char* begin;
+  const char* end;
+};
+
+void WrapChat(const char* mesg, s32 linesize, ChatSpan* lines, size_t* linecount, bool skip_spaces = true) {
+  // Trim front
+  while (skip_spaces && *mesg && *mesg == ' ') ++mesg;
+
+  s32 size = (s32)strlen(mesg);
+
+  if (size < linesize) {
+    lines[0].begin = mesg;
+    lines[0].end = mesg + size;
+    *linecount = 1;
+    return;
+  }
+
+  s32 last_end = 0;
+  for (int count = 1; count <= 16; ++count) {
+    s32 end = last_end + linesize;
+
+    if (end >= size) {
+      end = size;
+      lines[count - 1].begin = mesg + last_end;
+      lines[count - 1].end = mesg + end;
+      *linecount = count;
+      break;
+    }
+
+    if (skip_spaces) {
+      if (mesg[end] == ' ') {
+        // Go backwards to trim off last space
+        for (; end >= 0; --end) {
+          if (mesg[end] != ' ') {
+            ++end;
+            break;
+          }
+        }
+      } else {
+        for (; end >= 0; --end) {
+          // Go backwards looking for a space
+          if (mesg[end] == ' ') {
+            break;
+          }
+        }
+      }
+    }
+
+    if (end <= last_end) {
+      end = last_end + linesize;
+    }
+
+    lines[count - 1].begin = mesg + last_end;
+    lines[count - 1].end = mesg + end;
+
+    last_end = end;
+    *linecount = count;
+
+    // Trim again for next line
+    while (skip_spaces && last_end < size && mesg[last_end] == ' ') {
+      ++last_end;
+    }
+  }
+}
+
 static void OnChatPacketRaw(void* user, u8* packet, size_t size) {
   ChatController* controller = (ChatController*)user;
 
@@ -100,6 +169,168 @@ inline int GetShipStatusPercent(u32 upgrade, u32 maximum, u32 current) {
 }
 
 void ChatController::Update(float dt) {}
+
+void ChatController::Render(Camera& camera, SpriteRenderer& renderer) {
+  // TODO: pull radar size from somewhere else
+  float radar_size = camera.surface_dim.x * 0.165f + 11;
+  float name_size = 12 * kFontWidth;
+  float y = camera.surface_dim.y;
+  size_t display_amount = (size_t)((camera.surface_dim.y / 100) + 1);
+  ChatSpan lines[16];
+  size_t linecount;
+
+  if (entry_index == 0) return;
+
+  size_t start = entry_index;
+  size_t end = entry_index - display_amount;
+
+  if (start < display_amount) {
+    end = 0;
+  }
+
+  for (size_t i = start; i > end; --i) {
+    size_t index = (i - 1) % ZERO_ARRAY_SIZE(entries);
+    ChatEntry* entry = entries + index;
+
+    u32 max_characters = (u32)((camera.surface_dim.x - radar_size - name_size) / kFontWidth);
+
+    if (entry->type == ChatType::Arena || entry->type == ChatType::RedWarning || entry->type == ChatType::RedError ||
+        entry->type == ChatType::Channel) {
+      max_characters = (u32)((camera.surface_dim.x - radar_size) / kFontWidth);
+    }
+
+    WrapChat(entry->message, max_characters, lines, &linecount);
+
+    y -= kFontHeight * linecount;
+
+    switch (entry->type) {
+      case ChatType::RemotePrivate:
+      case ChatType::Fuchsia:
+      case ChatType::Arena: {
+        char output[512];
+
+        for (size_t j = 0; j < linecount; ++j) {
+          ChatSpan* span = lines + j;
+          u32 length = (u32)(span->end - span->begin);
+
+          sprintf(output, "%.*s", length, span->begin);
+
+          TextColor color = entry->type == ChatType::Fuchsia ? TextColor::Fuschia : TextColor::Green;
+
+          renderer.DrawText(camera, output, color, Vector2f(0, y + j * kFontHeight), Layer::Chat);
+        }
+      } break;
+      case ChatType::PublicMacro:
+      case ChatType::Public: {
+        char output[512];
+
+        for (size_t j = 0; j < linecount; ++j) {
+          ChatSpan* span = lines + j;
+          u32 length = (u32)(span->end - span->begin);
+
+          u32 spaces = 0;
+          u32 sender_length = (u32)strlen(entry->sender);
+
+          if (sender_length < g_Settings.chat_namelen) {
+            spaces = g_Settings.chat_namelen - sender_length;
+          }
+
+          sprintf(output, "%*s%.*s> %.*s", spaces, "", g_Settings.chat_namelen, entry->sender, length, span->begin);
+
+          renderer.DrawText(camera, output, TextColor::Blue, Vector2f(0, y + j * kFontHeight), Layer::Chat);
+        }
+      } break;
+      case ChatType::Team: {
+        char output[512];
+
+        for (size_t j = 0; j < linecount; ++j) {
+          ChatSpan* span = lines + j;
+          u32 length = (u32)(span->end - span->begin);
+
+          u32 spaces = 0;
+          u32 sender_length = (u32)strlen(entry->sender);
+
+          if (sender_length < g_Settings.chat_namelen) {
+            spaces = g_Settings.chat_namelen - sender_length;
+          }
+
+          sprintf(output, "%*s%.*s> %.*s", spaces, "", g_Settings.chat_namelen, entry->sender, length, span->begin);
+
+          renderer.DrawText(camera, output, TextColor::Yellow, Vector2f(0, y + j * kFontHeight), Layer::Chat);
+        }
+      } break;
+      case ChatType::OtherTeam: {
+        char output[512];
+
+        for (size_t j = 0; j < linecount; ++j) {
+          ChatSpan* span = lines + j;
+          u32 length = (u32)(span->end - span->begin);
+
+          u32 spaces = 0;
+          u32 sender_length = (u32)strlen(entry->sender);
+
+          if (sender_length < g_Settings.chat_namelen) {
+            spaces = g_Settings.chat_namelen - sender_length;
+          }
+
+          sprintf(output, "%*s%.*s> ", spaces, "", g_Settings.chat_namelen, entry->sender);
+          float skip = strlen(output) * kFontWidth;
+          renderer.DrawText(camera, output, TextColor::Green, Vector2f(0, y + j * kFontHeight), Layer::Chat);
+
+          sprintf(output, "%.*s", length, span->begin);
+
+          renderer.DrawText(camera, output, TextColor::Blue, Vector2f(skip, y + j * kFontHeight), Layer::Chat);
+        }
+      } break;
+      case ChatType::Private: {
+        char output[512];
+
+        for (size_t j = 0; j < linecount; ++j) {
+          ChatSpan* span = lines + j;
+          u32 length = (u32)(span->end - span->begin);
+
+          u32 spaces = 0;
+          u32 sender_length = (u32)strlen(entry->sender);
+
+          if (sender_length < g_Settings.chat_namelen) {
+            spaces = g_Settings.chat_namelen - sender_length;
+          }
+
+          sprintf(output, "%*s%.*s> %.*s", spaces, "", g_Settings.chat_namelen, entry->sender, length, span->begin);
+
+          renderer.DrawText(camera, output, TextColor::Green, Vector2f(0, y + j * kFontHeight), Layer::Chat);
+        }
+      } break;
+      case ChatType::RedWarning:
+      case ChatType::RedError: {
+        char output[512];
+
+        for (size_t j = 0; j < linecount; ++j) {
+          ChatSpan* span = lines + j;
+          u32 length = (u32)(span->end - span->begin);
+
+          sprintf(output, "%.*s", length, span->begin);
+
+          renderer.DrawText(camera, output, TextColor::DarkRed, Vector2f(0, y + j * kFontHeight), Layer::Chat);
+        }
+      } break;
+      case ChatType::Channel: {
+        char output[512];
+
+        for (size_t j = 0; j < linecount; ++j) {
+          ChatSpan* span = lines + j;
+          u32 length = (u32)(span->end - span->begin);
+
+          sprintf(output, "%.*s", length, span->begin);
+
+          renderer.DrawText(camera, output, TextColor::Red, Vector2f(0, y + j * kFontHeight), Layer::Chat);
+        }
+      } break;
+      default: {
+      } break;
+    }
+  }
+}
 
 char GetChatTypePrefix(ChatType type) {
   static const char kPrefixes[] = {'A', ' ', ' ', 'T', 'O', 'P', 'W', 'R', 'E', 'C'};

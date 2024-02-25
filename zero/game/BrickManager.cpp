@@ -9,6 +9,7 @@
 #include <zero/game/PlayerManager.h>
 #include <zero/game/net/Connection.h>
 #include <zero/game/net/PacketDispatcher.h>
+#include <zero/game/render/Graphics.h>
 
 namespace zero {
 
@@ -109,6 +110,38 @@ void BrickManager::Update(Map& map, u32 frequency, float dt) {
       previous = current;
       current = current->next;
     }
+  }
+}
+
+void BrickManager::Render(Camera& camera, SpriteRenderer& renderer, const Vector2f& surface_dim, u32 frequency) {
+  Brick* current = bricks;
+
+  Animation enemy_anim;
+  enemy_anim.t = animation_t;
+  enemy_anim.sprite = &Graphics::anim_enemy_brick;
+
+  Animation team_anim;
+  team_anim.t = animation_t;
+  team_anim.sprite = &Graphics::anim_team_brick;
+
+  Vector2f half_dim_world = surface_dim * (0.5f / 16.0f);
+  Vector2f view_min_world = camera.position - half_dim_world - Vector2f(3, 3);
+  Vector2f view_max_world = camera.position + half_dim_world + Vector2f(3, 3);
+
+  while (current) {
+    Vector2f position((float)current->tile.x, (float)current->tile.y);
+
+    if (BoxContainsPoint(view_min_world, view_max_world, position)) {
+      SpriteRenderable* renderable = &enemy_anim.GetFrame();
+
+      if (current->team == frequency) {
+        renderable = &team_anim.GetFrame();
+      }
+
+      renderer.Draw(camera, *renderable, position, Layer::AfterTiles);
+    }
+
+    current = current->next;
   }
 }
 

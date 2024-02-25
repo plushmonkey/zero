@@ -7,8 +7,10 @@
 
 namespace zero {
 
+struct Camera;
 struct Connection;
 struct PlayerManager;
+struct SpriteRenderer;
 
 enum class BallState { World, Carried, Goal };
 
@@ -47,6 +49,7 @@ struct Soccer {
   PlayerManager& player_manager;
   Connection& connection;
 
+  float anim_t = 0.0f;
   u32 last_pickup_request = 0;
   float carry_timer = 0.0f;
   u16 carry_id = kInvalidBallId;
@@ -54,6 +57,9 @@ struct Soccer {
   Powerball balls[8];
 
   Soccer(PlayerManager& player_manager);
+
+  void Render(Camera& camera, SpriteRenderer& renderer);
+  void RenderIndicator(Powerball& ball, const Vector2f& position);
 
   void Update(float dt);
   void Simulate(Powerball& ball, bool drop_trail);

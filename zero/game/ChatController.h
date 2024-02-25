@@ -6,10 +6,12 @@
 
 namespace zero {
 
+struct Camera;
 struct Connection;
 struct PacketDispatcher;
 struct Player;
 struct PlayerManager;
+struct SpriteRenderer;
 
 enum class ChatType {
   Arena,
@@ -60,6 +62,8 @@ struct ChatController {
   ChatController(PacketDispatcher& dispatcher, Connection& connection, PlayerManager& player_manager);
 
   void Update(float dt);
+  void Render(Camera& camera, SpriteRenderer& renderer);
+
   ChatEntry* PushEntry(const char* mesg, size_t size, ChatType type);
   void AddMessage(ChatType type, const char* fmt, ...);
 

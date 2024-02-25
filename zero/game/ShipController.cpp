@@ -15,11 +15,13 @@
 #include <zero/game/WeaponManager.h>
 #include <zero/game/net/Connection.h>
 #include <zero/game/net/PacketDispatcher.h>
+#include <zero/game/render/Graphics.h>
 
 namespace zero {
 
 constexpr float kAnimDurationShipExplode = 0.8f;
 constexpr u32 kRepelDelayTicks = 50;
+constexpr u32 kMaxExhaustIndex = 1024;
 
 static void OnCollectedPrizePkt(void* user, u8* pkt, size_t size) {
   ShipController* controller = (ShipController*)user;
@@ -56,6 +58,7 @@ void ShipController::Update(const InputState& input, float dt) {
   Player* self = player_manager.GetSelf();
 
   if (self == nullptr || self->ship >= 8 || self->enter_delay > 0.0f) {
+    exhaust_count = 0;
     return;
   }
 
@@ -259,6 +262,17 @@ void ShipController::Update(const InputState& input, float dt) {
   }
 
   FireWeapons(*self, input, dt, afterburners);
+  UpdateEffects(dt);
+  UpdateExhaust(*self, thrust_forward, thrust_backward, dt);
+
+  constexpr u32 kEmpSparkDropInterval = 15;
+  if (ship.emped_time > 0.0f && TICK_DIFF(tick, last_emp_animation_tick) >= kEmpSparkDropInterval) {
+    Vector2f position = self->position - Graphics::anim_emp_spark.frames[0].dimensions * (0.5f / 16.0f);
+
+    weapon_manager.animation.AddAnimation(Graphics::anim_emp_spark, position)->layer = Layer::AfterTiles;
+
+    last_emp_animation_tick = tick;
+  }
 }
 
 void ShipController::HandleStatusEnergy(Player& self, u32 status, u32 cost, float dt) {
@@ -271,6 +285,148 @@ void ShipController::HandleStatusEnergy(Player& self, u32 status, u32 cost, floa
       self.togglables &= ~status;
     }
   }
+}
+
+inline void UpdateTimedAnimationEffect(Animation* animation, float* time, float dt) {
+  if (animation->sprite) {
+    animation->t += dt;
+
+    if (animation->t >= animation->GetDuration()) {
+      animation->t -= animation->GetDuration();
+    }
+  }
+
+  if (time) {
+    *time -= dt;
+    if (*time < 0.0f) {
+      *time = 0.0f;
+    }
+  }
+}
+
+void ShipController::UpdateEffects(float dt) {
+  health_animation.sprite = &Graphics::anim_health_high;
+  if (health_animation.t < 0.0f) {
+    health_animation.t = 0.0f;
+  }
+
+  UpdateTimedAnimationEffect(&portal_animation, &ship.portal_time, dt);
+  UpdateTimedAnimationEffect(&super_animation, &ship.super_time, dt);
+  UpdateTimedAnimationEffect(&shield_animation, &ship.shield_time, dt);
+  UpdateTimedAnimationEffect(&flag_animation, nullptr, dt);
+  UpdateTimedAnimationEffect(&health_animation, nullptr, dt);
+}
+
+void ShipController::UpdateExhaust(Player& self, bool thrust_forward, bool thrust_backward, float dt) {
+  constexpr u32 kExhaustTickInterval = 6;
+  u32 tick = GetCurrentTick();
+
+  for (size_t i = 0; i < exhaust_count; ++i) {
+    Exhaust* exhaust = exhausts + i;
+
+    float t = exhaust->animation.t / exhaust->animation.GetDuration();
+    bool moving = t < exhaust->end_movement_t;
+    float anim_dt = moving ? dt : (dt * exhaust->end_animation_speed);
+
+    exhaust->animation.t += anim_dt;
+
+    if (!exhaust->animation.IsAnimating()) {
+      exhausts[i--] = exhausts[--exhaust_count];
+      continue;
+    }
+
+    if (moving) {
+      // Slow the velocity down the longer the exhaust instance is active so the end particles build up.
+      Vector2f velocity = exhaust->velocity * (1.0f - t * 2.0f) * 16.0f;
+      exhaust->animation.position += velocity * dt;
+    }
+  }
+
+  if (TICK_GT(tick, next_exhaust_tick)) {
+    Connection& connection = player_manager.connection;
+    ShipSettings& ship_settings = connection.settings.ShipSettings[self.ship];
+    Vector2f heading = OrientationToHeading((u8)(self.orientation * 40.0f));
+
+    if (!TICK_GT(tick, ship.rocket_end_tick)) {
+      Vector2f exhaust_pos = self.position - Graphics::anim_ship_rocket.frames[0].dimensions * (0.5f / 16.0f);
+      Vector2f velocity = -heading * 0.6f;
+
+      Exhaust* exhaust_m = CreateExhaust(exhaust_pos, heading, velocity, ship_settings.GetRadius());
+      Exhaust* exhaust_l = CreateExhaust(exhaust_pos, heading, velocity, ship_settings.GetRadius());
+      Exhaust* exhaust_r = CreateExhaust(exhaust_pos, heading, velocity, ship_settings.GetRadius());
+
+      constexpr float kRocketHeadingVelocitySpread = 0.3f;
+      constexpr float kRocketEndMovement = 0.5f;
+      constexpr float kRocketEndAnimationSpeed = 0.25f;
+
+      if (exhaust_r) {
+        exhaust_r->animation.position += velocity * 0.2f;
+        exhaust_r->animation.position += Perpendicular(heading) * 0.3f;
+        exhaust_r->velocity = Normalize(exhaust_r->velocity + Perpendicular(heading) * kRocketHeadingVelocitySpread);
+
+        exhaust_r->animation.sprite = &Graphics::anim_ship_rocket;
+        exhaust_r->end_movement_t = kRocketEndMovement;
+        exhaust_r->end_animation_speed = kRocketEndAnimationSpeed;
+      }
+
+      if (exhaust_m) {
+        exhaust_m->animation.position += velocity * 0.3f;
+        exhaust_m->animation.sprite = &Graphics::anim_ship_rocket;
+        exhaust_m->end_movement_t = kRocketEndMovement;
+        exhaust_m->end_animation_speed = kRocketEndAnimationSpeed;
+      }
+
+      if (exhaust_l) {
+        exhaust_l->animation.position += velocity * 0.2f;
+        exhaust_l->animation.position -= Perpendicular(heading) * 0.3f;
+        exhaust_l->velocity = Normalize(exhaust_l->velocity - Perpendicular(heading) * kRocketHeadingVelocitySpread);
+        exhaust_l->animation.sprite = &Graphics::anim_ship_rocket;
+        exhaust_l->end_movement_t = kRocketEndMovement;
+        exhaust_l->end_animation_speed = kRocketEndAnimationSpeed;
+      }
+    } else if (thrust_forward || thrust_backward) {
+      Vector2f exhaust_pos = self.position - Graphics::anim_ship_exhaust.frames[0].dimensions * (0.5f / 16.0f);
+      Vector2f velocity = (thrust_forward ? -heading : heading) * 0.75f;
+
+      Exhaust* exhaust_r = CreateExhaust(exhaust_pos, heading, velocity, ship_settings.GetRadius());
+      Exhaust* exhaust_l = CreateExhaust(exhaust_pos, heading, velocity, ship_settings.GetRadius());
+
+      if (exhaust_r) {
+        exhaust_r->animation.position += Perpendicular(heading) * 0.2f;
+        exhaust_r->velocity += Perpendicular(heading) * 0.2f;
+      }
+
+      if (exhaust_l) {
+        exhaust_l->animation.position -= Perpendicular(heading) * 0.2f;
+        exhaust_l->velocity -= Perpendicular(heading) * 0.2f;
+      }
+    }
+
+    next_exhaust_tick = tick + kExhaustTickInterval;
+  }
+}
+
+Exhaust* ShipController::CreateExhaust(const Vector2f& position, const Vector2f& heading, const Vector2f& velocity,
+                                       float ship_radius) {
+  Exhaust* exhaust = exhausts + exhaust_count++;
+
+  assert(exhaust_count + 1 < ZERO_ARRAY_SIZE(exhausts));
+
+  if (exhaust_count + 1 >= ZERO_ARRAY_SIZE(exhausts)) return nullptr;
+
+  exhaust->animation.t = 0.0f;
+  exhaust->animation.position = position - heading * ship_radius;
+  exhaust->animation.sprite = &Graphics::anim_ship_exhaust;
+  exhaust->velocity = velocity;
+  exhaust->index = next_exhaust_index++;
+  exhaust->end_movement_t = 0.5f;
+  exhaust->end_animation_speed = 0.5f;
+
+  if (next_exhaust_index >= kMaxExhaustIndex) {
+    next_exhaust_index = 0;
+  }
+
+  return exhaust;
 }
 
 inline void SetNextTick(u32* target, u32 next_tick) {
@@ -406,6 +562,9 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
     if (was_cleared && ship.portals > 0 && !player_manager.IsAntiwarped(self, true)) {
       --ship.portals;
 
+      portal_animation.sprite = &Graphics::anim_portal;
+      portal_animation.t = 0.0f;
+
       ship.portal_time = portal_time;
       ship.portal_location = self.position;
 
@@ -467,6 +626,12 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
 
             ship.next_bomb_tick = tick + kRepelDelayTicks;
           }
+        }
+
+        if (warped) {
+          Vector2f anim_pos = previous_pos - Graphics::anim_ship_warp.frames[0].dimensions * (0.5f / 16.0f);
+
+          this->weapon_manager.animation.AddAnimation(Graphics::anim_ship_warp, anim_pos.PixelRounded());
         }
       }
     }
@@ -637,6 +802,256 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
   }
 
   memset(&self.weapon, 0, sizeof(self.weapon));
+}
+
+
+void ShipController::Render(Camera& ui_camera, Camera& camera, SpriteRenderer& renderer) {
+  Player* self = player_manager.GetSelf();
+
+  if (!self || self->ship == 8) return;
+
+  int energy = (int)self->energy;
+
+  int count = 0;
+  while (energy > 0 || count == 0) {
+    int digit = energy % 10;
+    SpriteRenderable& renderable = Graphics::energyfont_sprites[digit];
+
+    renderer.Draw(ui_camera, renderable, Vector2f(ui_camera.surface_dim.x - (++count * 16), 0), Layer::Gauges);
+
+    energy /= 10;
+  }
+
+  RenderIndicators(ui_camera, renderer);
+
+  renderer.Render(ui_camera);
+
+  for (size_t i = 0; i < exhaust_count; ++i) {
+    Exhaust* exhaust = exhausts + i;
+
+    float z_offset = (exhaust->index / (float)kMaxExhaustIndex);
+    assert(z_offset < 1.0f);
+    float z = (float)Layer::AfterTiles + z_offset;
+    renderer.Draw(camera, exhaust->animation.GetFrame(), Vector3f(exhaust->animation.position, z));
+  }
+
+  if (ship.portal_time > 0) {
+    SpriteRenderable& renderable = portal_animation.GetFrame();
+    Vector2f position = ship.portal_location - renderable.dimensions * (0.5f / 16.0f);
+
+    renderer.Draw(camera, renderable, position, Layer::AfterWeapons);
+
+    // Speed up time so the calculation advances faster then take the fractional part as the spinner
+    float base_time = ship.portal_time * 1.5f;
+    float t = (base_time - (u32)base_time);
+
+    if (t < 0.25f) {
+      position += Vector2f(0, 1);
+    } else if (t < 0.5f) {
+      position += Vector2f(1, 1);
+    } else if (t < 0.75f) {
+      position += Vector2f(1, 0);
+    } else {
+      // Do nothing, show portal in top left position
+    }
+
+    weapon_manager.radar->AddTemporaryIndicator(position, 0, Vector2f(1, 1), ColorType::RadarPortal);
+  }
+
+  renderer.Render(camera);
+}
+
+inline void RenderTimedIndicator(Camera& ui_camera, SpriteRenderer& renderer, Animation* animation, float y,
+  float duration, TextColor color, bool percent = false) {
+  SpriteRenderable& renderable = animation->GetFrame();
+  Vector2f position(ui_camera.surface_dim.x - renderable.dimensions.x, y - renderable.dimensions.y * 0.5f);
+
+  renderer.Draw(ui_camera, renderable, position, Layer::Gauges);
+
+  char duration_text[16] = { 0 };
+
+  if (percent) {
+    sprintf(duration_text, "%d%%", (u32)(duration * 100.0f));
+  } else {
+    sprintf(duration_text, "%.1f", duration);
+  }
+
+  renderer.DrawText(ui_camera, duration_text, color, position + Vector2f(0, 4), Layer::Gauges, TextAlignment::Right);
+}
+
+void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& renderer) {
+  Player* self = player_manager.GetSelf();
+
+  if (!self) return;
+
+  if (ship.portal_time > 0) {
+    constexpr float kPortalIndicatorY = 133;
+
+    RenderTimedIndicator(ui_camera, renderer, &portal_animation, kPortalIndicatorY, ship.portal_time,
+      TextColor::Yellow);
+  }
+
+  if (ship.super_time > 0.0f) {
+    constexpr float kSuperIndicatorY = 101;
+
+    RenderTimedIndicator(ui_camera, renderer, &super_animation, kSuperIndicatorY, ship.super_time, TextColor::Yellow);
+  }
+
+  if (ship.shield_time > 0.0f) {
+    constexpr float kShieldIndicatorY = 85;
+
+    float max_shield_time = player_manager.connection.settings.ShipSettings[self->ship].ShieldsTime / 100.0f;
+    float percent = ship.shield_time / max_shield_time;
+
+    RenderTimedIndicator(ui_camera, renderer, &shield_animation, kShieldIndicatorY, percent, TextColor::Yellow, true);
+  }
+
+  if (self->flag_timer > 0) {
+    constexpr float kFlagIndicatorY = 117;
+
+    flag_animation.sprite = &Graphics::anim_flag_indicator;
+    float time = self->flag_timer / 100.0f;
+    RenderTimedIndicator(ui_camera, renderer, &flag_animation, kFlagIndicatorY, time, TextColor::DarkRed);
+  }
+
+  RenderEnergyDisplay(ui_camera, renderer);
+
+  // TODO: Find real position
+  float y_top = ((ui_camera.surface_dim.y * 0.57f) + 1.0f) - 25.0f * 4;
+  float y = y_top;
+
+  RenderItemIndicator(ui_camera, renderer, ship.bursts, 30, &y);
+  RenderItemIndicator(ui_camera, renderer, ship.repels, 31, &y);
+  RenderItemIndicator(ui_camera, renderer, ship.decoys, 40, &y);
+  RenderItemIndicator(ui_camera, renderer, ship.thors, 41, &y);
+  RenderItemIndicator(ui_camera, renderer, ship.bricks, 42, &y);
+  RenderItemIndicator(ui_camera, renderer, ship.rockets, 43, &y);
+  RenderItemIndicator(ui_camera, renderer, ship.portals, 46, &y);
+
+  float x = ui_camera.surface_dim.x - 26;
+  y = y_top;
+  size_t gun_index = GetGunIconIndex();
+  if (gun_index != 0xFFFFFFFF) {
+    renderer.Draw(ui_camera, Graphics::icon_sprites[gun_index], Vector2f(x, y), Layer::Gauges);
+  } else {
+    renderer.Draw(ui_camera, Graphics::empty_icon_sprites[1], Vector2f(x + 22, y), Layer::Gauges);
+  }
+  y += 25.0f;
+
+  size_t bomb_index = GetBombIconIndex();
+  if (bomb_index != 0xFFFFFFFF) {
+    renderer.Draw(ui_camera, Graphics::icon_sprites[bomb_index], Vector2f(x, y), Layer::Gauges);
+  } else {
+    renderer.Draw(ui_camera, Graphics::empty_icon_sprites[1], Vector2f(x + 22, y), Layer::Gauges);
+  }
+  y += 25.0f;
+
+  if (ship.capability & ShipCapability_Stealth) {
+    if (self->togglables & Status_Stealth) {
+      renderer.Draw(ui_camera, Graphics::icon_sprites[32], Vector2f(x, y), Layer::Gauges);
+    } else {
+      renderer.Draw(ui_camera, Graphics::icon_sprites[33], Vector2f(x, y), Layer::Gauges);
+    }
+  } else {
+    renderer.Draw(ui_camera, Graphics::empty_icon_sprites[1], Vector2f(x + 22, y), Layer::Gauges);
+  }
+  y += 25.0f;
+
+  if (ship.capability & ShipCapability_Cloak) {
+    if (self->togglables & Status_Cloak) {
+      renderer.Draw(ui_camera, Graphics::icon_sprites[34], Vector2f(x, y), Layer::Gauges);
+    } else {
+      renderer.Draw(ui_camera, Graphics::icon_sprites[35], Vector2f(x, y), Layer::Gauges);
+    }
+  } else {
+    renderer.Draw(ui_camera, Graphics::empty_icon_sprites[1], Vector2f(x + 22, y), Layer::Gauges);
+  }
+  y += 25.0f;
+
+  if (ship.capability & ShipCapability_XRadar) {
+    if (self->togglables & Status_XRadar) {
+      renderer.Draw(ui_camera, Graphics::icon_sprites[36], Vector2f(x, y), Layer::Gauges);
+    } else {
+      renderer.Draw(ui_camera, Graphics::icon_sprites[37], Vector2f(x, y), Layer::Gauges);
+    }
+  } else {
+    renderer.Draw(ui_camera, Graphics::empty_icon_sprites[1], Vector2f(x + 22, y), Layer::Gauges);
+  }
+  y += 25.0f;
+
+  if (ship.capability & ShipCapability_Antiwarp) {
+    if (self->togglables & Status_Antiwarp) {
+      renderer.Draw(ui_camera, Graphics::icon_sprites[38], Vector2f(x, y), Layer::Gauges);
+    } else {
+      renderer.Draw(ui_camera, Graphics::icon_sprites[39], Vector2f(x, y), Layer::Gauges);
+    }
+  } else {
+    renderer.Draw(ui_camera, Graphics::empty_icon_sprites[1], Vector2f(x + 22, y), Layer::Gauges);
+  }
+  y += 25.0f;
+}
+
+void ShipController::RenderEnergyDisplay(Camera& ui_camera, SpriteRenderer& renderer) {
+  Player* self = player_manager.GetSelf();
+
+  if (!self) return;
+
+  // Render energy display
+  SpriteRenderable& healthbar = Graphics::healthbar_sprites[0];
+  Vector2f health_center(ui_camera.surface_dim.x * 0.5f, healthbar.dimensions.y * 0.5f);
+  Vector2f health_position(ui_camera.surface_dim.x * 0.5f - healthbar.dimensions.x * 0.5f, 0);
+
+  SpriteRenderable top_display_full = Graphics::anim_health_high.frames[5];
+  top_display_full.dimensions = Vector2f(240, 2);
+
+  SpriteRenderable top_display = Graphics::anim_health_high.frames[0];
+
+  float ship_energy_percent =
+    (float)ship.energy / player_manager.connection.settings.ShipSettings[self->ship].MaximumEnergy;
+
+  top_display.dimensions = Vector2f(ship_energy_percent * 240, 2);
+
+  float energy_percent = self->energy / ship.energy;
+  float view_width = energy_percent * top_display.dimensions.x;
+
+  if (energy_percent > 0.5f) {
+    health_animation.sprite = &Graphics::anim_health_high;
+  } else if (energy_percent > 0.25f) {
+    health_animation.sprite = &Graphics::anim_health_medium;
+  } else {
+    health_animation.sprite = &Graphics::anim_health_low;
+  }
+
+  SpriteRenderable energy_display = health_animation.GetFrame();
+  energy_display.dimensions = Vector2f(view_width, 6);
+
+  renderer.Draw(ui_camera, top_display_full, health_center - Vector2f(240, 4), Layer::Gauges);
+  renderer.Draw(ui_camera, top_display_full, health_center - Vector2f(0, 4), Layer::Gauges);
+
+  renderer.Draw(ui_camera, top_display, health_center - Vector2f(top_display.dimensions.x, 4), Layer::Gauges);
+  renderer.Draw(ui_camera, top_display, health_center - Vector2f(0, 4), Layer::Gauges);
+
+  renderer.Draw(ui_camera, energy_display, health_center - Vector2f(view_width, 0), Layer::Gauges);
+  renderer.Draw(ui_camera, energy_display, health_center, Layer::Gauges);
+
+  renderer.Draw(ui_camera, healthbar, health_position, Layer::Gauges);
+}
+
+void ShipController::RenderItemIndicator(Camera& ui_camera, SpriteRenderer& renderer, int value, size_t index,
+  float* y) {
+  if (value > 0) {
+    renderer.Draw(ui_camera, Graphics::icon_sprites[index], Vector2f(0, *y), Layer::Gauges);
+
+    if (value > 9) {
+      renderer.Draw(ui_camera, Graphics::icon_count_sprites[10], Vector2f(23, *y + 5), Layer::Gauges);
+    } else if (value > 1) {
+      renderer.Draw(ui_camera, Graphics::icon_count_sprites[value], Vector2f(23, *y + 5), Layer::Gauges);
+    }
+  } else {
+    renderer.Draw(ui_camera, Graphics::empty_icon_sprites[0], Vector2f(0, *y), Layer::Gauges);
+  }
+
+  *y += 25.0f;
 }
 
 size_t ShipController::GetGunIconIndex() {
@@ -1037,12 +1452,18 @@ void ShipController::ApplyPrize(Player* self, s32 prize_id, bool notify, bool da
 
       if (super_time > ship.super_time) {
         ship.super_time = super_time;
+
+        super_animation.t = 0.0f;
+        super_animation.sprite = &Graphics::anim_super;
       }
 
       display_notification = true;
     } break;
     case Prize::Shields: {
       ship.shield_time = ship_settings.ShieldsTime / 100.0f;
+
+      shield_animation.t = 0.0f;
+      shield_animation.sprite = &Graphics::anim_shield;
 
       display_notification = true;
     } break;

@@ -2,6 +2,7 @@
 #define ZERO_CAMERA_H_
 
 #include <zero/Math.h>
+#include <zero/game/render/Layer.h>
 
 namespace zero {
 
@@ -13,7 +14,7 @@ struct Camera {
 
   Camera(const Vector2f& surface_dim, const Vector2f& position, float scale)
       : surface_dim(surface_dim), position(position), scale(scale) {
-    float zmax = 3.0f;
+    float zmax = (float)Layer::Count;
     projection = Orthographic(-surface_dim.x / 2.0f * scale, surface_dim.x / 2.0f * scale, surface_dim.y / 2.0f * scale,
                               -surface_dim.y / 2.0f * scale, -zmax, zmax);
   }

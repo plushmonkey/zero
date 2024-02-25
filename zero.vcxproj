@@ -19,12 +19,38 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="lib\glad\src\glad.cpp" />
+    <ClCompile Include="lib\glfw\src\context.cpp" />
+    <ClCompile Include="lib\glfw\src\egl_context.cpp" />
+    <ClCompile Include="lib\glfw\src\init.cpp" />
+    <ClCompile Include="lib\glfw\src\input.cpp" />
+    <ClCompile Include="lib\glfw\src\monitor.cpp" />
+    <ClCompile Include="lib\glfw\src\osmesa_context.cpp" />
+    <ClCompile Include="lib\glfw\src\vulkan.cpp" />
+    <ClCompile Include="lib\glfw\src\wgl_context.cpp" />
+    <ClCompile Include="lib\glfw\src\win32_init.cpp" />
+    <ClCompile Include="lib\glfw\src\win32_joystick.cpp" />
+    <ClCompile Include="lib\glfw\src\win32_monitor.cpp" />
+    <ClCompile Include="lib\glfw\src\win32_thread.cpp" />
+    <ClCompile Include="lib\glfw\src\win32_time.cpp" />
+    <ClCompile Include="lib\glfw\src\win32_window.cpp" />
+    <ClCompile Include="lib\glfw\src\window.cpp" />
     <ClCompile Include="zero\behavior\BehaviorBuilder.cpp" />
     <ClCompile Include="zero\behavior\BehaviorTree.cpp" />
     <ClCompile Include="zero\BotController.cpp" />
     <ClCompile Include="zero\ChatQueue.cpp" />
     <ClCompile Include="zero\commands\CommandSystem.cpp" />
+    <ClCompile Include="zero\DebugRenderer.cpp" />
     <ClCompile Include="zero\game\Logger.cpp" />
+    <ClCompile Include="zero\game\render\AnimatedTileRenderer.cpp" />
+    <ClCompile Include="zero\game\render\Animation.cpp" />
+    <ClCompile Include="zero\game\render\BackgroundRenderer.cpp" />
+    <ClCompile Include="zero\game\render\Colors.cpp" />
+    <ClCompile Include="zero\game\render\Graphics.cpp" />
+    <ClCompile Include="zero\game\render\Image.cpp" />
+    <ClCompile Include="zero\game\render\Shader.cpp" />
+    <ClCompile Include="zero\game\render\SpriteRenderer.cpp" />
+    <ClCompile Include="zero\game\render\TileRenderer.cpp" />
     <ClCompile Include="zero\ZeroBot.cpp" />
     <ClCompile Include="zero\game\BrickManager.cpp" />
     <ClCompile Include="zero\game\Buffer.cpp" />
@@ -53,10 +79,10 @@
     <ClCompile Include="zero\game\Soccer.cpp" />
     <ClCompile Include="zero\game\WeaponManager.cpp" />
     <ClCompile Include="zero\game\WorkQueue.cpp" />
-    <ClCompile Include="zero\zones\hyperspace\BallBehavior.cpp" />
-    <ClCompile Include="zero\zones\hyperspace\CenterJavBehavior.cpp" />
-    <ClCompile Include="zero\zones\hyperspace\CenterLeviBehavior.cpp" />
-    <ClCompile Include="zero\zones\hyperspace\CenterBehavior.cpp" />
+    <ClCompile Include="zero\zones\hyperspace\center\BallBehavior.cpp" />
+    <ClCompile Include="zero\zones\hyperspace\center\CenterJavBehavior.cpp" />
+    <ClCompile Include="zero\zones\hyperspace\center\CenterLeviBehavior.cpp" />
+    <ClCompile Include="zero\zones\hyperspace\center\CenterBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\CommandBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\Hyperspace.cpp" />
     <ClCompile Include="zero\zones\metalgear\GunnerBehavior.cpp" />
@@ -88,10 +114,23 @@
     <ClInclude Include="zero\BotController.h" />
     <ClInclude Include="zero\ChatQueue.h" />
     <ClInclude Include="zero\commands\CommandSystem.h" />
+    <ClInclude Include="zero\DebugRenderer.h" />
     <ClInclude Include="zero\Event.h" />
     <ClInclude Include="zero\game\GameEvent.h" />
     <ClInclude Include="zero\game\Logger.h" />
     <ClInclude Include="zero\InfluenceMap.h" />
+    <ClInclude Include="zero\game\render\AnimatedTileRenderer.h" />
+    <ClInclude Include="zero\game\render\Animation.h" />
+    <ClInclude Include="zero\game\render\BackgroundRenderer.h" />
+    <ClInclude Include="zero\game\render\Colors.h" />
+    <ClInclude Include="zero\game\render\Graphics.h" />
+    <ClInclude Include="zero\game\render\Image.h" />
+    <ClInclude Include="zero\game\render\Layer.h" />
+    <ClInclude Include="zero\game\render\Shader.h" />
+    <ClInclude Include="zero\game\render\Sprite.h" />
+    <ClInclude Include="zero\game\render\SpriteRenderer.h" />
+    <ClInclude Include="zero\game\render\TextureMap.h" />
+    <ClInclude Include="zero\game\render\TileRenderer.h" />
     <ClInclude Include="zero\path\Path.h" />
     <ClInclude Include="zero\Utility.h" />
     <ClInclude Include="zero\ZeroBot.h" />
@@ -135,10 +174,10 @@
     <ClInclude Include="zero\Types.h" />
     <ClInclude Include="zero\game\WeaponManager.h" />
     <ClInclude Include="zero\game\WorkQueue.h" />
-    <ClInclude Include="zero\zones\hyperspace\BallBehavior.h" />
-    <ClInclude Include="zero\zones\hyperspace\CenterJavBehavior.h" />
-    <ClInclude Include="zero\zones\hyperspace\CenterLeviBehavior.h" />
-    <ClInclude Include="zero\zones\hyperspace\CenterBehavior.h" />
+    <ClInclude Include="zero\zones\hyperspace\center\BallBehavior.h" />
+    <ClInclude Include="zero\zones\hyperspace\center\CenterJavBehavior.h" />
+    <ClInclude Include="zero\zones\hyperspace\center\CenterLeviBehavior.h" />
+    <ClInclude Include="zero\zones\hyperspace\center\CenterBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\CommandBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\nodes\CommandNode.h" />
     <ClInclude Include="zero\zones\metalgear\GunnerBehavior.h" />
@@ -199,10 +238,10 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>.;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>./lib/;./lib/glad/include;./lib/glfw/include;.;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>.;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>./lib/;./lib/glad/include;./lib/glfw/include;.;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -242,7 +281,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_GLFW_WIN32;_CRT_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DisableSpecificWarnings>
@@ -259,7 +298,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_GLFW_WIN32;_CRT_SECURE_NO_WARNINGS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DisableSpecificWarnings>

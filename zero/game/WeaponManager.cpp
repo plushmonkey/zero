@@ -6,11 +6,13 @@
 #include <zero/game/Camera.h>
 #include <zero/game/Clock.h>
 #include <zero/game/GameEvent.h>
+#include <zero/game/Memory.h>
 #include <zero/game/PlayerManager.h>
 #include <zero/game/Radar.h>
 #include <zero/game/ShipController.h>
 #include <zero/game/net/Connection.h>
 #include <zero/game/net/PacketDispatcher.h>
+#include <zero/game/render/Graphics.h>
 
 #include <chrono>
 
@@ -25,8 +27,8 @@ static void OnLargePositionPkt(void* user, u8* pkt, size_t size) {
 }
 
 WeaponManager::WeaponManager(MemoryArena& temp_arena, Connection& connection, PlayerManager& player_manager,
-                             PacketDispatcher& dispatcher)
-    : temp_arena(temp_arena), connection(connection), player_manager(player_manager) {
+                             PacketDispatcher& dispatcher, AnimationSystem& animation)
+    : temp_arena(temp_arena), connection(connection), player_manager(player_manager), animation(animation) {
   dispatcher.Register(ProtocolS2C::LargePosition, OnLargePositionPkt, this);
 }
 
@@ -67,6 +69,8 @@ void WeaponManager::Update(float dt) {
         weapons[i--] = weapons[--weapon_count];
         break;
       }
+
+      DropTrail(*weapon);
     }
   }
 
@@ -95,6 +99,32 @@ void WeaponManager::Update(float dt) {
           weapons[i--] = weapons[--weapon_count];
         }
       }
+    }
+  }
+}
+
+void WeaponManager::DropTrail(Weapon& weapon) {
+  constexpr s32 kBulletTrailInterval = 1;
+  constexpr s32 kBombTrailInterval = 5;
+
+  if (weapon.data.type == WeaponType::Bullet || weapon.data.type == WeaponType::BouncingBullet) {
+    if (TICK_DIFF(weapon.last_tick, weapon.last_trail_tick) >= kBulletTrailInterval) {
+      SpriteRenderable& frame = Graphics::anim_bullet_trails[weapon.data.level].frames[0];
+      Vector2f offset = Vector2f(0.5f / 16.0f, 0.5f / 16.0f);
+      Vector2f position = (weapon.position - weapon.velocity * (1.0f / 100.0f) - offset).PixelRounded();
+
+      animation.AddAnimation(Graphics::anim_bullet_trails[weapon.data.level], position)->layer = Layer::AfterTiles;
+      weapon.last_trail_tick = weapon.last_tick + kBulletTrailInterval;
+    }
+  } else if ((weapon.data.type == WeaponType::Bomb || weapon.data.type == WeaponType::ProximityBomb) &&
+             !weapon.data.alternate) {
+    if (TICK_DIFF(weapon.last_tick, weapon.last_trail_tick) >= kBombTrailInterval) {
+      SpriteRenderable& frame = Graphics::anim_bomb_trails[weapon.data.level].frames[0];
+      Vector2f offset = (frame.dimensions * (0.5f / 16.0f));
+      Vector2f position = (weapon.position - weapon.velocity * (1.0f / 100.0f) - offset).PixelRounded();
+
+      animation.AddAnimation(Graphics::anim_bomb_trails[weapon.data.level], position)->layer = Layer::AfterTiles;
+      weapon.last_trail_tick += kBombTrailInterval;
     }
   }
 }
@@ -383,10 +413,11 @@ WeaponSimulateResult WeaponManager::SimulatePosition(Weapon& weapon) {
       }
 
       if (--weapon.bounces_remaining == 0 && !(weapon.flags & WEAPON_FLAG_EMP)) {
-        // Do nothing. It would normally change sprite.
+        weapon.animation.sprite = Graphics::anim_bombs + weapon.data.level;
       }
     } else if (type == WeaponType::Burst) {
       weapon.flags |= WEAPON_FLAG_BURST_ACTIVE;
+      weapon.animation.sprite = &Graphics::anim_burst_active;
     }
   }
 
@@ -429,6 +460,20 @@ void WeaponManager::CreateExplosion(Weapon& weapon) {
     case WeaponType::Bomb:
     case WeaponType::ProximityBomb:
     case WeaponType::Thor: {
+      if (weapon.flags & WEAPON_FLAG_EMP) {
+        Vector2f offset = Graphics::anim_emp_explode.frames[0].dimensions * (0.5f / 16.0f);
+
+        animation.AddAnimation(Graphics::anim_emp_explode, weapon.position - offset)->layer = Layer::Explosions;
+      } else {
+        Vector2f offset = Graphics::anim_bomb_explode.frames[0].dimensions * (0.5f / 16.0f);
+
+        animation.AddAnimation(Graphics::anim_bomb_explode, weapon.position - offset)->layer = Layer::Explosions;
+      }
+
+      constexpr u32 kExplosionIndicatorTicks = 125;
+      radar->AddTemporaryIndicator(weapon.position, GetCurrentTick() + kExplosionIndicatorTicks, Vector2f(2, 2),
+                                   ColorType::RadarExplosion);
+
       s32 count = weapon.data.shrap;
 
       VieRNG rng = {(s32)weapon.rng_seed};
@@ -448,13 +493,17 @@ void WeaponManager::CreateExplosion(Weapon& weapon) {
 
         Weapon* shrap = weapons + weapon_count++;
 
+        shrap->animation.t = 0.0f;
+        shrap->animation.repeat = true;
         shrap->bounces_remaining = 0;
         shrap->data = weapon.data;
         shrap->data.level = weapon.data.shraplevel;
         if (weapon.data.shrapbouncing) {
           shrap->data.type = WeaponType::BouncingBullet;
+          shrap->animation.sprite = Graphics::anim_bounce_shrapnel + weapon.data.shraplevel;
         } else {
           shrap->data.type = WeaponType::Bullet;
+          shrap->animation.sprite = Graphics::anim_shrapnel + weapon.data.shraplevel;
         }
         shrap->flags = 0;
         shrap->frequency = weapon.frequency;
@@ -482,10 +531,115 @@ void WeaponManager::CreateExplosion(Weapon& weapon) {
     } break;
     case WeaponType::BouncingBullet:
     case WeaponType::Bullet: {
+      Vector2f offset = Graphics::anim_bullet_explode.frames[0].dimensions * (0.5f / 16.0f);
+      // Render the tiny explosions below the bomb explosions so they don't look weird
+      animation.AddAnimation(Graphics::anim_bullet_explode, weapon.position - offset)->layer = Layer::AfterShips;
     } break;
     default: {
     } break;
   }
+}
+
+void WeaponManager::Render(Camera& camera, Camera& ui_camera, SpriteRenderer& renderer, float dt,
+                           const RadarVisibility& radar_visibility) {
+#pragma pack(push, 1)
+  struct DecoyRenderRequest {
+    Player* player;
+    Vector2f position;
+  };
+#pragma pack(pop)
+
+  ArenaSnapshot snapshot = temp_arena.GetSnapshot();
+
+  // WARNING: temp_arena must not be used for anything else here or in any calls made here.
+  // All of the decoys are allocated contiguously so the base decoys array can access all of them
+  DecoyRenderRequest* decoys = (DecoyRenderRequest*)temp_arena.Allocate(0);
+  size_t decoy_count = 0;
+
+  Player* self = player_manager.GetSelf();
+
+  for (size_t i = 0; i < weapon_count; ++i) {
+    Weapon* weapon = weapons + i;
+
+    if (weapon->animation.sprite) {
+      weapon->animation.t += dt;
+
+      if (!weapon->animation.IsAnimating() && weapon->animation.repeat) {
+        weapon->animation.t -= weapon->animation.sprite->duration;
+      }
+    }
+
+    u16 see_bomb_level = radar_visibility.see_bomb_level;
+
+    if (weapon->data.type == WeaponType::Bomb || weapon->data.type == WeaponType::ProximityBomb) {
+      bool add_indicator = false;
+
+      if (!weapon->data.alternate && see_bomb_level > 0 && (weapon->data.level + 1) >= see_bomb_level) {
+        add_indicator = true;
+      } else if (weapon->data.alternate && radar_visibility.see_mines) {
+        add_indicator = true;
+      }
+
+      if (add_indicator) {
+        radar->AddTemporaryIndicator(weapon->position, 0, Vector2f(2, 2), ColorType::RadarBomb);
+      }
+    }
+
+    Vector2f extrapolated_pos = GetExtrapolatedPos(*weapon);
+
+    if (weapon->animation.IsAnimating()) {
+      SpriteRenderable& frame = weapon->animation.GetFrame();
+      Vector2f position = extrapolated_pos - frame.dimensions * (0.5f / 16.0f);
+
+      renderer.Draw(camera, frame, position.PixelRounded(), Layer::Weapons);
+    } else if (weapon->data.type == WeaponType::Decoy) {
+      Player* player = player_manager.GetPlayerById(weapon->player_id);
+
+      if (player) {
+        float orientation = weapon->initial_orientation - (player->orientation - weapon->initial_orientation);
+
+        if (orientation < 0.0f) {
+          orientation += 1.0f;
+        } else if (orientation >= 1.0f) {
+          orientation -= 1.0f;
+        }
+
+        u8 direction = (u8)(orientation * 40);
+        assert(direction < 40);
+
+        size_t index = player->ship * 40 + direction;
+        SpriteRenderable& frame = Graphics::ship_sprites[index];
+        Vector2f position = extrapolated_pos - frame.dimensions * (0.5f / 16.0f);
+
+        renderer.Draw(camera, frame, position.PixelRounded(), Layer::Ships);
+
+        if (self && player->id != self->id) {
+          player_manager.RenderPlayerName(camera, renderer, *self, *player, extrapolated_pos, true);
+        }
+
+        // Push them on here to minimize draw calls
+        DecoyRenderRequest* request = memory_arena_push_type(&temp_arena, DecoyRenderRequest);
+        request->player = player;
+        request->position = weapon->position;
+
+        ++decoy_count;
+      }
+    }
+  }
+
+  renderer.Render(camera);
+
+  if (self && radar) {
+    for (size_t i = 0; i < decoy_count; ++i) {
+      DecoyRenderRequest* request = decoys + i;
+
+      radar->RenderDecoy(ui_camera, renderer, *self, *request->player, request->position);
+    }
+
+    renderer.Render(ui_camera);
+  }
+
+  temp_arena.Revert(snapshot);
 }
 
 Vector2f WeaponManager::GetExtrapolatedPos(Weapon& weapon) {
@@ -728,6 +882,12 @@ WeaponSimulateResult WeaponManager::GenerateWeapon(u16 player_id, WeaponData wea
     weapon->velocity = Vector2f(0, 0);
   }
 
+  weapon->animation.t = 0.0f;
+  weapon->animation.sprite = nullptr;
+  weapon->animation.repeat = true;
+
+  SetWeaponSprite(*player, *weapon);
+
   Event::Dispatch(WeaponSpawnEvent(*weapon, *player));
 
   s32 tick_diff = TICK_DIFF(GetCurrentTick(), local_timestamp);
@@ -738,6 +898,16 @@ WeaponSimulateResult WeaponManager::GenerateWeapon(u16 player_id, WeaponData wea
     result = Simulate(*weapon);
 
     if (result != WeaponSimulateResult::Continue) {
+      if (type == WeaponType::Repel) {
+        // Create an animation even if the repel was instant.
+        Vector2f offset = Graphics::anim_repel.frames[0].dimensions * (0.5f / 16.0f);
+
+        Animation* anim =
+            animation.AddAnimation(Graphics::anim_repel, weapon->position.PixelRounded() - offset.PixelRounded());
+        anim->layer = Layer::AfterShips;
+        anim->repeat = false;
+      }
+
       CreateExplosion(*weapon);
       Event::Dispatch(WeaponDestroyEvent(*weapon));
       --weapon_count;
@@ -763,6 +933,64 @@ WeaponSimulateResult WeaponManager::GenerateWeapon(u16 player_id, WeaponData wea
   }
 
   return result;
+}
+
+void WeaponManager::SetWeaponSprite(Player& player, Weapon& weapon) {
+  WeaponType type = weapon.data.type;
+
+  switch (type) {
+    case WeaponType::Bullet: {
+      weapon.animation.sprite = Graphics::anim_bullets + weapon.data.level;
+    } break;
+    case WeaponType::BouncingBullet: {
+      weapon.animation.sprite = Graphics::anim_bullets_bounce + weapon.data.level;
+    } break;
+    case WeaponType::ProximityBomb:
+    case WeaponType::Bomb: {
+      bool emp = connection.settings.ShipSettings[player.ship].EmpBomb;
+
+      if (weapon.data.alternate) {
+        if (emp) {
+          weapon.animation.sprite = Graphics::anim_emp_mines + weapon.data.level;
+          weapon.flags |= WEAPON_FLAG_EMP;
+        } else {
+          weapon.animation.sprite = Graphics::anim_mines + weapon.data.level;
+        }
+      } else {
+        if (emp) {
+          weapon.animation.sprite = Graphics::anim_emp_bombs + weapon.data.level;
+          weapon.flags |= WEAPON_FLAG_EMP;
+        } else {
+          if (weapon.bounces_remaining > 0) {
+            weapon.animation.sprite = Graphics::anim_bombs_bounceable + weapon.data.level;
+          } else {
+            weapon.animation.sprite = Graphics::anim_bombs + weapon.data.level;
+          }
+        }
+      }
+    } break;
+    case WeaponType::Thor: {
+      weapon.animation.sprite = &Graphics::anim_thor;
+    } break;
+    case WeaponType::Repel: {
+      Vector2f offset = Graphics::anim_repel.frames[0].dimensions * (0.5f / 16.0f);
+
+      Animation* anim =
+          animation.AddAnimation(Graphics::anim_repel, weapon.position.PixelRounded() - offset.PixelRounded());
+      anim->layer = Layer::AfterShips;
+      anim->repeat = false;
+
+      weapon.animation.sprite = nullptr;
+      weapon.animation.repeat = false;
+    } break;
+    case WeaponType::Burst: {
+      weapon.animation.sprite = &Graphics::anim_burst_inactive;
+    } break;
+    default: {
+    } break;
+  }
+
+  weapon.animation.t = 0.0f;
 }
 
 int WeaponManager::GetWeaponTotalAliveTime(WeaponType type, bool alternate) {

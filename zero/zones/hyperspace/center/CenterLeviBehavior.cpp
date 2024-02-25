@@ -86,7 +86,7 @@ std::unique_ptr<behavior::BehaviorNode> CenterLeviBehavior::CreateTree(behavior:
                                     .Child<DistanceThresholdNode>("nearest_target_position", 15.0f)
                                     .Child<VisibilityQueryNode>("nearest_target_position")
                                     .Child<PlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 12.0f)
-                                    .Child<AimNode>("nearest_target", "aim_position")
+                                    .Child<AimNode>(WeaponType::Bomb, "nearest_target", "aim_position")
                                     .Child<MoveRectangleNode>("target_bounds", "aim_position", "target_bounds")
                                     .End()
                                 .Sequence() // Attempt to fire at center if enemy is not visible.

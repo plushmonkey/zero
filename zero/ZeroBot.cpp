@@ -8,10 +8,16 @@
 
 #include <chrono>
 
+#define CREATE_RENDER_WINDOW 0
+#define SURFACE_WIDTH 1360
+#define SURFACE_HEIGHT 768
 //
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
+#ifdef APIENTRY
+#undef APIENTRY
+#endif
 #include <Windows.h>
 #else
 #include <memory.h>
@@ -72,15 +78,28 @@ bool ZeroBot::JoinZone(ServerInfo& server) {
   kPlayerName = name;
   kPlayerPassword = password;
 
-  game = memory_arena_construct_type(&perm_arena, Game, perm_arena, trans_arena, *work_queue, 1920, 1080);
+  game = memory_arena_construct_type(&perm_arena, Game, perm_arena, trans_arena, *work_queue, SURFACE_WIDTH, SURFACE_HEIGHT);
   bot_controller = memory_arena_construct_type(&perm_arena, BotController, *game);
 
   commands = memory_arena_construct_type(&perm_arena, CommandSystem, *this, this->game->dispatcher);
 
-  if (!game->Initialize(input)) {
+#if CREATE_RENDER_WINDOW
+  debug_renderer.Initialize(SURFACE_WIDTH, SURFACE_HEIGHT);
+  game->render_enabled = true;
+#endif
+
+  GameInitializeResult init_result = game->Initialize(input);
+  if (init_result == GameInitializeResult::Failure) {
     Log(LogLevel::Error, "Failed to create game");
     return false;
   }
+
+#if CREATE_RENDER_WINDOW
+  if (init_result != GameInitializeResult::Full) {
+    debug_renderer.Close();
+    game->render_enabled = false;
+  }
+#endif
 
   ConnectResult result = game->connection.Connect(server.ipaddr, server.port);
 
@@ -134,7 +153,19 @@ void ZeroBot::Run() {
       break;
     }
 
+    if (game->render_enabled) {
+      if (!debug_renderer.Render(*game, dt)) {
+        game->Cleanup();
+        break;
+      }
+    } else {
+      // Manually call game render when renderer is disabled so it can flush the buffers.
+      game->Render(dt);
+    }
+
+#if CREATE_RENDER_WINDOW == 0
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
+#endif
 
     auto end = std::chrono::high_resolution_clock::now();
     frame_time = std::chrono::duration_cast<ms_float>(end - start).count();

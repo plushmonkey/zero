@@ -4,11 +4,11 @@
 #include <zero/game/GameEvent.h>
 #include <zero/game/Logger.h>
 #include <zero/zones/ZoneController.h>
-#include <zero/zones/hyperspace/BallBehavior.h>
-#include <zero/zones/hyperspace/CenterBehavior.h>
-#include <zero/zones/hyperspace/CenterJavBehavior.h>
-#include <zero/zones/hyperspace/CenterLeviBehavior.h>
 #include <zero/zones/hyperspace/CommandBehavior.h>
+#include <zero/zones/hyperspace/center/BallBehavior.h>
+#include <zero/zones/hyperspace/center/CenterBehavior.h>
+#include <zero/zones/hyperspace/center/CenterJavBehavior.h>
+#include <zero/zones/hyperspace/center/CenterLeviBehavior.h>
 
 #include <format>
 

@@ -189,6 +189,202 @@ void PlayerManager::Update(float dt) {
     SendPositionPacket();
   }
 }
+void PlayerManager::Render(Camera& camera, SpriteRenderer& renderer) {
+  Player* self = GetPlayerById(player_id);
+
+  if (!self) return;
+
+  u32 self_freq = self->frequency;
+
+  // Draw player ships
+  for (size_t i = 0; i < this->player_count; ++i) {
+    Player* player = this->players + i;
+
+    if (player->ship == 8) continue;
+    if (player->position == Vector2f(0, 0)) continue;
+    if (player->attach_parent != kInvalidPlayerId) continue;
+
+    if (explode_animation.IsAnimating(player->explode_anim_t)) {
+      SpriteRenderable& renderable = explode_animation.GetFrame(player->explode_anim_t);
+      Vector2f position = player->position - renderable.dimensions * (0.5f / 16.0f);
+
+      renderer.Draw(camera, renderable, position, Layer::AfterShips);
+    } else if (player->enter_delay <= 0.0f) {
+      if (IsSynchronized(*player) && IsPlayerVisible(*self, self_freq, *player)) {
+        size_t index = player->ship * 40 + (u8)(player->orientation * 40.0f);
+
+        Vector2f offset = Graphics::ship_sprites[index].dimensions * (0.5f / 16.0f);
+        Vector2f position = player->position.PixelRounded() - offset.PixelRounded();
+
+        renderer.Draw(camera, Graphics::ship_sprites[index], position, Layer::Ships);
+      }
+
+      AttachInfo* info = player->children;
+
+      while (info) {
+        Player* child = GetPlayerById(info->player_id);
+
+        if (child && IsSynchronized(*child) && IsPlayerVisible(*self, self_freq, *child)) {
+          size_t index = (size_t)(child->orientation * 40.0f);
+
+          Vector2f offset = Graphics::turret_sprites[index].dimensions * (0.5f / 16.0f);
+          Vector2f position = player->position.PixelRounded() - offset.PixelRounded();
+
+          renderer.Draw(camera, Graphics::turret_sprites[index], position, Layer::Ships);
+        }
+
+        info = info->next;
+      }
+
+      if (warp_animation.IsAnimating(player->warp_anim_t)) {
+        SpriteRenderable& renderable = warp_animation.GetFrame(player->warp_anim_t);
+        Vector2f position = player->position - renderable.dimensions * (0.5f / 16.0f);
+
+        renderer.Draw(camera, renderable, position, Layer::AfterShips);
+      }
+
+      if (bombflash_animation.IsAnimating(player->bombflash_anim_t)) {
+        SpriteRenderable& renderable = bombflash_animation.GetFrame(player->bombflash_anim_t);
+        Vector2f heading = OrientationToHeading((u8)(player->orientation * 40.0f));
+        ShipSettings& ship_settings = connection.settings.ShipSettings[player->ship];
+
+        Vector2f position =
+            player->position + heading * ship_settings.GetRadius() - renderable.dimensions * (0.5f / 16.0f);
+
+        renderer.Draw(camera, renderable, position, Layer::Weapons);
+      }
+    } else if (player == self && player->enter_delay > 0 && !explode_animation.IsAnimating(player->explode_anim_t)) {
+      char output[256];
+      sprintf(output, "%.1f", player->enter_delay);
+      renderer.DrawText(camera, output, TextColor::DarkRed, camera.position, Layer::TopMost, TextAlignment::Center);
+    }
+  }
+
+  // Draw player names - This is done in separate loop to batch sprite sheet renderables
+  for (size_t i = 0; i < this->player_count; ++i) {
+    Player* player = this->players + i;
+
+    if (player->ship == 8) continue;
+    if (player->position == Vector2f(0, 0)) continue;
+    if (player->attach_parent != kInvalidPlayerId) continue;
+
+    Vector2f position = player->position;
+
+    // Don't render the player's name if they aren't synchronized, but still render their children
+    if (IsSynchronized(*player)) {
+      RenderPlayerName(camera, renderer, *self, *player, position, false);
+
+      float max_energy = (float)ship_controller->ship.energy;
+      if (player->id == player_id && player->energy < max_energy * 0.5f) {
+        position += Vector2f(0, 12.0f / 16.0f);
+      }
+    }
+
+    AttachInfo* info = player->children;
+
+    while (info) {
+      position += Vector2f(0, 12.0f / 16.0f);
+
+      Player* child = GetPlayerById(info->player_id);
+
+      if (child && IsSynchronized(*child)) {
+        RenderPlayerName(camera, renderer, *self, *child, position, false);
+      }
+
+      info = info->next;
+    }
+  }
+}
+
+void PlayerManager::RenderPlayerName(Camera& camera, SpriteRenderer& renderer, Player& self, Player& player,
+                                     const Vector2f& position, bool is_decoy) {
+  if (player.ship == 8) return;
+  if (player.position == Vector2f(0, 0)) return;
+
+  u32 tick = GetCurrentTick();
+  u32 self_freq = self.frequency;
+
+  if (!IsPlayerVisible(self, self_freq, player)) return;
+
+  if (player.enter_delay <= 0.0f) {
+    size_t render_ship = player.ship;
+
+    if (player.attach_parent != kInvalidPlayerId) {
+      Player* parent = GetPlayerById(player.attach_parent);
+
+      if (parent && parent->ship != 8) {
+        render_ship = parent->ship;
+      }
+    }
+
+    size_t index = render_ship * 40 + (u8)(player.orientation * 40.0f);
+    Vector2f offset = Graphics::ship_sprites[index].dimensions * (0.5f / 16.0f);
+
+    offset = offset.PixelRounded();
+
+    char display[48];
+
+    bool display_ball = player.ball_carrier && !is_decoy;
+
+    if (player.flags > 0) {
+      sprintf(display, "%s(%d:%d)[%d] %s", player.name, player.bounty, player.flags, player.ping * 10,
+              display_ball ? "(Ball)" : "");
+    } else {
+      sprintf(display, "%s(%d)[%d] %s", player.name, player.bounty, player.ping * 10, display_ball ? "(Ball)" : "");
+    }
+
+    TextColor color = TextColor::Blue;
+
+    if (player.frequency == self_freq) {
+      color = TextColor::Yellow;
+    } else if (player.flags > 0 || (player.ball_carrier && !is_decoy)) {
+      color = TextColor::DarkRed;
+    }
+
+    Vector2f current_position = position.PixelRounded() + offset;
+
+    if (!is_decoy) {
+      if (player.ball_carrier && player.id == player_id &&
+          connection.settings.ShipSettings[player.ship].SoccerBallThrowTimer > 0) {
+        char ball_time_output[16];
+
+        sprintf(ball_time_output, "%.1f", soccer->carry_timer);
+
+        renderer.DrawText(camera, ball_time_output, TextColor::Red, current_position, Layer::Ships);
+        current_position.y += (12.0f / 16.0f);
+      }
+
+      float max_energy = (float)ship_controller->ship.energy;
+
+      if (player.id == player_id && player.energy < max_energy * 0.5f) {
+        TextColor energy_color = player.energy < max_energy * 0.25f ? TextColor::DarkRed : TextColor::Yellow;
+        char energy_output[16];
+        sprintf(energy_output, "%d", (u32)player.energy);
+
+        renderer.DrawText(camera, energy_output, energy_color, current_position, Layer::Ships);
+
+        current_position.y += (12.0f / 16.0f);
+      } else if (player.id != player_id && TICK_DIFF(tick, player.last_extra_timestamp) < kExtraDataTimeout) {
+        char energy_output[16];
+        sprintf(energy_output, "%d", (u32)player.energy);
+        Vector2f energy_p = position.PixelRounded() + Vector2f(-0.5f, offset.y);
+
+        float initial_energy = (float)connection.settings.ShipSettings[player.ship].InitialEnergy;
+        TextColor color = TextColor::Blue;
+
+        if (player.energy < initial_energy / 4.0f) {
+          color = TextColor::DarkRed;
+        } else if (player.energy < initial_energy / 2.0f) {
+          color = TextColor::Yellow;
+        }
+
+        renderer.DrawText(camera, energy_output, color, energy_p, Layer::Ships, TextAlignment::Right);
+      }
+    }
+
+    renderer.DrawText(camera, display, color, current_position.PixelRounded(), Layer::Ships);
+  }
+}
 
 void PlayerManager::SendPositionPacket() {
   u8 data[kMaxPacketSize];

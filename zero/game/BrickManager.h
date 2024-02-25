@@ -53,10 +53,12 @@ struct BrickManager {
   Brick* free = nullptr;
 
   BrickMap brick_map;
+  float animation_t = 0.0f;
 
   BrickManager(MemoryArena& arena, Connection& connection, PlayerManager& player_manager, PacketDispatcher& dispatcher);
 
   void Update(Map& map, u32 frequency, float dt);
+  void Render(Camera& camera, SpriteRenderer& renderer, const Vector2f& surface_dim, u32 frequency);
   void InsertBrick(u16 x, u16 y, u16 team, u16 id, u32 timestamp);
   void Clear();
 

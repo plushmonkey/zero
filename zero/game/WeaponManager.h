@@ -3,6 +3,7 @@
 
 #include <zero/Types.h>
 #include <zero/game/Player.h>
+#include <zero/game/render/Animation.h>
 
 namespace zero {
 
@@ -49,14 +50,19 @@ struct Weapon {
 
   // incremental id for connected multifire bullet
   u32 link_id = kInvalidLink;
+
+  Animation animation;
 };
 
+struct Camera;
 struct Connection;
 struct MemoryArena;
 struct PacketDispatcher;
 struct PlayerManager;
 struct Radar;
 struct ShipController;
+struct SoundSystem;
+struct SpriteRenderer;
 
 enum class WeaponSimulateResult { Continue, WallExplosion, PlayerExplosion, TimedOut };
 
@@ -76,6 +82,7 @@ struct WeaponManager {
 
   Connection& connection;
   PlayerManager& player_manager;
+  AnimationSystem& animation;
   ShipController* ship_controller = nullptr;
   Radar* radar = nullptr;
   u32 next_link_id = 0;
@@ -87,7 +94,7 @@ struct WeaponManager {
   WeaponLinkRemoval link_removals[2048];
 
   WeaponManager(MemoryArena& temp_arena, Connection& connection, PlayerManager& player_manager,
-                PacketDispatcher& dispatcher);
+                PacketDispatcher& dispatcher, AnimationSystem& animation);
 
   void Initialize(ShipController* ship_controller, Radar* radar) {
     this->ship_controller = ship_controller;
@@ -95,6 +102,9 @@ struct WeaponManager {
   }
 
   void Update(float dt);
+  void DropTrail(Weapon& weapon);
+  void Render(Camera& camera, Camera& ui_camera, SpriteRenderer& renderer, float dt,
+              const RadarVisibility& radar_visibility);
 
   int GetWeaponTotalAliveTime(WeaponType type, bool alternate);
 
@@ -115,6 +125,7 @@ struct WeaponManager {
   bool HasLinkRemoved(u32 link_id);
 
   void CreateExplosion(Weapon& weapon);
+  void SetWeaponSprite(Player& player, Weapon& weapon);
 
   u32 CalculateRngSeed(u32 x, u32 y, u32 vel_x, u32 vel_y, u16 shrap_count, u16 weapon_level, u32 frequency);
 
