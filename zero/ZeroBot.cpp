@@ -163,6 +163,26 @@ void ZeroBot::Run() {
 
     game->Render(dt);
 
+#if 0
+    // Line renderer examples.
+    // Push a line using the ui camera.
+    game->line_renderer.PushLine(Vector2f(0, 0), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(512, 512), Vector3f(1.0f, 0.0f, 0.0f));
+    game->line_renderer.Render(game->ui_camera);
+
+    // Loop over players and render a bounding box around them using world camera.
+    for (size_t i = 0; i < game->player_manager.player_count; ++i) {
+      Player* player = game->player_manager.players + i;
+      Vector2f position = player->position;
+
+      if (player->ship >= 8) continue;
+      float radius = game->connection.settings.ShipSettings[player->ship].GetRadius();
+
+      Vector2f half_extents(radius, radius);
+      game->line_renderer.PushRect(player->position - half_extents, player->position + half_extents, Vector3f(0.0f, 1.0f, 0.0f));
+    }
+    game->line_renderer.Render(game->camera);
+#endif
+
     if (game->render_enabled) {
       debug_renderer.Present();
     }

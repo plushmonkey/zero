@@ -15,6 +15,7 @@
 #include <zero/game/net/Connection.h>
 #include <zero/game/net/PacketDispatcher.h>
 #include <zero/game/render/AnimatedTileRenderer.h>
+#include <zero/game/render/LineRenderer.h>
 #include <zero/game/render/SpriteRenderer.h>
 #include <zero/game/render/TileRenderer.h>
 
@@ -78,6 +79,7 @@ struct Game {
   TileRenderer tile_renderer;
   AnimatedTileRenderer animated_tile_renderer;
   SpriteRenderer sprite_renderer;
+  LineRenderer line_renderer;
 
   char arena_name[17] = {};
 

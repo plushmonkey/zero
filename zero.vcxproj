@@ -48,6 +48,7 @@
     <ClCompile Include="zero\game\render\Colors.cpp" />
     <ClCompile Include="zero\game\render\Graphics.cpp" />
     <ClCompile Include="zero\game\render\Image.cpp" />
+    <ClCompile Include="zero\game\render\LineRenderer.cpp" />
     <ClCompile Include="zero\game\render\Shader.cpp" />
     <ClCompile Include="zero\game\render\SpriteRenderer.cpp" />
     <ClCompile Include="zero\game\render\TileRenderer.cpp" />
@@ -118,6 +119,7 @@
     <ClInclude Include="zero\Event.h" />
     <ClInclude Include="zero\game\GameEvent.h" />
     <ClInclude Include="zero\game\Logger.h" />
+    <ClInclude Include="zero\game\render\LineRenderer.h" />
     <ClInclude Include="zero\InfluenceMap.h" />
     <ClInclude Include="zero\game\render\AnimatedTileRenderer.h" />
     <ClInclude Include="zero\game\render\Animation.h" />

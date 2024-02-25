@@ -269,6 +269,7 @@ GameInitializeResult Game::Initialize(InputState& input) {
   if (render_enabled) {
     if (sprite_renderer.Initialize(perm_arena)) {
       if (Graphics::Initialize(sprite_renderer)) {
+        line_renderer.Initialize();
         return GameInitializeResult::Full;
       } else {
         Log(LogLevel::Error, "Failed to initialize graphics. Debug display disabled.");
