@@ -99,6 +99,10 @@ void LineRenderer::PushRect(const Vector2f& start, const Vector2f& end, const Ve
 
 void LineRenderer::Render(Camera& camera) {
   if (lines.empty()) return;
+  if (shader.program == -1) {
+    lines.clear();
+    return;
+  }
 
   glUseProgram(shader.program);
   glBindVertexArray(vao);
