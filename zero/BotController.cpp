@@ -39,6 +39,9 @@ void BotController::Update(RenderContext& rc, float dt, InputState& input, behav
 
   steering.Reset();
 
+  execute_ctx.blackboard.Set("world_camera", game.camera);
+  execute_ctx.blackboard.Set("ui_camera", game.ui_camera);
+
   Event::Dispatch(UpdateEvent(*this, execute_ctx));
 
   static behavior::TreePrinter tree_printer;

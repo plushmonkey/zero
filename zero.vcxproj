@@ -35,6 +35,7 @@
     <ClCompile Include="lib\glfw\src\win32_time.cpp" />
     <ClCompile Include="lib\glfw\src\win32_window.cpp" />
     <ClCompile Include="lib\glfw\src\window.cpp" />
+    <ClCompile Include="zero\Actuator.cpp" />
     <ClCompile Include="zero\behavior\BehaviorBuilder.cpp" />
     <ClCompile Include="zero\behavior\BehaviorTree.cpp" />
     <ClCompile Include="zero\BotController.cpp" />
@@ -107,6 +108,7 @@
     <ClInclude Include="zero\behavior\nodes\PlayerNode.h" />
     <ClInclude Include="zero\behavior\nodes\PowerballNode.h" />
     <ClInclude Include="zero\behavior\nodes\RegionNode.h" />
+    <ClInclude Include="zero\behavior\nodes\RenderNode.h" />
     <ClInclude Include="zero\behavior\nodes\ShipNode.h" />
     <ClInclude Include="zero\behavior\nodes\TargetNode.h" />
     <ClInclude Include="zero\behavior\nodes\ThreatNode.h" />

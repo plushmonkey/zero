@@ -91,8 +91,10 @@ struct LineRenderer {
   bool Initialize();
 
   void PushLine(const Vector2f& start, const Vector3f& start_color, const Vector2f& end, const Vector3f& end_color);
+  void PushLine(const LineSegment& line, const Vector3f& color);
   void PushCross(const Vector2f& start, const Vector3f& color, float size = 1.0f);
   void PushRect(const Vector2f& start, const Vector2f& end, const Vector3f& color);
+  void PushRect(const Rectangle& rect, const Vector3f& color);
   void Render(Camera& camera);
 };
 

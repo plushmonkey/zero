@@ -11,15 +11,28 @@
 #include <zero/behavior/nodes/PlayerNode.h>
 #include <zero/behavior/nodes/PowerballNode.h>
 #include <zero/behavior/nodes/RegionNode.h>
+#include <zero/behavior/nodes/RenderNode.h>
 #include <zero/behavior/nodes/ShipNode.h>
 #include <zero/behavior/nodes/TargetNode.h>
 #include <zero/behavior/nodes/ThreatNode.h>
 #include <zero/behavior/nodes/TimerNode.h>
 #include <zero/behavior/nodes/WaypointNode.h>
 
+#include <format>
+
 namespace zero {
 namespace hyperspace {
 
+// This tree will generate a territory position around the current target that it tries to stay near.
+// It uses weapon trajectories to determine the threat to self and territory position.
+// If it finds the territory is threatened enough, it will generate a new one around the target and path to it.
+//
+// Debug display:
+//   The yellow line is the trajectory of self's potential bullet shot.
+//   Green rect is the generated territory bounds.
+//   Red rect is the current aimshot.
+//   Self threat is rendered with the ui camera.
+//   Territory threat is rendered at the territory.
 std::unique_ptr<behavior::BehaviorNode> CenterBehavior::CreateTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
@@ -58,7 +71,17 @@ std::unique_ptr<behavior::BehaviorNode> CenterBehavior::CreateTree(behavior::Exe
                                     .Child<FindTerritoryPosition>("nearest_target", "leash_distance", "territory_position")
                                     .Sequence(CompositeDecorator::Success)
                                         .Child<PositionThreatQueryNode>("self_position", "self_threat", 8.0f, 3.0f)
+                                        .Child<RenderTextNode>("ui_camera", Vector2f(512, 600), [](ExecuteContext& ctx) {
+                                          std::string str = std::format("Self threat: {}", ctx.blackboard.ValueOr<float>("self_threat", 0.0f));
+
+                                          return RenderTextNode::Request(str, TextColor::White, Layer::TopMost, TextAlignment::Center);
+                                        })
                                         .Child<PositionThreatQueryNode>("territory_position", "territory_threat", 8.0f, 3.0f)
+                                        .Child<RenderTextNode>("world_camera", "territory_position", [](ExecuteContext& ctx) {
+                                          std::string str = std::format("Threat: {}", ctx.blackboard.ValueOr<float>("territory_threat", 0.0f));
+
+                                          return RenderTextNode::Request(str, TextColor::White, Layer::TopMost, TextAlignment::Center);
+                                        })
                                         .Child<ScalarThresholdNode<float>>("territory_threat", 0.2f)
                                         .Child<FindTerritoryPosition>("nearest_target", "leash_distance", "territory_position", true)
                                         .End()
@@ -67,17 +90,22 @@ std::unique_ptr<behavior::BehaviorNode> CenterBehavior::CreateTree(behavior::Exe
                                         .Child<FaceNode>("aimshot")
                                         .End()
                                     .Child<ArriveNode>("territory_position", 25.0f)
+                                    .Child<RectangleNode>("territory_position", Vector2f(2.0f, 2.0f), "territory_rect")
+                                    .Child<RenderRectNode>("world_camera", "territory_rect", Vector3f(0.0f, 1.0f, 0.0f))
                                     .End()
                                 .Sequence()
                                     .Child<FaceNode>("aimshot")
                                     .Child<SeekNode>("aimshot", "leash_distance")
                                     .End()
                                 .End()
-                            .Sequence(CompositeDecorator::Success)
+                            .Sequence(CompositeDecorator::Success) // Determine if a shot should be fired by using weapon trajectory and bounding boxes.
                                 .InvertChild<TileQueryNode>(kTileSafeId)
                                 .Child<ShotVelocityQueryNode>(WeaponType::Bullet, "bullet_fire_velocity")
                                 .Child<RayNode>("self_position", "bullet_fire_velocity", "bullet_fire_ray")
                                 .Child<PlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 3.0f)
+                                .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
+                                .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
+                                .Child<RenderRayNode>("world_camera", "bullet_fire_ray", 50.0f, Vector3f(1.0f, 1.0f, 0.0f))
                                 .Child<RayRectangleInterceptNode>("bullet_fire_ray", "target_bounds")
                                 .Child<InputActionNode>(InputAction::Bullet)
                                 .End()

@@ -4,6 +4,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <memory>
 #include <string_view>
 #include <vector>
@@ -116,6 +117,17 @@ class InvertNode : public BehaviorNode {
   void Child(std::unique_ptr<BehaviorNode> child) { child_ = std::move(child); }
 
   std::unique_ptr<BehaviorNode> child_;
+};
+
+// Generic execution node that will execute any function that matches the required signature.
+struct ExecuteNode : public BehaviorNode {
+  using Func = ExecuteResult(ExecuteContext&);
+
+  ExecuteNode(Func func) : func(func) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override { return func(ctx); }
+
+  std::function<Func> func;
 };
 
 }  // namespace behavior
