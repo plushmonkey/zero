@@ -9,8 +9,8 @@
 #include <chrono>
 
 #define CREATE_RENDER_WINDOW 0
-#define SURFACE_WIDTH 1360
-#define SURFACE_HEIGHT 768
+#define SURFACE_WIDTH 1152
+#define SURFACE_HEIGHT 648
 
 //
 

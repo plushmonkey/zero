@@ -11,11 +11,14 @@
 #include <zero/behavior/nodes/PlayerNode.h>
 #include <zero/behavior/nodes/PowerballNode.h>
 #include <zero/behavior/nodes/RegionNode.h>
+#include <zero/behavior/nodes/RenderNode.h>
 #include <zero/behavior/nodes/ShipNode.h>
 #include <zero/behavior/nodes/TargetNode.h>
 #include <zero/behavior/nodes/ThreatNode.h>
 #include <zero/behavior/nodes/TimerNode.h>
 #include <zero/behavior/nodes/WaypointNode.h>
+
+#include <format>
 
 namespace zero {
 namespace mg {
@@ -63,6 +66,11 @@ std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::Execu
                                     .Sequence(CompositeDecorator::Success)
                                         .Child<PositionThreatQueryNode>("self_position", "self_threat", 15.0f, 2.25f)
                                         .Child<PositionThreatQueryNode>("territory_position", "territory_threat", 15.0f, 2.25f)
+                                        .Child<RenderTextNode>("world_camera", "territory_position", [](ExecuteContext& ctx) {
+                                          std::string str = std::format("Threat: {}", ctx.blackboard.ValueOr<float>("territory_threat", 0.0f));
+
+                                          return RenderTextNode::Request(str, TextColor::White, Layer::TopMost, TextAlignment::Center);
+                                        })
                                         .Child<ScalarThresholdNode<float>>("territory_threat", 0.2f)
                                         .Child<FindTerritoryPosition>("nearest_target", "leash_distance", "territory_position", true)
                                         .End()
@@ -71,6 +79,8 @@ std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::Execu
                                         .Child<VectorNode>("aimshot", "face_position")
                                         .End()
                                     .Child<ArriveNode>("territory_position", 15.0f)
+                                    .Child<RectangleNode>("territory_position", Vector2f(2.0f, 2.0f), "territory_rect")
+                                    .Child<RenderRectNode>("world_camera", "territory_rect", Vector3f(0.0f, 1.0f, 0.0f))
                                     .End()                            
                                 .Sequence()
                                     .Child<VectorNode>("aimshot", "face_position")
@@ -82,7 +92,10 @@ std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::Execu
                                 .Sequence()
                                     .Child<ShotVelocityQueryNode>(WeaponType::Bomb, "bomb_fire_velocity")
                                     .Child<RayNode>("self_position", "bomb_fire_velocity", "bomb_fire_ray")
-                                    .Child<PlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 2.5f)
+                                    .Child<PlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 1.5f)
+                                    .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
+                                    .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
+                                    .Child<RenderRayNode>("world_camera", "bomb_fire_ray", 50.0f, Vector3f(1.0f, 1.0f, 0.0f))
                                     .Child<RayRectangleInterceptNode>("bomb_fire_ray", "target_bounds")
                                     .Child<InputActionNode>(InputAction::Bomb)
                                     .End()
