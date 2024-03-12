@@ -6,8 +6,16 @@ Connecting to SSC zones requires cryptinuum security solver service unless you h
 
 Without the security solver, you can connect to asss zones that are using `enc_null` module and `Security::SecurityKickoff` to set 0 or by using `CAP_BYPASS_SECURITY`.
 
-The bot can be changed to VIE encryption in `game/Settings.h` by changing the encrypt_method to `EncryptMethod encrypt_method = EncryptMethod::Subspace;`.
-This will allow you to connect to `enc_vie` zones.
+Set `Encryption = Subspace` in the config file to use VIE encryption.
+
+## Config
+1. Copy `zero.cfg.dist` to `zero.cfg`
+2. Open `zero.cfg` and modify the login details.
+
+Config file order:
+1. Command line first argument `./zero.exe mybot.cfg`
+2. `zero.cfg` if nothing is specified on command line.
+3. `zero.cfg.dist` if `zero.cfg` was not found.
 
 ## Building
 ### Getting source
@@ -26,11 +34,6 @@ This will allow you to connect to `enc_vie` zones.
 4. `cmake -B build -S .`
 5. `cd build`
 6. `make -j 12`
-
-### Config
-1. Open `main.cpp`
-2. Set `kServerIndex` to index into one of the servers listed in `kServers` list.
-3. Set `kLoginName` and `kLoginPassword` to the login details.
 
 ### Debug renderer
 1. Open `ZeroBot.cpp`

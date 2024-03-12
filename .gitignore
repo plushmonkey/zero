@@ -39,3 +39,4 @@ local.properties
 *.bm2
 *.wa2
 graphics
+*.cfg

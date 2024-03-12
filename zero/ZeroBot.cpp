@@ -103,7 +103,7 @@ bool ZeroBot::JoinZone(ServerInfo& server) {
   }
 #endif
 
-  ConnectResult result = game->connection.Connect(server.ipaddr, server.port);
+  ConnectResult result = game->connection.Connect(server.ipaddr.data(), server.port);
 
   if (result != ConnectResult::Success) {
     Log(LogLevel::Error, "Failed to connect. Error: %d", (int)result);

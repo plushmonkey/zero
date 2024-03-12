@@ -9,6 +9,7 @@
 #include <zero/game/Memory.h>
 
 #include <memory>
+#include <string>
 
 namespace zero {
 
@@ -41,8 +42,8 @@ inline const char* to_string(Zone zone) {
 }
 
 struct ServerInfo {
-  const char* name;
-  const char* ipaddr;
+  std::string name;
+  std::string ipaddr;
   u16 port;
 
   Zone zone = Zone::Unknown;

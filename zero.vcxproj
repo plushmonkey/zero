@@ -41,6 +41,7 @@
     <ClCompile Include="zero\BotController.cpp" />
     <ClCompile Include="zero\ChatQueue.cpp" />
     <ClCompile Include="zero\commands\CommandSystem.cpp" />
+    <ClCompile Include="zero\Config.cpp" />
     <ClCompile Include="zero\DebugRenderer.cpp" />
     <ClCompile Include="zero\game\Logger.cpp" />
     <ClCompile Include="zero\game\render\AnimatedTileRenderer.cpp" />
@@ -117,6 +118,7 @@
     <ClInclude Include="zero\BotController.h" />
     <ClInclude Include="zero\ChatQueue.h" />
     <ClInclude Include="zero\commands\CommandSystem.h" />
+    <ClInclude Include="zero\Config.h" />
     <ClInclude Include="zero\DebugRenderer.h" />
     <ClInclude Include="zero\Event.h" />
     <ClInclude Include="zero\game\GameEvent.h" />
