@@ -26,39 +26,40 @@ std::unique_ptr<behavior::BehaviorNode> CreateTransactionTree(behavior::ExecuteC
   Rectangle center_safe_rect(Vector2f(503, 503), Vector2f(520, 520));
   Rectangle depot_safe_rect(Vector2f(433, 345), Vector2f(437, 349));
 
+  const char* store_key = TransactionNodeType::State::StoreKey();
   // clang-format off
   builder
     .Selector()
         .Sequence()
-            .Child<ValueCompareQuery<Store>>(TransactionNodeType::State::StoreKey(), Store::Center)
-            .Child<PlayerPositionQueryNode>("self_position")
+            .template Child<ValueCompareQuery<Store>>(store_key, Store::Center)
+            .template Child<PlayerPositionQueryNode>("self_position")
             .Sequence(CompositeDecorator::Success)
-                .Child<DistanceNode>(center, "self_position", "to_center_dist", true)
-                .Child<ScalarThresholdNode<float>>("to_center_dist", 32.0f * 32.0f)
-                .Child<WarpNode>() // Keep trying to warp to center if not near center
+                .template Child<DistanceNode>(center, "self_position", "to_center_dist", true)
+                .template Child<ScalarThresholdNode<float>>("to_center_dist", 32.0f * 32.0f)
+                .template Child<WarpNode>() // Keep trying to warp to center if not near center
                 .End()
             .Sequence(CompositeDecorator::Success) // Try to move toward center in case it can reach it before energy is full.
-                .Child<RegionContainQueryNode>(center)
-                .Child<GoToNode>(center)
+                .template Child<RegionContainQueryNode>(center)
+                .template Child<GoToNode>(center)
                 .End()
-            .Child<RectangleContainsNode>(center_safe_rect, "self_position") // Check if we are in the center safe
-            .Child<InputActionNode>(InputAction::Bullet) // Stop moving in the safe
-            .Child<TransactionNodeType>() // Execute the buy/sell node
+            .template Child<RectangleContainsNode>(center_safe_rect, "self_position") // Check if we are in the center safe
+            .template Child<InputActionNode>(InputAction::Bullet) // Stop moving in the safe
+            .template Child<TransactionNodeType>() // Execute the buy/sell node
             .End()
         .Sequence()
-            .Child<ValueCompareQuery<Store>>(TransactionNodeType::State::StoreKey(), Store::Depot)
-            .Child<PlayerPositionQueryNode>("self_position")
+            .template Child<ValueCompareQuery<Store>>(store_key, Store::Depot)
+            .template Child<PlayerPositionQueryNode>("self_position")
             .Sequence(CompositeDecorator::Success)
                 .Selector()
                     .Sequence()
-                        .InvertChild<RegionContainQueryNode>(center)
-                        .Child<WarpNode>() // Warp to center if not in center
+                        .template InvertChild<RegionContainQueryNode>(center)
+                        .template Child<WarpNode>() // Warp to center if not in center
                         .End()
                     .Sequence()
-                        .Child<GoToNode>(depot_position)
-                        .Child<RectangleContainsNode>(depot_safe_rect, "self_position") // Check if we are in the depot safe
-                        .Child<InputActionNode>(InputAction::Bullet) // Stop moving in the safe
-                        .Child<TransactionNodeType>() // Execute the buy/sell node
+                        .template Child<GoToNode>(depot_position)
+                        .template Child<RectangleContainsNode>(depot_safe_rect, "self_position") // Check if we are in the depot safe
+                        .template Child<InputActionNode>(InputAction::Bullet) // Stop moving in the safe
+                        .template Child<TransactionNodeType>() // Execute the buy/sell node
                         .End()
                     .End()
                 .End()

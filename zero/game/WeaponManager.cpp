@@ -1102,6 +1102,8 @@ int GetEstimatedWeaponDamage(Weapon& weapon, Connection& connection) {
     case WeaponType::Burst: {
       damage = connection.settings.BurstDamageLevel;
     } break;
+    default: {
+    } break;
   }
 
   return damage;

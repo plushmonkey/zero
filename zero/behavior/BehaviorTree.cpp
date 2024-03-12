@@ -47,7 +47,8 @@ void Print(std::unique_ptr<BehaviorNode>& node) {
     if (IsNodeType<SuccessNode>(node)) return;
     if (IsNodeType<InvertNode>(node)) return;
 
-    const char* type_name = typeid(*node.get()).name();
+    auto raw_node = node.get();
+    const char* type_name = typeid(*raw_node).name();
     int type_name_len = (int)strlen(type_name);
     int first_index = 0;
 

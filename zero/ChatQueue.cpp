@@ -71,6 +71,8 @@ void ChatQueue::HandleEvent(const ChatQueueEvent& event) {
     case ChatType::OtherTeam: {
       SendFrequency(event.frequency, event.message);
     } break;
+    default: {
+    } break;
   }
 }
 

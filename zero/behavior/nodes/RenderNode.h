@@ -122,12 +122,12 @@ struct RenderLineNode : public BehaviorNode {
 struct RenderRayNode : public BehaviorNode {
   RenderRayNode(const char* camera_key, const char* ray_key, float length, const Vector3f& color)
       : camera_key(camera_key), ray_key(ray_key), length(length), color(color) {}
-  RenderRayNode(const char* camera_name, const Ray& ray, float length, const Vector3f& color)
+  RenderRayNode(const char* camera_key, const Ray& ray, float length, const Vector3f& color)
       : camera_key(camera_key), ray(ray), length(length), color(color) {}
 
   RenderRayNode(const char* camera_key, const char* ray_key, const char* length_key, const Vector3f& color)
       : camera_key(camera_key), ray_key(ray_key), length_key(length_key), color(color) {}
-  RenderRayNode(const char* camera_name, const Ray& ray, const char* length_key, const Vector3f& color)
+  RenderRayNode(const char* camera_key, const Ray& ray, const char* length_key, const Vector3f& color)
       : camera_key(camera_key), ray(ray), length_key(length_key), color(color) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {

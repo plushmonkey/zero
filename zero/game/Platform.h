@@ -1,4 +1,4 @@
-#ifndef ZEOR_PLATFORM_H_
+#ifndef ZERO_PLATFORM_H_
 #define ZERO_PLATFORM_H_
 
 #include <stdlib.h>

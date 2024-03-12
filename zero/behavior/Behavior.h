@@ -9,6 +9,7 @@ namespace zero {
 namespace behavior {
 
 struct Behavior {
+  virtual ~Behavior() {}
   virtual void OnInitialize(ExecuteContext& ctx) = 0;
   virtual std::unique_ptr<BehaviorNode> CreateTree(ExecuteContext& ctx) = 0;
 };

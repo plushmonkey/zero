@@ -1,5 +1,5 @@
 #ifndef ZERO_NET_SECURITY_SECURITYSOLVER_H_
-#define ZERo_NET_SECURITY_SECURITYSOLVER_H_
+#define ZERO_NET_SECURITY_SECURITYSOLVER_H_
 
 #include <zero/Types.h>
 #include <zero/game/WorkQueue.h>

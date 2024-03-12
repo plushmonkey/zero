@@ -4,6 +4,7 @@
 #include <zero/Types.h>
 #include <zero/game/Memory.h>
 
+#include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
@@ -28,7 +29,7 @@ struct Work {
 
 struct WorkQueue {
   MemoryArena& arena;
-  volatile size_t queue_size;
+  std::atomic<int> queue_size;
   Work* queue;
 
   Work* free;

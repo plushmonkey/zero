@@ -54,6 +54,7 @@ struct ExecuteContext {
 
 class BehaviorNode {
  public:
+  virtual ~BehaviorNode() {}
   virtual ExecuteResult Execute(ExecuteContext& ctx) = 0;
 };
 

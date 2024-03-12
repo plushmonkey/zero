@@ -31,6 +31,8 @@ struct ShipWeaponCooldownQueryNode : public BehaviorNode {
       case WeaponType::Repel: {
         cooldown_tick = ctx.bot->game->ship_controller.ship.next_repel_tick;
       } break;
+      default: {
+      } break;
     }
 
     return TICK_GT(cooldown_tick, current_tick) ? ExecuteResult::Success : ExecuteResult::Failure;
