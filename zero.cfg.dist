@@ -18,5 +18,7 @@ MetalGear = 69.164.220.203:14000
 ExtremeGames = 208.118.63.35:7900
 
 [Debug]
+# Set this to 1 to display a window with the game rendered. This requires the graphics folder from Continuum.
 RenderWindow = 0
+# Set this to 1 to render a text display of the execution path for the behavior tree.
 RenderBehaviorTree = 0

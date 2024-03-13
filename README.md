@@ -32,13 +32,11 @@ Config file order:
 1. Install GLFW3 development libraries (`sudo apt-get install libglfw3-dev` on Ubuntu)
 2. Install cmake
 3. Open terminal in zero directory
-4. `cmake -B build -S .`
+4. `cmake -DCMAKE_BUILD_TYPE=Release -B build -S .`
 5. `cd build`
 6. `make -j 12`
 7. `cp ../zero.cfg.dist zero.cfg`
 
 ### Debug renderer
-1. Open `ZeroBot.cpp`
-2. Change `CREATE_RENDER_WINDOW` to 1
-3. Debugging the behavior tree execution path can be done in `BotController.cpp` by setting `should_print` to true.
-
+1. Copy Continuum's graphics folder to the folder where you're running zero.
+2. Change config file to enable `RenderWindow`.
