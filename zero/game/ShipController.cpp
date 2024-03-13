@@ -804,7 +804,6 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
   memset(&self.weapon, 0, sizeof(self.weapon));
 }
 
-
 void ShipController::Render(Camera& ui_camera, Camera& camera, SpriteRenderer& renderer) {
   Player* self = player_manager.GetSelf();
 
@@ -862,13 +861,13 @@ void ShipController::Render(Camera& ui_camera, Camera& camera, SpriteRenderer& r
 }
 
 inline void RenderTimedIndicator(Camera& ui_camera, SpriteRenderer& renderer, Animation* animation, float y,
-  float duration, TextColor color, bool percent = false) {
+                                 float duration, TextColor color, bool percent = false) {
   SpriteRenderable& renderable = animation->GetFrame();
   Vector2f position(ui_camera.surface_dim.x - renderable.dimensions.x, y - renderable.dimensions.y * 0.5f);
 
   renderer.Draw(ui_camera, renderable, position, Layer::Gauges);
 
-  char duration_text[16] = { 0 };
+  char duration_text[16] = {0};
 
   if (percent) {
     sprintf(duration_text, "%d%%", (u32)(duration * 100.0f));
@@ -888,7 +887,7 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
     constexpr float kPortalIndicatorY = 133;
 
     RenderTimedIndicator(ui_camera, renderer, &portal_animation, kPortalIndicatorY, ship.portal_time,
-      TextColor::Yellow);
+                         TextColor::Yellow);
   }
 
   if (ship.super_time > 0.0f) {
@@ -1007,7 +1006,7 @@ void ShipController::RenderEnergyDisplay(Camera& ui_camera, SpriteRenderer& rend
   SpriteRenderable top_display = Graphics::anim_health_high.frames[0];
 
   float ship_energy_percent =
-    (float)ship.energy / player_manager.connection.settings.ShipSettings[self->ship].MaximumEnergy;
+      (float)ship.energy / player_manager.connection.settings.ShipSettings[self->ship].MaximumEnergy;
 
   top_display.dimensions = Vector2f(ship_energy_percent * 240, 2);
 
@@ -1038,7 +1037,7 @@ void ShipController::RenderEnergyDisplay(Camera& ui_camera, SpriteRenderer& rend
 }
 
 void ShipController::RenderItemIndicator(Camera& ui_camera, SpriteRenderer& renderer, int value, size_t index,
-  float* y) {
+                                         float* y) {
   if (value > 0) {
     renderer.Draw(ui_camera, Graphics::icon_sprites[index], Vector2f(0, *y), Layer::Gauges);
 
@@ -1190,6 +1189,26 @@ void ShipController::ApplyPrize(Player* self, s32 prize_id, bool notify, bool da
   bool display_notification = false;
 
   switch (prize) {
+    case Prize::None: {
+      if (!negative) {
+        for (u16 attempts = 0; attempts < 9999; ++attempts) {
+          s32 random_prize = GeneratePrize(false);
+
+          if (random_prize == 0 || random_prize == (s32)Prize::EngineShutdown || random_prize == (s32)Prize::Shields ||
+              random_prize == (s32)Prize::Super || random_prize == (s32)Prize::Multiprize ||
+              random_prize == (s32)Prize::Warp) {
+            continue;
+          }
+
+          u16 bounty = self->bounty;
+          ApplyPrize(self, random_prize, false, false);
+          self->bounty = bounty;
+          break;
+        }
+
+        display_notification = false;
+      }
+    } break;
     case Prize::Recharge: {
       display_notification = true;
 

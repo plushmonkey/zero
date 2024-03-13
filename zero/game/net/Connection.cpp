@@ -296,7 +296,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
           u8 type;
           u32 received_timestamp;
           u32 local_timestamp;
-        } sync_response = {0x00, 0x06, timestamp, timestamp};
+        } sync_response = {0x00, 0x06, timestamp, GetCurrentTick()};
 #pragma pack(pop)
 
         Send((u8*)&sync_response, sizeof(sync_response));
