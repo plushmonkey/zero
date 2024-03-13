@@ -14,7 +14,7 @@ namespace zero {
 namespace hyperspace {
 
 struct HyperspaceController : ZoneController {
-  bool IsZone(Zone zone) override { return zone == Zone::Hyperspace || zone == Zone::Local; }
+  bool IsZone(Zone zone) override { return zone == Zone::Hyperspace || zone == Zone::Local || zone == Zone::Subgame; }
 
   void CreateBehaviors(const char* arena_name) override;
 
