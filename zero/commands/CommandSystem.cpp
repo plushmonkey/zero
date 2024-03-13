@@ -7,8 +7,6 @@
 #include <zero/game/Game.h>
 #include <zero/game/net/PacketDispatcher.h>
 
-#include <format>
-
 namespace zero {
 
 constexpr int kArenaSecurityLevel = 5;
@@ -20,7 +18,7 @@ class BehaviorsCommand : public CommandExecutor {
     Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
     if (!player) return;
 
-    std::string current = std::format("Current: {}", bot.bot_controller->behavior_name);
+    std::string current = std::string("Current: ") + bot.bot_controller->behavior_name;
     Event::Dispatch(ChatQueueEvent::Private(player->name, current.data()));
 
     auto& map = bot.bot_controller->behaviors.behaviors;
@@ -53,10 +51,10 @@ class BehaviorsCommand : public CommandExecutor {
   }
 
   CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags)  override {}
-  std::vector<std::string> GetAliases()  override { return {"behaviors"}; }
-  std::string GetDescription()  override { return "Lists all possible behaviors."; }
-  int GetSecurityLevel()  override { return 0; }
+  void SetAccess(CommandAccessFlags flags) override {}
+  std::vector<std::string> GetAliases() override { return {"behaviors"}; }
+  std::string GetDescription() override { return "Lists all possible behaviors."; }
+  int GetSecurityLevel() override { return 0; }
 };
 
 class BehaviorCommand : public CommandExecutor {
@@ -66,7 +64,7 @@ class BehaviorCommand : public CommandExecutor {
     bool success = false;
 
     if (arg.empty()) {
-      std::string current = std::format("Current: {}", bot.bot_controller->behavior_name);
+      std::string current = std::string("Current: ") + bot.bot_controller->behavior_name;
       Event::Dispatch(ChatQueueEvent::Private(player->name, current.data()));
       return;
     }
@@ -91,20 +89,21 @@ class BehaviorCommand : public CommandExecutor {
 
     if (player) {
       if (success) {
-        std::string response = std::format("Behavior set to '{}'.", arg);
+        std::string response = std::string("Behavior set to '") + arg + "'.";
         Event::Dispatch(ChatQueueEvent::Private(player->name, response.data()));
       } else {
-        std::string response = std::format("Failed to find behavior '{}'. PM !behaviors to see the full list.", arg);
+        std::string response =
+            std::string("Failed to find behavior '") + arg + "'. PM !behaviors to see the full list.";
         Event::Dispatch(ChatQueueEvent::Private(player->name, response.data()));
       }
     }
   }
 
-  CommandAccessFlags GetAccess()  override { return CommandAccess_Public | CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags)  override {}
-  std::vector<std::string> GetAliases()  override { return {"behavior", "b"}; }
-  std::string GetDescription()  override { return "Sets the active behavior."; }
-  int GetSecurityLevel()  override { return 0; }
+  CommandAccessFlags GetAccess() override { return CommandAccess_Public | CommandAccess_Private; }
+  void SetAccess(CommandAccessFlags flags) override {}
+  std::vector<std::string> GetAliases() override { return {"behavior", "b"}; }
+  std::string GetDescription() override { return "Sets the active behavior."; }
+  int GetSecurityLevel() override { return 0; }
 };
 
 class SayCommand : public CommandExecutor {
@@ -129,9 +128,9 @@ class SayCommand : public CommandExecutor {
 
   CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
   void SetAccess(CommandAccessFlags flags) override { return; }
-  std::vector<std::string> GetAliases()  override { return {"say"}; }
-  std::string GetDescription()  override { return "Repeats a message publicly"; }
-  int GetSecurityLevel()  override { return 10; }
+  std::vector<std::string> GetAliases() override { return {"say"}; }
+  std::string GetDescription() override { return "Repeats a message publicly"; }
+  int GetSecurityLevel() override { return 10; }
 };
 
 class GoCommand : public CommandExecutor {
@@ -167,11 +166,11 @@ class GoCommand : public CommandExecutor {
     }
   }
 
-  CommandAccessFlags GetAccess()  override { return CommandAccess_Public | CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags)  override { return; }
-  std::vector<std::string> GetAliases()  override { return {"go"}; }
-  std::string GetDescription()  override { return "Moves to another arena."; }
-  int GetSecurityLevel()  override { return 5; }
+  CommandAccessFlags GetAccess() override { return CommandAccess_Public | CommandAccess_Private; }
+  void SetAccess(CommandAccessFlags flags) override { return; }
+  std::vector<std::string> GetAliases() override { return {"go"}; }
+  std::string GetDescription() override { return "Moves to another arena."; }
+  int GetSecurityLevel() override { return 5; }
 };
 
 class ZoneCommand : public CommandExecutor {
@@ -190,11 +189,11 @@ class ZoneCommand : public CommandExecutor {
     Event::Dispatch(ChatQueueEvent::Private(player->name, zone_message));
   }
 
-  CommandAccessFlags GetAccess()  override { return CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags)  override { return; }
-  std::vector<std::string> GetAliases()  override { return {"zone", "z"}; }
-  std::string GetDescription()  override { return "Prints current zone"; }
-  int GetSecurityLevel()  override { return 0; }
+  CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
+  void SetAccess(CommandAccessFlags flags) override { return; }
+  std::vector<std::string> GetAliases() override { return {"zone", "z"}; }
+  std::string GetDescription() override { return "Prints current zone"; }
+  int GetSecurityLevel() override { return 0; }
 };
 
 class SetShipCommand : public CommandExecutor {
@@ -233,11 +232,11 @@ class SetShipCommand : public CommandExecutor {
     Event::Dispatch(ChatQueueEvent::Private(player.name, "Usage: !setship [shipNum 1-9]"));
   }
 
-  CommandAccessFlags GetAccess()  override { return CommandAccess_Private | CommandAccess_Public; }
-  void SetAccess(CommandAccessFlags flags)  override { return; }
-  std::vector<std::string> GetAliases()  override { return {"setship", "ss"}; }
-  std::string GetDescription()  override { return "Sets the ship"; }
-  int GetSecurityLevel()  override { return 5; }
+  CommandAccessFlags GetAccess() override { return CommandAccess_Private | CommandAccess_Public; }
+  void SetAccess(CommandAccessFlags flags) override { return; }
+  std::vector<std::string> GetAliases() override { return {"setship", "ss"}; }
+  std::string GetDescription() override { return "Sets the ship"; }
+  int GetSecurityLevel() override { return 5; }
 };
 
 class HelpCommand : public CommandExecutor {
@@ -250,15 +249,15 @@ class HelpCommand : public CommandExecutor {
 
     Event::Dispatch(ChatQueueEvent::Private(player->name, "-- !commands {.c} -- see command list (pm)"));
     Event::Dispatch(ChatQueueEvent::Private(player->name, "Code: https://github.com/plushmonkey/zero"));
-    auto owner_msg = std::format("Owner: {}", kOwner);
+    auto owner_msg = std::string("Owner: ") + kOwner;
     Event::Dispatch(ChatQueueEvent::Private(player->name, owner_msg.data()));
   }
 
-  CommandAccessFlags GetAccess()  override { return CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags)  override { return; }
+  CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
+  void SetAccess(CommandAccessFlags flags) override { return; }
   std::vector<std::string> GetAliases() override { return {"help", "h"}; }
-  std::string GetDescription()  override { return "Helps"; }
-  int GetSecurityLevel()  override { return 0; }
+  std::string GetDescription() override { return "Helps"; }
+  int GetSecurityLevel() override { return 0; }
 };
 
 class CommandsCommand : public CommandExecutor {
@@ -324,11 +323,11 @@ class CommandsCommand : public CommandExecutor {
     }
   }
 
-  CommandAccessFlags GetAccess()  override { return CommandAccess_Private; }
+  CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
   void SetAccess(CommandAccessFlags flags) override { return; }
   std::vector<std::string> GetAliases() override { return {"commands", "c"}; }
-  std::string GetDescription()  override { return "Shows available commands"; }
-  int GetSecurityLevel()  override { return 0; }
+  std::string GetDescription() override { return "Shows available commands"; }
+  int GetSecurityLevel() override { return 0; }
 };
 
 std::string Lowercase(std::string_view str) {

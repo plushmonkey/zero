@@ -6,8 +6,6 @@
 #include <zero/game/Clock.h>
 #include <zero/game/Logger.h>
 
-#include <format>
-
 namespace zero {
 namespace hyperspace {
 
@@ -58,25 +56,23 @@ struct CommandTypeQuery : public behavior::BehaviorNode {
 
 template <CommandType command_type, size_t store_prefix_size>
 struct ItemTransactionNode : public behavior::BehaviorNode {
-  static constexpr const char* kMatchVector[] = {
-      "You purchased ",
-      "You sold ",
-      "You cannot buy item",
-      "You cannot sell item",
-      "No item ",
-      "You do not have enough free",
-      "No items can be loaded onto a",
-      "You cannot buy or sell items",
-      "Too many partial matches!",
-      "You may only have",
-      "more experience to buy item",
-      "You do not have enough money to ",
-      "is not for sale",
-      "is not allowed on a",
-      "You do not have any of item",
-      "You do not have that many of item",
-      "cannot be sold."
-  };
+  static constexpr const char* kMatchVector[] = {"You purchased ",
+                                                 "You sold ",
+                                                 "You cannot buy item",
+                                                 "You cannot sell item",
+                                                 "No item ",
+                                                 "You do not have enough free",
+                                                 "No items can be loaded onto a",
+                                                 "You cannot buy or sell items",
+                                                 "Too many partial matches!",
+                                                 "You may only have",
+                                                 "more experience to buy item",
+                                                 "You do not have enough money to ",
+                                                 "is not for sale",
+                                                 "is not allowed on a",
+                                                 "You do not have any of item",
+                                                 "You do not have that many of item",
+                                                 "cannot be sold."};
 
   enum class ResponseType {
     Failure,
@@ -112,7 +108,7 @@ struct ItemTransactionNode : public behavior::BehaviorNode {
 
     if (!command_state.IsPending()) {
       // TODO: Should report exact outcome.
-      std::string result = std::format("Failed to execute {}: Timeout.", to_string(command_type));
+      std::string result = std::string("Failed to execute ") + to_string(command_type) + ": Timeout.";
       Event::Dispatch(ChatQueueEvent::Private(command_state.sender.data(), result.data()));
 
       ctx.blackboard.Erase(CommandExecuteState::Key());

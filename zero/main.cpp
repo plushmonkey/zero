@@ -18,10 +18,11 @@
 #ifdef APIENTRY
 #undef APIENTRY
 #endif
-#ifdef _WIN32
-#include <Windows.h>
 
 zero::ZeroBot* g_Bot = nullptr;
+
+#ifdef _WIN32
+#include <Windows.h>
 
 // Force disconnect when closing the console so the bot doesn't stick around in the zone waiting to be timed out.
 BOOL WINAPI ConsoleCloserHandler(DWORD dwCtrlType) {

@@ -8,8 +8,6 @@
 #include <zero/zones/metalgear/JuggBehavior.h>
 #include <zero/zones/metalgear/SniperBehavior.h>
 
-#include <format>
-
 namespace zero {
 namespace mg {
 
@@ -24,7 +22,8 @@ struct MetalGearController : ZoneController, public EventHandler<PlayerDeathEven
     if (!self) return;
 
     if (event.player.id == self->id || event.killer.id == self->id) {
-      Log(LogLevel::Info, "%s (%d) killed by %s (%d)", event.player.name, event.bounty, event.killer.name, event.killer.bounty);
+      Log(LogLevel::Info, "%s (%d) killed by %s (%d)", event.player.name, event.bounty, event.killer.name,
+          event.killer.bounty);
     }
   }
 };

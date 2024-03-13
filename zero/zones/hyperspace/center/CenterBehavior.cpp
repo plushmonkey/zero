@@ -18,8 +18,6 @@
 #include <zero/behavior/nodes/TimerNode.h>
 #include <zero/behavior/nodes/WaypointNode.h>
 
-#include <format>
-
 namespace zero {
 namespace hyperspace {
 
@@ -72,13 +70,13 @@ std::unique_ptr<behavior::BehaviorNode> CenterBehavior::CreateTree(behavior::Exe
                                     .Sequence(CompositeDecorator::Success)
                                         .Child<PositionThreatQueryNode>("self_position", "self_threat", 8.0f, 3.0f)
                                         .Child<RenderTextNode>("ui_camera", Vector2f(512, 600), [](ExecuteContext& ctx) {
-                                          std::string str = std::format("Self threat: {}", ctx.blackboard.ValueOr<float>("self_threat", 0.0f));
+                                          std::string str = std::string("Self threat: ") + std::to_string(ctx.blackboard.ValueOr<float>("self_threat", 0.0f));
 
                                           return RenderTextNode::Request(str, TextColor::White, Layer::TopMost, TextAlignment::Center);
                                         })
                                         .Child<PositionThreatQueryNode>("territory_position", "territory_threat", 8.0f, 3.0f)
                                         .Child<RenderTextNode>("world_camera", "territory_position", [](ExecuteContext& ctx) {
-                                          std::string str = std::format("Threat: {}", ctx.blackboard.ValueOr<float>("territory_threat", 0.0f));
+                                          std::string str = std::string("Threat: ") + std::to_string(ctx.blackboard.ValueOr<float>("territory_threat", 0.0f));
 
                                           return RenderTextNode::Request(str, TextColor::White, Layer::TopMost, TextAlignment::Center);
                                         })

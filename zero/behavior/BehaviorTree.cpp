@@ -1,6 +1,5 @@
 #include "BehaviorTree.h"
 
-#include <Windows.h>
 #include <zero/RenderContext.h>
 #include <zero/game/Game.h>
 
