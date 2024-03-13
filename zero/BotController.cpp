@@ -47,8 +47,7 @@ void BotController::Update(RenderContext& rc, float dt, InputState& input, behav
   static behavior::TreePrinter tree_printer;
 
   if (behavior_tree) {
-    // Set this to true to render the behavior execution tree.
-    bool should_print = false;
+    bool should_print = g_Settings.debug_behavior_tree;
 
     if (should_print) {
       // Set to true to render { and } for each composite node.

@@ -8,7 +8,6 @@
 
 #include <chrono>
 
-#define CREATE_RENDER_WINDOW 0
 #define SURFACE_WIDTH 1152
 #define SURFACE_HEIGHT 648
 
@@ -85,10 +84,10 @@ bool ZeroBot::JoinZone(ServerInfo& server) {
 
   commands = memory_arena_construct_type(&perm_arena, CommandSystem, *this, this->game->dispatcher);
 
-#if CREATE_RENDER_WINDOW
-  debug_renderer.Initialize(SURFACE_WIDTH, SURFACE_HEIGHT);
-  game->render_enabled = true;
-#endif
+  if (g_Settings.debug_window) {
+    debug_renderer.Initialize(SURFACE_WIDTH, SURFACE_HEIGHT);
+    game->render_enabled = true;
+  }
 
   GameInitializeResult init_result = game->Initialize(input);
   if (init_result == GameInitializeResult::Failure) {
@@ -96,12 +95,12 @@ bool ZeroBot::JoinZone(ServerInfo& server) {
     return false;
   }
 
-#if CREATE_RENDER_WINDOW
-  if (init_result != GameInitializeResult::Full) {
-    debug_renderer.Close();
-    game->render_enabled = false;
+  if (g_Settings.debug_window) {
+    if (init_result != GameInitializeResult::Full) {
+      debug_renderer.Close();
+      game->render_enabled = false;
+    }
   }
-#endif
 
   ConnectResult result = game->connection.Connect(server.ipaddr.data(), server.port);
 
@@ -195,9 +194,9 @@ void ZeroBot::Run() {
       debug_renderer.Present();
     }
 
-#if CREATE_RENDER_WINDOW == 0
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-#endif
+    if (!g_Settings.debug_window) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
 
     auto end = std::chrono::high_resolution_clock::now();
     frame_time = std::chrono::duration_cast<ms_float>(end - start).count();

@@ -12,6 +12,8 @@ struct GameSettings {
   bool vsync;
   WindowType window_type;
   bool render_stars;
+  bool debug_window = false;
+  bool debug_behavior_tree = false;
 
   EncryptMethod encrypt_method = EncryptMethod::Continuum;
 

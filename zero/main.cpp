@@ -136,6 +136,16 @@ int main(int argc, char* argv[]) {
       }
     }
 
+    auto render_window = cfg->GetString("Debug", "RenderWindow");
+    if (render_window) {
+      zero::g_Settings.debug_window = strtol(*render_window, nullptr, 10) != 0;
+    }
+
+    auto print_behavior_tree = cfg->GetString("Debug", "RenderBehaviorTree");
+    if (print_behavior_tree) {
+      zero::g_Settings.debug_behavior_tree = strtol(*print_behavior_tree, nullptr, 10) != 0;
+    }
+
     // Go through the servers that were configured and loading the data.
     zero::ConfigGroup servers_group = cfg->GetOrCreateGroup("Servers");
     for (auto& kv : servers_group.map) {
