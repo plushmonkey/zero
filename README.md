@@ -20,7 +20,8 @@ Config file order:
 ## Building
 ### Getting source
 1. `git clone https://github.com/plushmonkey/zero`
-2. `git submodule init && git submodule update`
+2. `cd zero`
+3. `git submodule init && git submodule update`
 
 ### Windows
 1. Open `zero.sln`
@@ -34,6 +35,7 @@ Config file order:
 4. `cmake -B build -S .`
 5. `cd build`
 6. `make -j 12`
+7. `cp ../zero.cfg.dist zero.cfg`
 
 ### Debug renderer
 1. Open `ZeroBot.cpp`

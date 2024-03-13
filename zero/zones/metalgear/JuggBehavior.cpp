@@ -18,8 +18,6 @@
 #include <zero/behavior/nodes/TimerNode.h>
 #include <zero/behavior/nodes/WaypointNode.h>
 
-#include <format>
-
 namespace zero {
 namespace mg {
 
@@ -67,7 +65,7 @@ std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::Execu
                                         .Child<PositionThreatQueryNode>("self_position", "self_threat", 15.0f, 2.25f)
                                         .Child<PositionThreatQueryNode>("territory_position", "territory_threat", 15.0f, 2.25f)
                                         .Child<RenderTextNode>("world_camera", "territory_position", [](ExecuteContext& ctx) {
-                                          std::string str = std::format("Threat: {}", ctx.blackboard.ValueOr<float>("territory_threat", 0.0f));
+                                          std::string str = std::string("Threat: ") + std::to_string(ctx.blackboard.ValueOr<float>("territory_threat", 0.0f));
 
                                           return RenderTextNode::Request(str, TextColor::White, Layer::TopMost, TextAlignment::Center);
                                         })

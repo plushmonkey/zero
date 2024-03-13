@@ -10,8 +10,6 @@
 #include <zero/zones/hyperspace/center/CenterJavBehavior.h>
 #include <zero/zones/hyperspace/center/CenterLeviBehavior.h>
 
-#include <format>
-
 namespace zero {
 namespace hyperspace {
 
@@ -53,7 +51,7 @@ class ParseResponseCommand : public CommandExecutor {
 
       if (state.IsPending()) {
         std::string response =
-            std::format("Failed. Awaiting response: {} for {}.", to_string(state.type), state.sender);
+            std::string("Failed. Awaiting response: ") + to_string(state.type) + " for " + state.sender + ".";
 
         Event::Dispatch(ChatQueueEvent::Private(sender.data(), response.data()));
         return false;
@@ -179,7 +177,7 @@ class ShipItemsCommand : public ParseResponseCommand {
     controller.command_behavior->OnInitialize(bot.execute_ctx);
     bot.bot_controller->SetBehavior("command-parse", controller.command_behavior->CreateTree(bot.execute_ctx));
 
-    std::string command = std::format("?shipitems {}", ship);
+    std::string command = std::string("?shipitems ") + std::to_string(ship);
     Event::Dispatch(ChatQueueEvent::Public(command.data()));
   }
 
