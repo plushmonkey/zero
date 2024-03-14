@@ -14,7 +14,7 @@ namespace zero {
 namespace hyperspace {
 
 struct HyperspaceController : ZoneController {
-  bool IsZone(Zone zone) override { return zone == Zone::Hyperspace || zone == Zone::Local || zone == Zone::Subgame; }
+  bool IsZone(Zone zone) override { return zone == Zone::Hyperspace; }
 
   void CreateBehaviors(const char* arena_name) override;
 
@@ -34,11 +34,11 @@ class FlagCommand : public CommandExecutor {
     Event::Dispatch(ChatQueueEvent::Private(player->name, output.data()));
   }
 
-  CommandAccessFlags GetAccess()  override { return CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags)  override {}
-  std::vector<std::string> GetAliases()  override { return {"flag"}; }
+  CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
+  void SetAccess(CommandAccessFlags flags) override {}
+  std::vector<std::string> GetAliases() override { return {"flag"}; }
   std::string GetDescription() override { return "Enables flagging."; }
-  int GetSecurityLevel()  override { return 0; }
+  int GetSecurityLevel() override { return 0; }
 };
 
 class ParseResponseCommand : public CommandExecutor {
@@ -99,11 +99,11 @@ class BuyCommand : public ParseResponseCommand {
     Event::Dispatch(ChatQueueEvent::Private(sender.data(), "Usage: !buy close combat|radiating coils"));
   }
 
-  CommandAccessFlags GetAccess()  override { return CommandAccess_Public | CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags)  override {}
-  std::vector<std::string> GetAliases()  override { return {"buy"}; }
+  CommandAccessFlags GetAccess() override { return CommandAccess_Public | CommandAccess_Private; }
+  void SetAccess(CommandAccessFlags flags) override {}
+  std::vector<std::string> GetAliases() override { return {"buy"}; }
   std::string GetDescription() override { return "Buys items."; }
-  int GetSecurityLevel()  override { return 0; }
+  int GetSecurityLevel() override { return 0; }
 };
 
 class SellCommand : public ParseResponseCommand {
@@ -144,10 +144,10 @@ class SellCommand : public ParseResponseCommand {
   }
 
   CommandAccessFlags GetAccess() override { return CommandAccess_Public | CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags)  override {}
+  void SetAccess(CommandAccessFlags flags) override {}
   std::vector<std::string> GetAliases() override { return {"sell"}; }
   std::string GetDescription() override { return "Sells items."; }
-  int GetSecurityLevel()  override { return 0; }
+  int GetSecurityLevel() override { return 0; }
 };
 
 class ShipItemsCommand : public ParseResponseCommand {
@@ -185,11 +185,11 @@ class ShipItemsCommand : public ParseResponseCommand {
     Event::Dispatch(ChatQueueEvent::Private(sender.data(), "!shipitems [1-8]"));
   }
 
-  CommandAccessFlags GetAccess()  override { return CommandAccess_Public | CommandAccess_Private; }
+  CommandAccessFlags GetAccess() override { return CommandAccess_Public | CommandAccess_Private; }
   void SetAccess(CommandAccessFlags flags) override {}
-  std::vector<std::string> GetAliases()  override { return {"shipitems"}; }
-  std::string GetDescription()  override { return "Prints a list of items the bot currently owns."; }
-  int GetSecurityLevel()  override { return 0; }
+  std::vector<std::string> GetAliases() override { return {"shipitems"}; }
+  std::string GetDescription() override { return "Prints a list of items the bot currently owns."; }
+  int GetSecurityLevel() override { return 0; }
 };
 
 void HyperspaceController::CreateBehaviors(const char* arena_name) {

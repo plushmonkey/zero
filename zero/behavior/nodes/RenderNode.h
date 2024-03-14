@@ -12,6 +12,45 @@
 namespace zero {
 namespace behavior {
 
+struct RenderPathNode : public BehaviorNode {
+  RenderPathNode(Vector3f color) : color(color) {}
+  RenderPathNode(const char* path_key, Vector3f color) : path_key(path_key), color(color) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    path::Path path = ctx.bot->bot_controller->current_path;
+
+    Vector2f prev_position;
+
+    if (path_key) {
+      auto opt_path = ctx.blackboard.Value<path::Path>(path_key);
+      if (!opt_path) return ExecuteResult::Failure;
+      path = *opt_path;
+
+      if (path.Empty()) return ExecuteResult::Success;
+
+      prev_position = path.points[0];
+    } else {
+      prev_position = ctx.bot->game->player_manager.GetSelf()->position;
+    }
+
+    bool render = false;
+    for (size_t i = path.index; i < path.points.size(); ++i) {
+      ctx.bot->game->line_renderer.PushLine(prev_position, color, path.points[i], color);
+      prev_position = path.points[i];
+      render = true;
+    }
+
+    if (render) {
+      ctx.bot->game->line_renderer.Render(ctx.bot->game->camera);
+    }
+
+    return ExecuteResult::Success;
+  }
+
+  Vector3f color;
+  const char* path_key = nullptr;
+};
+
 struct RenderTextNode : public BehaviorNode {
   struct Request {
     std::string str;

@@ -126,7 +126,7 @@ struct ShipRequestNode : public BehaviorNode {
       return ExecuteResult::Running;
     }
 
-    return ExecuteResult::Failure;
+    return ExecuteResult::Running;
   }
 
   int ship = 0;

@@ -92,6 +92,8 @@
     <ClCompile Include="zero\zones\metalgear\JuggBehavior.cpp" />
     <ClCompile Include="zero\zones\metalgear\MetalGear.cpp" />
     <ClCompile Include="zero\zones\metalgear\SniperBehavior.cpp" />
+    <ClCompile Include="zero\zones\svs\Svs.cpp" />
+    <ClCompile Include="zero\zones\svs\WarbirdBehavior.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="zero\Actuator.h" />
@@ -190,6 +192,8 @@
     <ClInclude Include="zero\zones\metalgear\GunnerBehavior.h" />
     <ClInclude Include="zero\zones\metalgear\JuggBehavior.h" />
     <ClInclude Include="zero\zones\metalgear\SniperBehavior.h" />
+    <ClInclude Include="zero\zones\svs\nodes\MemoryTargetNode.h" />
+    <ClInclude Include="zero\zones\svs\WarbirdBehavior.h" />
     <ClInclude Include="zero\zones\ZoneController.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

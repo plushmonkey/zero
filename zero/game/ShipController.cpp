@@ -1320,7 +1320,7 @@ void ShipController::ApplyPrize(Player* self, s32 prize_id, bool notify, bool da
     } break;
     case Prize::Warp: {
       display_notification = true;
-      player_manager.Spawn();
+      player_manager.Spawn(false);
       self->velocity = Vector2f(0, 0);
     } break;
     case Prize::Guns: {
