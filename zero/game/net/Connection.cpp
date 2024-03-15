@@ -555,7 +555,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
         security.checksum_key = buffer.ReadU32();
 
         map.door_rng.Seed(security.door_seed);
-        map.last_seed_tick = security.timestamp - time_diff;
+        map.last_seed_tick = MAKE_TICK(security.timestamp - time_diff);
 
         if (security.checksum_key && map.checksum) {
           SendSecurityPacket();

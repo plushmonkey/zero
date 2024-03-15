@@ -209,7 +209,10 @@ static void OnPlayerPrizePkt(void* user, u8* pkt, size_t size) {
       u16 share_limit = game->connection.settings.ShipSettings[self->ship].PrizeShareLimit;
 
       if (self->bounty < share_limit) {
+        u32 pristine_seed = game->connection.security.prize_seed;
+
         game->ship_controller.ApplyPrize(self, prize_id, true);
+        game->connection.security.prize_seed = pristine_seed;
       }
     }
   }

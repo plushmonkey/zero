@@ -16,7 +16,11 @@
 #include <zero/behavior/nodes/ThreatNode.h>
 #include <zero/behavior/nodes/TimerNode.h>
 #include <zero/behavior/nodes/WaypointNode.h>
+#include <zero/zones/svs/nodes/BurstAreaQueryNode.h>
+#include <zero/zones/svs/nodes/DynamicPlayerBoundingBoxQueryNode.h>
+#include <zero/zones/svs/nodes/FindNearestGreenNode.h>
 #include <zero/zones/svs/nodes/MemoryTargetNode.h>
+#include <zero/zones/svs/nodes/NearbyEnemyWeaponQueryNode.h>
 
 namespace zero {
 namespace svs {
@@ -97,20 +101,54 @@ std::unique_ptr<behavior::BehaviorNode> WarbirdBehavior::CreateTree(behavior::Ex
                                     .Child<SeekNode>("aimshot", "leash_distance")
                                     .End()
                                 .End()
-                            .Sequence(CompositeDecorator::Success) // Determine if a shot should be fired by using weapon trajectory and bounding boxes.
-                                .InvertChild<TileQueryNode>(kTileSafeId)
-                                .Child<ShotVelocityQueryNode>(WeaponType::Bullet, "bullet_fire_velocity")
-                                .Child<RayNode>("self_position", "bullet_fire_velocity", "bullet_fire_ray")
-                                .Child<PlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 3.0f)
-                                .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
-                                .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
-                                .Child<RenderRayNode>("world_camera", "bullet_fire_ray", 50.0f, Vector3f(1.0f, 1.0f, 0.0f))
-                                .Child<RayRectangleInterceptNode>("bullet_fire_ray", "target_bounds")
-                                .Child<InputActionNode>(InputAction::Bullet)
+                            .Parallel()
+                                .Sequence(CompositeDecorator::Success)
+                                    .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Repel)
+                                    .Child<RepelDistanceQueryNode>("repel_distance")
+                                    .Child<NearbyEnemyWeaponQueryNode>(WeaponTypeCombine() | WeaponType::Bomb | WeaponType::ProximityBomb, "repel_distance")
+                                    .Child<InputActionNode>(InputAction::Repel)
+                                    .End()
+                                .Sequence(CompositeDecorator::Success)
+                                    .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Burst)
+                                    .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
+                                    .InvertChild<DistanceThresholdNode>("nearest_target_position", 15.0f)
+                                    .Child<BurstAreaQueryNode>()
+                                    .Child<InputActionNode>(InputAction::Burst)
+                                    .End()
+                                .Sequence(CompositeDecorator::Success)
+                                    .Child<PlayerEnergyPercentThresholdNode>(0.65f)
+                                    .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Bomb)
+                                    .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
+                                    .Child<DistanceThresholdNode>("nearest_target_position", 10.0f)
+                                    .Child<ShotVelocityQueryNode>(WeaponType::Bomb, "bomb_fire_velocity")
+                                    .Child<RayNode>("self_position", "bomb_fire_velocity", "bomb_fire_ray")
+                                    .Child<DynamicPlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 3.0f)
+                                    .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
+                                    .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
+                                    .Child<RenderRayNode>("world_camera", "bomb_fire_ray", 50.0f, Vector3f(1.0f, 1.0f, 0.0f))
+                                    .Child<RayRectangleInterceptNode>("bomb_fire_ray", "target_bounds")
+                                    .Child<InputActionNode>(InputAction::Bomb)
+                                    .End()
+                                .Sequence(CompositeDecorator::Success) // Determine if a shot should be fired by using weapon trajectory and bounding boxes.
+                                    .Child<PlayerEnergyPercentThresholdNode>(0.3f)
+                                    .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bullet)
+                                    .InvertChild<InputQueryNode>(InputAction::Bomb) // Don't try to shoot a bullet when shooting a bomb.
+                                    .InvertChild<TileQueryNode>(kTileSafeId)
+                                    .Child<ShotVelocityQueryNode>(WeaponType::Bullet, "bullet_fire_velocity")
+                                    .Child<RayNode>("self_position", "bullet_fire_velocity", "bullet_fire_ray")
+                                    .Child<DynamicPlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 4.0f)
+                                    .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
+                                    .Child<RayRectangleInterceptNode>("bullet_fire_ray", "target_bounds")
+                                    .Child<InputActionNode>(InputAction::Bullet)
+                                    .End()
                                 .End()
                             .End()
                         .End()
                     .End()
+                .End()
+            .Sequence()
+                .Child<FindNearestGreenNode>("nearest_green_position")
+                .Child<GoToNode>("nearest_green_position")
                 .End()
             .Sequence() // Follow set waypoints.
                 .Child<WaypointNode>("waypoints", "waypoint_index", "waypoint_position", 15.0f)

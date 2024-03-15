@@ -29,6 +29,23 @@ struct InputActionNode : public BehaviorNode {
   InputAction action;
 };
 
+// Returns Success if the input type is currently activated.
+struct InputQueryNode : public BehaviorNode {
+  InputQueryNode(InputAction action) : action(action) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto self = ctx.bot->game->player_manager.GetSelf();
+    if (!self) return ExecuteResult::Failure;
+
+    auto& input = ctx.bot->bot_controller->input;
+    if (!input) return ExecuteResult::Failure;
+
+    return input->IsDown(action) ? ExecuteResult::Success : ExecuteResult::Failure;
+  }
+
+  InputAction action;
+};
+
 struct WarpNode : public BehaviorNode {
   ExecuteResult Execute(ExecuteContext& ctx) override {
     auto self = ctx.bot->game->player_manager.GetSelf();

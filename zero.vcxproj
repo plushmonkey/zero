@@ -192,7 +192,11 @@
     <ClInclude Include="zero\zones\metalgear\GunnerBehavior.h" />
     <ClInclude Include="zero\zones\metalgear\JuggBehavior.h" />
     <ClInclude Include="zero\zones\metalgear\SniperBehavior.h" />
+    <ClInclude Include="zero\zones\svs\nodes\BurstAreaQueryNode.h" />
+    <ClInclude Include="zero\zones\svs\nodes\FindNearestGreenNode.h" />
     <ClInclude Include="zero\zones\svs\nodes\MemoryTargetNode.h" />
+    <ClInclude Include="zero\zones\svs\nodes\DynamicPlayerBoundingBoxQueryNode.h" />
+    <ClInclude Include="zero\zones\svs\nodes\NearbyEnemyWeaponQueryNode.h" />
     <ClInclude Include="zero\zones\svs\WarbirdBehavior.h" />
     <ClInclude Include="zero\zones\ZoneController.h" />
   </ItemGroup>

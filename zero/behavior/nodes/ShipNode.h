@@ -150,6 +150,53 @@ struct ShipCapabilityQueryNode : public BehaviorNode {
   ShipCapabilityFlags cap;
 };
 
+struct ShipWeaponCapabilityQueryNode : public BehaviorNode {
+  ShipWeaponCapabilityQueryNode(WeaponType type, u32 level = 1) : type(type), level(level) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    Player* player = ctx.bot->game->player_manager.GetSelf();
+    if (!player || player->ship >= 8) return ExecuteResult::Failure;
+
+    auto& ship = ctx.bot->game->ship_controller.ship;
+
+    switch (type) {
+      case WeaponType::Bullet: {
+        return ship.guns >= level ? ExecuteResult::Success : ExecuteResult::Failure;
+      } break;
+      case WeaponType::BouncingBullet: {
+        return (ship.capability & ShipCapability_BouncingBullets && ship.guns >= level) ? ExecuteResult::Success
+                                                                                        : ExecuteResult::Failure;
+      } break;
+      case WeaponType::Bomb: {
+        return ship.bombs >= level ? ExecuteResult::Success : ExecuteResult::Failure;
+      } break;
+      case WeaponType::ProximityBomb: {
+        return (ship.capability & ShipCapability_Proximity && ship.bombs >= level) ? ExecuteResult::Success
+                                                                                   : ExecuteResult::Failure;
+      } break;
+      case WeaponType::Repel: {
+        return ship.repels >= level ? ExecuteResult::Success : ExecuteResult::Failure;
+      } break;
+      case WeaponType::Decoy: {
+        return ship.decoys >= level ? ExecuteResult::Success : ExecuteResult::Failure;
+      } break;
+      case WeaponType::Burst: {
+        return ship.bursts >= level ? ExecuteResult::Success : ExecuteResult::Failure;
+      } break;
+      case WeaponType::Thor: {
+        return ship.thors >= level ? ExecuteResult::Success : ExecuteResult::Failure;
+      } break;
+      default: {
+      } break;
+    }
+
+    return ExecuteResult::Failure;
+  }
+
+  WeaponType type;
+  u32 level;
+};
+
 struct ShipMultifireQueryNode : public BehaviorNode {
   ExecuteResult Execute(ExecuteContext& ctx) override {
     Player* player = ctx.bot->game->player_manager.GetSelf();
@@ -157,6 +204,23 @@ struct ShipMultifireQueryNode : public BehaviorNode {
 
     return ctx.bot->game->ship_controller.ship.multifire ? ExecuteResult::Success : ExecuteResult::Failure;
   }
+};
+
+struct RepelDistanceQueryNode : public BehaviorNode {
+  RepelDistanceQueryNode(const char* output_key) : output_key(output_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    Player* player = ctx.bot->game->player_manager.GetSelf();
+    if (!player || player->ship >= 8) return ExecuteResult::Failure;
+
+    float dist = ctx.bot->game->connection.settings.RepelDistance / 16.0f;
+
+    ctx.blackboard.Set(output_key, dist);
+
+    return ExecuteResult::Success;
+  }
+
+  const char* output_key = nullptr;
 };
 
 }  // namespace behavior

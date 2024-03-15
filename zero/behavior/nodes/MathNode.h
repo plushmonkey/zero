@@ -102,6 +102,32 @@ struct RandomNode : public BehaviorNode {
   const char* output_key = nullptr;
 };
 
+struct ScalarNode : public BehaviorNode {
+  ScalarNode(const char* existing_key, const char* output_key)
+    : existing_key(existing_key), output_key(output_key) {}
+  ScalarNode(float value, const char* output_key)
+    : value(value), existing_key(nullptr), output_key(output_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    float input = value;
+
+    if (existing_key) {
+      auto opt_input = ctx.blackboard.Value<float>(existing_key);
+      if (!opt_input.has_value()) return ExecuteResult::Failure;
+
+      input = opt_input.value();
+    }
+
+    ctx.blackboard.Set(output_key, input);
+
+    return ExecuteResult::Success;
+  }
+
+  const char* existing_key;
+  const char* output_key;
+  float value = 0.0f;
+};
+
 struct VectorNode : public BehaviorNode {
   VectorNode(const char* existing_vector_key, const char* output_key)
       : existing_vector_key(existing_vector_key), output_key(output_key) {}

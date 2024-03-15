@@ -1101,9 +1101,13 @@ void ShipController::OnCollectedPrize(u8* pkt, size_t size) {
 
   if (!self) return;
 
+  u32 pristine_seed = player_manager.connection.security.prize_seed;
+
   for (u16 i = 0; i < count; ++i) {
     ApplyPrize(self, prize_id, true);
   }
+
+  player_manager.connection.security.prize_seed = pristine_seed;
 }
 
 void ShipController::ApplyPrize(Player* self, s32 prize_id, bool notify, bool damage) {
@@ -1694,6 +1698,7 @@ s32 ShipController::GeneratePrize(bool negative_allowed) {
   }
 
   player_manager.connection.security.prize_seed = random;
+
   return result;
 }
 
