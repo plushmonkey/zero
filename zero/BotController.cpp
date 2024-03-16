@@ -11,7 +11,7 @@ BotController::BotController(Game& game) : game(game), chat_queue(game.chat) {
 }
 
 void BotController::HandleEvent(const JoinGameEvent& event) {
-  Log(LogLevel::Info, "Clearing bot behaviors from JoinGameEvent.");
+  Log(LogLevel::Debug, "Clearing bot behaviors from JoinGameEvent.");
 
   behaviors.Clear();
   chat_queue.Reset();

@@ -1,4 +1,3 @@
-#include <zero/Config.h>
 #include <zero/ZeroBot.h>
 #include <zero/game/Buffer.h>
 #include <zero/game/Clock.h>
@@ -76,6 +75,8 @@ int main(int argc, char* argv[]) {
   zero::ZeroBot bot;
   g_Bot = &bot;
 
+  zero::g_LogPrintLevel = zero::LogLevel::Info;
+
   const char* login_name = zero::kLoginName;
   const char* login_password = zero::kLoginPassword;
 
@@ -136,6 +137,26 @@ int main(int argc, char* argv[]) {
       }
     }
 
+    auto log_level_str = cfg->GetString("General", "LogLevel");
+    if (log_level_str) {
+      std::string_view view(*log_level_str);
+
+      if (view == "Jabber") {
+        zero::g_LogPrintLevel = zero::LogLevel::Jabber;
+      } else if (view == "Debug") {
+        zero::g_LogPrintLevel = zero::LogLevel::Debug;
+      } else if (view == "Info") {
+        zero::g_LogPrintLevel = zero::LogLevel::Info;
+      } else if (view == "Warning") {
+        zero::g_LogPrintLevel = zero::LogLevel::Warning;
+      } else if (view == "Error") {
+        zero::g_LogPrintLevel = zero::LogLevel::Error;
+      } else {
+        zero::Log(zero::LogLevel::Error, "General::LogLevel that was specified is not valid.");
+        return 1;
+      }
+    }
+
     auto render_window = cfg->GetString("Debug", "RenderWindow");
     if (render_window) {
       zero::g_Settings.debug_window = strtol(*render_window, nullptr, 10) != 0;
@@ -164,6 +185,8 @@ int main(int argc, char* argv[]) {
       }
     }
   }
+
+  bot.config = std::move(cfg);
 
   const char* encrypt_type =
       zero::g_Settings.encrypt_method == zero::EncryptMethod::Subspace ? "Subspace" : "Continuum";

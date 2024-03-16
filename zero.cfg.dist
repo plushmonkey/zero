@@ -8,6 +8,11 @@ Server = Local
 # Encryption should be either Subspace or Continuum
 Encryption = Subspace
 
+[General]
+# Sets the log level threshold so only log messages of that level or higher are displayed.
+# Must be one of these: Jabber, Debug, Info, Warning, Error
+LogLevel = Info
+
 # Only these servers are supported. The names must not be changed.
 [Servers]
 Local = 127.0.0.1:5000

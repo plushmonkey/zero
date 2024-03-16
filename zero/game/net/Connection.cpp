@@ -373,7 +373,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
         u32 key1 = buffer.ReadU32();
         u32 key2 = buffer.ReadU32();
 
-        Log(LogLevel::Info, "Received encryption response with keys %08X, %08X", key1, key2);
+        Log(LogLevel::Debug, "Received encryption response with keys %08X, %08X", key1, key2);
 
 #pragma pack(push, 1)
         struct {
@@ -397,7 +397,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
 
         security_solver.ExpandKey(key2, [this](u32* table) {
           if (table) {
-            Log(LogLevel::Info, "Successfully expanded continuum encryption keys.");
+            Log(LogLevel::Debug, "Successfully expanded continuum encryption keys.");
             memcpy(encrypt.expanded_key, table, sizeof(encrypt.expanded_key));
             encrypt.FinalizeExpansion(encrypt.key1);
           } else {
@@ -421,7 +421,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
               buffer.WriteU32(table[i]);
             }
 
-            Log(LogLevel::Info, "Sending key expansion response for key %08X", seed);
+            Log(LogLevel::Debug, "Sending key expansion response for key %08X", seed);
             this->Send(buffer);
           } else {
             Log(LogLevel::Error, "Failed to load table for key expansion request.");
@@ -721,7 +721,7 @@ void Connection::SendSecurityPacket() {
     u32 map_checksum = map.GetChecksum(security.checksum_key);
     u32 exe_checksum = VieChecksum(security.checksum_key);
 
-    Log(LogLevel::Info, "Sending security packet with checksum seed %08X", security.checksum_key);
+    Log(LogLevel::Debug, "Sending security packet with checksum seed %08X", security.checksum_key);
     SendSecurity(settings_checksum, exe_checksum, map_checksum);
   } else {
     u32 request_key = security.checksum_key;
@@ -734,7 +734,7 @@ void Connection::SendSecurityPacket() {
         u32 settings_checksum = SettingsChecksum(security.checksum_key, settings);
         u32 map_checksum = map.GetChecksum(security.checksum_key);
 
-        Log(LogLevel::Info, "Sending security packet with checksum seed %08X", request_key);
+        Log(LogLevel::Debug, "Sending security packet with checksum seed %08X", request_key);
 
         SendSecurity(settings_checksum, *checksum, map_checksum);
       } else {

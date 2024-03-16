@@ -66,7 +66,6 @@ bool ZeroBot::Initialize(const char* name, const char* password) {
   strcpy(this->name, name);
   strcpy(this->password, password);
 
-  g_LogPrintLevel = LogLevel::Info;
   g_Settings.vsync = true;
 
   return true;

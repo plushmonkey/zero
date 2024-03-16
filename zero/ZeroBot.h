@@ -7,6 +7,7 @@
 #include <zero/game/Game.h>
 #include <zero/game/InputState.h>
 #include <zero/game/Memory.h>
+#include <zero/Config.h>
 
 #include <memory>
 #include <string>
@@ -57,6 +58,8 @@ struct ZeroBot {
   Worker* worker;
   Game* game = nullptr;
   DebugRenderer debug_renderer;
+
+  std::unique_ptr<Config> config;
 
   ServerInfo server_info = {};
 
