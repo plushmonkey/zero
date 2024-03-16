@@ -764,7 +764,12 @@ void Connection::SendSecurity(u32 settings_checksum, u32 exe_checksum, u32 map_c
   buffer.WriteU16(stat.ping_avg / 10);      // Ping average
   buffer.WriteU16(stat.ping_low / 10);      // Ping low
   buffer.WriteU16(stat.ping_high / 10);     // Ping high
-  buffer.WriteU8(0);                        // slow frame
+  buffer.WriteU8(0);                        // Slow frame
+  buffer.WriteU16(0);                       // Timer drift
+
+  u32 map_crc32 = crc32_map(map.tiles, 1024 * 1024);
+
+  buffer.WriteU32(map_crc32);
 
   packet_sequencer.SendReliableMessage(*this, buffer.data, buffer.GetSize());
 }
