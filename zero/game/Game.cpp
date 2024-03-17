@@ -342,9 +342,15 @@ bool Game::Update(const InputState& input, float dt) {
     }
   }
 
-  animated_tile_renderer.Update(dt);
+  if (render_enabled) {
+    animated_tile_renderer.Update(dt);
+  } else {
+    ship_controller.exhaust_count = 0;
+  }
 
-  radar.Update(ui_camera, connection.settings.MapZoomFactor, self->frequency, self->id);
+  if (self) {
+    radar.Update(ui_camera, connection.settings.MapZoomFactor, self->frequency, self->id);
+  }
 
   UpdateGreens(dt);
 
@@ -424,13 +430,14 @@ void Game::Render(float dt) {
     fps = fps * 0.99f + (1.0f / dt) * 0.01f;
   }
 
+  // Always update animations even when the renderer is disabled so they get removed from the active list.
+  animation.Update(dt);
+
   if (!render_enabled) {
     sprite_renderer.push_buffer.Reset();
     sprite_renderer.texture_push_buffer.Reset();
     return;
   }
-
-  animation.Update(dt);
 
   if (connection.login_state == Connection::LoginState::Complete) {
     RenderGame(dt);

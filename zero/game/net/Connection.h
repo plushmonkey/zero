@@ -104,7 +104,6 @@ struct Connection {
   bool extra_position_info = false;
 
   u32 last_sync_tick = 0;
-  u32 last_position_tick = 0;
   u32 last_packet_tick = 0;
   LoginState login_state = LoginState::EncryptionRequested;
 

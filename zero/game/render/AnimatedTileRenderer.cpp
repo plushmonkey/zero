@@ -38,6 +38,8 @@ void AnimatedTileRenderer::Update(float dt) {
 void AnimatedTileRenderer::Render(SpriteRenderer& renderer, Map& map, Camera& camera, const Vector2f& screen_dim,
                                   struct GameFlag* flags, size_t flag_count, struct PrizeGreen* greens,
                                   size_t green_count, u32 freq, Soccer& soccer) {
+  if (renderer.shader.program == -1) return;
+
   for (size_t i = 0; i < green_count; ++i) {
     SpriteRenderable* renderable = &anim_prize.GetFrame();
     PrizeGreen* green = greens + i;
@@ -145,6 +147,8 @@ void AnimatedTileRenderer::Initialize() {
 }
 
 void AnimatedTileRenderer::InitializeDoors(TileRenderer& tile_renderer) {
+  if (tile_renderer.shader.program == -1) return;
+
   for (size_t i = 0; i < 8; ++i) {
     float uv_x_start = i / 8.0f;
     float uv_x_end = (i + 1) / 8.0f;

@@ -149,6 +149,7 @@ std::unique_ptr<behavior::BehaviorNode> WarbirdBehavior::CreateTree(behavior::Ex
             .Sequence()
                 .Child<FindNearestGreenNode>("nearest_green_position")
                 .Child<GoToNode>("nearest_green_position")
+                .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.0f))
                 .End()
             .Sequence() // Follow set waypoints.
                 .Child<WaypointNode>("waypoints", "waypoint_index", "waypoint_position", 15.0f)

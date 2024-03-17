@@ -36,6 +36,8 @@ void main() {
 )";
 
 LineRenderer::~LineRenderer() {
+  if (shader.program == -1) return;
+
   glDeleteBuffers(1, &vbo);
   glDeleteVertexArrays(1, &vao);
 }
@@ -67,14 +69,20 @@ bool LineRenderer::Initialize() {
 
 void LineRenderer::PushLine(const Vector2f& start, const Vector3f& start_color, const Vector2f& end,
                             const Vector3f& end_color) {
+  if (shader.program == -1) return;
+
   lines.emplace_back(LineVertex(start, start_color), LineVertex(end, end_color));
 }
 
 void LineRenderer::PushLine(const LineSegment& line, const Vector3f& color) {
+  if (shader.program == -1) return;
+
   PushLine(line.points[0], color, line.points[1], color);
 }
 
 void LineRenderer::PushCross(const Vector2f& start, const Vector3f& color, float size) {
+  if (shader.program == -1) return;
+
   float radius = size * 0.5f;
 
   Vector2f top_left = start;
@@ -93,6 +101,8 @@ void LineRenderer::PushRect(const Rectangle& rect, const Vector3f& color) {
 }
 
 void LineRenderer::PushRect(const Vector2f& start, const Vector2f& end, const Vector3f& color) {
+  if (shader.program == -1) return;
+
   Vector2f top_left(start.x, start.y);
   Vector2f top_right(end.x, start.y);
   Vector2f bottom_left(start.x, end.y);

@@ -288,7 +288,7 @@ void ShipController::HandleStatusEnergy(Player& self, u32 status, u32 cost, floa
 }
 
 inline void UpdateTimedAnimationEffect(Animation* animation, float* time, float dt) {
-  if (animation->sprite) {
+  if (animation->sprite && animation->sprite->frame_count > 0) {
     animation->t += dt;
 
     if (animation->t >= animation->GetDuration()) {

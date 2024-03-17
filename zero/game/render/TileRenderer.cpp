@@ -194,6 +194,7 @@ bool TileRenderer::Initialize() {
 }
 
 void TileRenderer::Render(Camera& camera) {
+  if (shader.program == -1) return;
   if (tiledata_texture == -1 || tilemap_texture == -1) return;
 
   mat4 proj = camera.GetProjection();
@@ -226,6 +227,8 @@ void TileRenderer::Render(Camera& camera) {
 }
 
 bool TileRenderer::CreateMapBuffer(MemoryArena& temp_arena, const char* filename, const Vector2f& surface_dim) {
+  if (shader.program == -1) return false;
+
   // Create and setup tilemap color texture
   glBindVertexArray(vao);
 
@@ -336,6 +339,8 @@ bool TileRenderer::CreateMapBuffer(MemoryArena& temp_arena, const char* filename
 
 bool TileRenderer::CreateRadar(MemoryArena& temp_arena, Map& map, const Vector2f& surface_dim, u16 mapzoom,
                                Soccer& soccer) {
+  if (shader.program == -1) return false;
+
   u32 surface_width = (u32)surface_dim.x;
   u32 surface_height = (u32)surface_dim.y;
 
@@ -370,6 +375,8 @@ bool TileRenderer::CreateRadar(MemoryArena& temp_arena, Map& map, const Vector2f
 
 void TileRenderer::RenderRadar(Map& map, MemoryArena& temp_arena, u32 dimensions, SpriteRenderable& renderable,
                                GLuint* texture, GLint filter, Soccer& soccer) {
+  if (shader.program == -1) return;
+
   glGenTextures(1, texture);
   glBindTexture(GL_TEXTURE_2D, *texture);
 
@@ -471,6 +478,8 @@ u32 TileRenderer::GetRadarTileColor(u8 id, u16 x, u16 y, Soccer& soccer) {
 }
 
 void TileRenderer::Cleanup() {
+  if (shader.program == -1) return;
+
   shader.Cleanup();
   fly_under_shader.Cleanup();
 

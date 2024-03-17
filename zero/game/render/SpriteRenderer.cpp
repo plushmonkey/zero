@@ -97,6 +97,8 @@ bool SpriteRenderer::Initialize(MemoryArena& perm_arena) {
 }
 
 SpriteRenderable* SpriteRenderer::CreateSheet(TextureData* texture_data, const Vector2f& dimensions, int* count) {
+  if (shader.program == -1) return nullptr;
+
   SpriteRenderable* result = renderables + renderable_count;
 
   int texture_id = texture_data->id;
@@ -127,6 +129,8 @@ SpriteRenderable* SpriteRenderer::CreateSheet(TextureData* texture_data, const V
 }
 
 GLuint SpriteRenderer::CreateTexture(const char* name, const u8* data, int width, int height) {
+  if (shader.program == -1) return -1;
+
   size_t texture_index = texture_count++;
   GLuint* texture_id = textures + texture_index;
 
@@ -148,6 +152,8 @@ GLuint SpriteRenderer::CreateTexture(const char* name, const u8* data, int width
 }
 
 SpriteRenderable* SpriteRenderer::LoadSheet(const char* filename, const Vector2f& dimensions, int* count) {
+  if (shader.program == -1) return nullptr;
+
   int width, height;
 
   u8* image = ImageLoad(filename, &width, &height);
@@ -167,6 +173,8 @@ SpriteRenderable* SpriteRenderer::LoadSheet(const char* filename, const Vector2f
 
 SpriteRenderable* SpriteRenderer::LoadSheetFromMemory(const char* name, const u8* data, int width, int height,
                                                       const Vector2f& dimensions, int* count) {
+  if (shader.program == -1) return nullptr;
+
   GLuint texture_id = CreateTexture(name, data, width, height);
 
   SpriteRenderable* result = renderables + renderable_count;
@@ -194,11 +202,15 @@ SpriteRenderable* SpriteRenderer::LoadSheetFromMemory(const char* name, const u8
 }
 
 void SpriteRenderer::FreeSheet(unsigned int texture_id) {
+  if (shader.program == -1) return;
+
   glDeleteTextures(1, &texture_id);
 }
 
 void SpriteRenderer::PushText(Camera& camera, const char* text, TextColor color, const Vector2f& position, Layer layer,
                               TextAlignment alignment) {
+  if (shader.program == -1) return;
+
   constexpr size_t kCountPerColor = 96;
   constexpr size_t kForeignCountPerColor = 24 * 3;
 
@@ -247,6 +259,8 @@ void SpriteRenderer::Draw(Camera& camera, const SpriteRenderable& renderable, co
 }
 
 void SpriteRenderer::Draw(Camera& camera, const SpriteRenderable& renderable, const Vector3f& position) {
+  if (shader.program == -1) return;
+
   SpritePushElement* element = memory_arena_push_type(&push_buffer, SpritePushElement);
   GLuint* texture_storage = memory_arena_push_type(&texture_push_buffer, GLuint);
 
@@ -325,6 +339,8 @@ void SpriteRenderer::Render(Camera& camera) {
 }
 
 void SpriteRenderer::Cleanup() {
+  if (shader.program == -1) return;
+
   shader.Cleanup();
   glDeleteTextures((GLsizei)texture_count, textures);
   if (vao != -1) {

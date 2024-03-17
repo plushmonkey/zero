@@ -63,13 +63,13 @@ void PacketSequencer::Tick(Connection& connection) {
 void PacketSequencer::SendReliableMessage(Connection& connection, u8* pkt, size_t size) {
   assert(size + kReliableHeaderSize <= kMaxPacketSize);
 
-  Log(LogLevel::Jabber, "PacketSequencer: Sending reliable type 0x%02X", pkt[0]);
-
   ReliableMessage* mesg = reliable_sent + reliable_sent_count++;
   mesg->id = next_reliable_id++;
   mesg->size = size;
   mesg->timestamp = GetCurrentTick();
   memcpy(mesg->message, pkt, size);
+
+  Log(LogLevel::Jabber, "PacketSequencer: Sending reliable type 0x%02X id %d", pkt[0], mesg->id);
 
   SendReliable(connection, *mesg);
 }

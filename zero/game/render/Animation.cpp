@@ -14,7 +14,7 @@ void AnimationSystem::Update(float dt) {
     animation->t += dt;
 
     if (!animation->IsAnimating()) {
-      if (animation->repeat) {
+      if (animation->sprite && animation->sprite->frame_count > 0 && animation->repeat) {
         animation->t -= animation->sprite->duration;
       } else {
         // Remove animation by swapping with last one
@@ -37,6 +37,11 @@ void AnimationSystem::Render(Camera& camera, SpriteRenderer& renderer) {
 }
 
 Animation* AnimationSystem::AddAnimation(AnimatedSprite& sprite, const Vector2f& position) {
+  if (animation_count >= ZERO_ARRAY_SIZE(animations) - 1) {
+    // This should never happen, but handle it gracefully if it does by having graphics reset.
+    animation_count = 0;
+  }
+
   Animation* animation = animations + animation_count++;
 
   animation->sprite = &sprite;

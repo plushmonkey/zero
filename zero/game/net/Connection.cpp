@@ -91,8 +91,7 @@ Connection::Connection(MemoryArena& perm_arena, MemoryArena& temp_arena, WorkQue
       requester(perm_arena, temp_arena, *this, dispatcher),
       packet_sequencer(perm_arena, temp_arena),
       buffer(perm_arena, kMaxPacketSize),
-      last_sync_tick(GetCurrentTick()),
-      last_position_tick(GetCurrentTick()) {
+      last_sync_tick(GetCurrentTick()) {
   map_arena = perm_arena.CreateArena(Megabytes(16));
   send_arena = perm_arena.CreateArena(Megabytes(2));
 }
@@ -765,11 +764,14 @@ void Connection::SendSecurity(u32 settings_checksum, u32 exe_checksum, u32 map_c
   buffer.WriteU16(stat.ping_low / 10);      // Ping low
   buffer.WriteU16(stat.ping_high / 10);     // Ping high
   buffer.WriteU8(0);                        // Slow frame
-  buffer.WriteU16(0);                       // Timer drift
 
-  u32 map_crc32 = crc32_map(map.tiles, 1024 * 1024);
+  if (encrypt_method == EncryptMethod::Continuum) {
+    buffer.WriteU16(0);  // Timer drift
 
-  buffer.WriteU32(map_crc32);
+    u32 map_crc32 = crc32_map(map.tiles, 1024 * 1024);
+
+    buffer.WriteU32(map_crc32);
+  }
 
   packet_sequencer.SendReliableMessage(*this, buffer.data, buffer.GetSize());
 }
