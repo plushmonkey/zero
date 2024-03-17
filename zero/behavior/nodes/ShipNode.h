@@ -133,6 +133,24 @@ struct ShipRequestNode : public BehaviorNode {
   const char* ship_key = nullptr;
 };
 
+struct ShipPortalPositionQueryNode : public BehaviorNode {
+  ShipPortalPositionQueryNode(const char* output_key = nullptr) : output_key(output_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    if (ctx.bot->game->ship_controller.ship.portal_time <= 0.0f) {
+      return ExecuteResult::Failure;
+    }
+
+    if (output_key) {
+      ctx.blackboard.Set(output_key, ctx.bot->game->ship_controller.ship.portal_location);
+    }
+
+    return ExecuteResult::Success;
+  }
+
+  const char* output_key = nullptr;
+};
+
 struct ShipCapabilityQueryNode : public BehaviorNode {
   ShipCapabilityQueryNode(ShipCapabilityFlags cap) : cap(cap) {}
 
@@ -148,6 +166,44 @@ struct ShipCapabilityQueryNode : public BehaviorNode {
   }
 
   ShipCapabilityFlags cap;
+};
+
+struct ShipItemCountThresholdNode : public BehaviorNode {
+  ShipItemCountThresholdNode(ShipItemType type, u32 count = 1) : type(type), count(count) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto& ship = ctx.bot->game->ship_controller.ship;
+
+    u32* items[] = {&ship.repels, &ship.bursts, &ship.decoys, &ship.thors, &ship.bricks, &ship.rockets, &ship.portals};
+
+    size_t index = (size_t)type;
+    if (index >= ZERO_ARRAY_SIZE(items)) return ExecuteResult::Failure;
+
+    return *items[index] >= count ? ExecuteResult::Success : ExecuteResult::Failure;
+  }
+
+  ShipItemType type;
+  u32 count;
+};
+
+struct ShipItemCountQueryNode : public BehaviorNode {
+  ShipItemCountQueryNode(ShipItemType type, const char* output_key) : type(type), output_key(output_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto& ship = ctx.bot->game->ship_controller.ship;
+
+    u32* items[] = {&ship.repels, &ship.bursts, &ship.decoys, &ship.thors, &ship.bricks, &ship.rockets, &ship.portals};
+
+    size_t index = (size_t)type;
+    if (index >= ZERO_ARRAY_SIZE(items)) return ExecuteResult::Failure;
+
+    ctx.blackboard.Set(output_key, *items[index]);
+
+    return ExecuteResult::Success;
+  }
+
+  ShipItemType type = ShipItemType::Repel;
+  const char* output_key = nullptr;
 };
 
 struct ShipWeaponCapabilityQueryNode : public BehaviorNode {

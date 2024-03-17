@@ -74,6 +74,8 @@ enum {
 };
 using ShipCapabilityFlags = int;
 
+enum class ShipItemType { Repel, Burst, Decoy, Thor, Brick, Rocket, Portal };
+
 struct Ship {
   u32 energy;
   u32 recharge;

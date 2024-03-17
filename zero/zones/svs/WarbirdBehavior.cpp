@@ -47,6 +47,11 @@ std::unique_ptr<behavior::BehaviorNode> WarbirdBehavior::CreateTree(behavior::Ex
                     .Child<NearestMemoryTargetNode>("nearest_target")
                     .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
                     .End()
+                .Sequence(CompositeDecorator::Success) // If we have a portal but no location, lay one down.
+                    .Child<ShipItemCountThresholdNode>(ShipItemType::Portal, 1)
+                    .InvertChild<ShipPortalPositionQueryNode>()
+                    .Child<InputActionNode>(InputAction::Portal)
+                    .End()
                 .Selector(CompositeDecorator::Success) // Enable multifire if ship supports it and it's disabled.
                     .Sequence()
                         .Child<ShipCapabilityQueryNode>(ShipCapability_Multifire)
@@ -59,6 +64,20 @@ std::unique_ptr<behavior::BehaviorNode> WarbirdBehavior::CreateTree(behavior::Ex
                         .InvertChild<DistanceThresholdNode>("nearest_target_position", 15.0f) // If we are far from enemy, use multifire
                         .Child<ShipMultifireQueryNode>()
                         .Child<InputActionNode>(InputAction::Multifire)
+                        .End()
+                    .End()
+                .Selector(CompositeDecorator::Success) // Toggle antiwarp based on energy
+                    .Sequence() // Enable antiwarp if we are healthy
+                        .Child<ShipCapabilityQueryNode>(ShipCapability_Antiwarp)
+                        .Child<PlayerEnergyPercentThresholdNode>(0.75f)
+                        .InvertChild<PlayerStatusQueryNode>(Status_Antiwarp)
+                        .Child<InputActionNode>(InputAction::Antiwarp)
+                        .End()
+                    .Sequence() // Disable antiwarp if we aren't healthy
+                        .Child<ShipCapabilityQueryNode>(ShipCapability_Antiwarp)
+                        .InvertChild<PlayerEnergyPercentThresholdNode>(0.75f)
+                        .Child<PlayerStatusQueryNode>(Status_Antiwarp)
+                        .Child<InputActionNode>(InputAction::Antiwarp)
                         .End()
                     .End()
                 .Selector()
@@ -103,22 +122,34 @@ std::unique_ptr<behavior::BehaviorNode> WarbirdBehavior::CreateTree(behavior::Ex
                                     .End()
                                 .End()
                             .Parallel()
-                                .Sequence(CompositeDecorator::Success)
-                                    .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Repel)
+                                .Sequence(CompositeDecorator::Success) // Always check incoming damage so we can use it in repel and portal sequences.
                                     .Child<RepelDistanceQueryNode>("repel_distance")
                                     .Child<IncomingDamageQueryNode>("repel_distance", "incoming_damage")
                                     .Child<PlayerCurrentEnergyQueryNode>("self_energy")
+                                    .End()
+                                .Sequence(CompositeDecorator::Success) // If we are in danger but can't repel, use our portal.
+                                    .InvertChild<ShipItemCountThresholdNode>(ShipItemType::Repel)
+                                    .Child<ShipPortalPositionQueryNode>() // Check if we have a portal down.
+                                    .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
+                                    .Child<TimerExpiredNode>("defense_timer")
+                                    .Child<InputActionNode>(InputAction::Warp)
+                                    .Child<TimerSetNode>("defense_timer", 100)
+                                    .End()
+                                .Sequence(CompositeDecorator::Success) // Use repel when in danger.
+                                    .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Repel)
+                                    .Child<TimerExpiredNode>("defense_timer")
                                     .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
                                     .Child<InputActionNode>(InputAction::Repel)
+                                    .Child<TimerSetNode>("defense_timer", 100)
                                     .End()
-                                .Sequence(CompositeDecorator::Success)
+                                .Sequence(CompositeDecorator::Success) // Use burst when near a wall.
                                     .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Burst)
                                     .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
                                     .InvertChild<DistanceThresholdNode>("nearest_target_position", 15.0f)
                                     .Child<BurstAreaQueryNode>()
                                     .Child<InputActionNode>(InputAction::Burst)
                                     .End()
-                                .Sequence(CompositeDecorator::Success)
+                                .Sequence(CompositeDecorator::Success) // Bomb fire check.
                                     .Child<PlayerEnergyPercentThresholdNode>(0.65f)
                                     .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Bomb)
                                     .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
