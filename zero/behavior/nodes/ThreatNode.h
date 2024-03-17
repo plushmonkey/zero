@@ -7,6 +7,7 @@
 #include <zero/game/Game.h>
 
 #include <random>
+#include <unordered_set>
 
 // These nodes are pretty bad. They could be improved by projecting weapons through an influence map and finding a
 // nearby tile on the map that is safe.
@@ -130,8 +131,10 @@ struct InfluenceMapPopulateWeapons : public BehaviorNode {
         Vector2f side = Normalize(Perpendicular(weapon->velocity));
 
         for (int i = 1; i <= 2; ++i) {
-          CastInfluence(influence_map, ctx.bot->game->connection.map, weapon->position + side * (float)i, direction, remaining_dist, dmg);
-          CastInfluence(influence_map, ctx.bot->game->connection.map, weapon->position - side * (float)i, direction, remaining_dist, dmg);
+          CastInfluence(influence_map, ctx.bot->game->connection.map, weapon->position + side * (float)i, direction,
+                        remaining_dist, dmg);
+          CastInfluence(influence_map, ctx.bot->game->connection.map, weapon->position - side * (float)i, direction,
+                        remaining_dist, dmg);
         }
       }
     }
@@ -324,16 +327,27 @@ struct PositionThreatQueryNode : public BehaviorNode {
 
     Rectangle bounds(position - Vector2f(radius, radius), position + Vector2f(radius, radius));
 
+    links.clear();
+
     for (size_t i = 0; i < weapon_manager.weapon_count; ++i) {
       Weapon& weapon = weapon_manager.weapons[i];
 
       if (weapon.frequency == freq) continue;
       if (weapon.data.type == WeaponType::Repel || weapon.data.type == WeaponType::Decoy) continue;
+      if (weapon.data.type == WeaponType::Burst && !(weapon.flags & WEAPON_FLAG_BURST_ACTIVE)) continue;
+      if (links.contains(weapon.link_id)) continue;
+
+      if (weapon.link_id != kInvalidLink) {
+        links.insert(weapon.link_id);
+      }
 
       float dist = 0.0f;
       Vector2f start = weapon.position;
 
-      if (RayBoxIntersect(Ray(start, Normalize(weapon.velocity)), bounds, &dist, nullptr)) {
+      float bounds_scale = weapon.data.type == WeaponType::ProximityBomb ? 2.0f : 1.0f;
+      Rectangle check_bounds = bounds.Scale(bounds_scale);
+
+      if (RayBoxIntersect(Ray(start, Normalize(weapon.velocity)), check_bounds, &dist, nullptr)) {
         Vector2f end = weapon.position + weapon.velocity * seconds_lookahead;
 
         if (start.DistanceSq(end) >= dist * dist) {
@@ -355,6 +369,8 @@ struct PositionThreatQueryNode : public BehaviorNode {
   float radius;
   const char* position_key = nullptr;
   const char* output_key = nullptr;
+
+  std::unordered_set<u32> links;
 };
 
 }  // namespace behavior

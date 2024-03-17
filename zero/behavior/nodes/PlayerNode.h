@@ -203,6 +203,22 @@ struct PlayerEnergyPercentThresholdNode : public behavior::BehaviorNode {
   float threshold;
 };
 
+struct PlayerCurrentEnergyQueryNode : public behavior::BehaviorNode {
+  PlayerCurrentEnergyQueryNode(const char* output_key) : output_key(output_key) { }
+  
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    Player* player = ctx.bot->game->player_manager.GetSelf();
+
+    if (!player) return ExecuteResult::Failure;
+    
+    ctx.blackboard.Set(output_key, player->energy);
+
+    return ExecuteResult::Success;
+  }
+
+  const char* output_key = nullptr;
+};
+
 struct PlayerPositionQueryNode : public behavior::BehaviorNode {
   PlayerPositionQueryNode(const char* position_key) : player_key(nullptr), position_key(position_key) {}
   PlayerPositionQueryNode(const char* player_key, const char* position_key)

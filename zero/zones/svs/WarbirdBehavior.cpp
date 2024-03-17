@@ -19,6 +19,7 @@
 #include <zero/zones/svs/nodes/BurstAreaQueryNode.h>
 #include <zero/zones/svs/nodes/DynamicPlayerBoundingBoxQueryNode.h>
 #include <zero/zones/svs/nodes/FindNearestGreenNode.h>
+#include <zero/zones/svs/nodes/IncomingDamageQueryNode.h>
 #include <zero/zones/svs/nodes/MemoryTargetNode.h>
 #include <zero/zones/svs/nodes/NearbyEnemyWeaponQueryNode.h>
 
@@ -105,7 +106,9 @@ std::unique_ptr<behavior::BehaviorNode> WarbirdBehavior::CreateTree(behavior::Ex
                                 .Sequence(CompositeDecorator::Success)
                                     .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Repel)
                                     .Child<RepelDistanceQueryNode>("repel_distance")
-                                    .Child<NearbyEnemyWeaponQueryNode>(WeaponTypeCombine() | WeaponType::Bomb | WeaponType::ProximityBomb, "repel_distance")
+                                    .Child<IncomingDamageQueryNode>("repel_distance", "incoming_damage")
+                                    .Child<PlayerCurrentEnergyQueryNode>("self_energy")
+                                    .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
                                     .Child<InputActionNode>(InputAction::Repel)
                                     .End()
                                 .Sequence(CompositeDecorator::Success)

@@ -103,10 +103,8 @@ struct RandomNode : public BehaviorNode {
 };
 
 struct ScalarNode : public BehaviorNode {
-  ScalarNode(const char* existing_key, const char* output_key)
-    : existing_key(existing_key), output_key(output_key) {}
-  ScalarNode(float value, const char* output_key)
-    : value(value), existing_key(nullptr), output_key(output_key) {}
+  ScalarNode(const char* existing_key, const char* output_key) : existing_key(existing_key), output_key(output_key) {}
+  ScalarNode(float value, const char* output_key) : value(value), existing_key(nullptr), output_key(output_key) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
     float input = value;
@@ -370,10 +368,9 @@ struct RayRectangleInterceptNode : public BehaviorNode {
 
 template <typename T>
 struct ScalarThresholdNode : public BehaviorNode {
-  ScalarThresholdNode(const char* scalar_key, T threshold)
-      : scalar_key(scalar_key), threshold_key(nullptr), threshold(threshold) {}
+  ScalarThresholdNode(const char* scalar_key, T threshold) : scalar_key(scalar_key), threshold(threshold) {}
   ScalarThresholdNode(const char* scalar_key, const char* threshold_key)
-      : scalar_key(scalar_key), threshold_key(threshold_key), threshold({}) {}
+      : scalar_key(scalar_key), threshold_key(threshold_key) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
     auto opt_scalar = ctx.blackboard.Value<T>(scalar_key);
@@ -392,9 +389,9 @@ struct ScalarThresholdNode : public BehaviorNode {
     return scalar >= threshold ? ExecuteResult::Success : ExecuteResult::Failure;
   }
 
-  const char* scalar_key;
-  const char* threshold_key;
-  T threshold;
+  const char* scalar_key = nullptr;
+  const char* threshold_key = nullptr;
+  T threshold = {};
 };
 
 struct VectorDotNode : public BehaviorNode {
@@ -432,7 +429,7 @@ struct VectorDotNode : public BehaviorNode {
 // Computes vector_a_key + vector_b_key and stores in output_key.
 struct VectorAddNode : public BehaviorNode {
   VectorAddNode(const char* vector_a_key, const char* vector_b_key, const char* output_key, bool normalize = false)
-    : vector_a_key(vector_a_key), vector_b_key(vector_b_key), output_key(output_key), normalize(normalize) {}
+      : vector_a_key(vector_a_key), vector_b_key(vector_b_key), output_key(output_key), normalize(normalize) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
     auto opt_vector_a = ctx.blackboard.Value<Vector2f>(vector_a_key);

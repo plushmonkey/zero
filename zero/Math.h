@@ -215,6 +215,12 @@ struct Rectangle {
   }
 
   inline Rectangle Translate(Vector2f v) const { return Rectangle(min + v, max + v); }
+  inline Rectangle Scale(float scale) const {
+    Vector2f center = (max + min) * 0.5f;
+    Vector2f half_extents = (max - min) * (scale * 0.5f);
+    return Rectangle(center - half_extents, center + half_extents);
+  }
+
   inline Vector2f GetCenter() const { return (min + max) * 0.5f; }
 
   inline bool Contains(Vector2f point) const {
