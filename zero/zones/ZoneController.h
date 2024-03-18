@@ -23,6 +23,21 @@ struct ZoneController : EventHandler<ZeroBot::JoinRequestEvent>,
 
     bot->commands->Reset();
     CreateBehaviors(event.name);
+
+    // Assign standard variables with priority of zone name section then General if that fails.
+    const char* group_lookups[] = {to_string(bot->server_info.zone), "General"};
+
+    auto default_behavior = bot->config->GetString(group_lookups, ZERO_ARRAY_SIZE(group_lookups), "Behavior");
+    auto request_ship = bot->config->GetInt(group_lookups, ZERO_ARRAY_SIZE(group_lookups), "RequestShip");
+
+    if (default_behavior) {
+      SetBehavior(*default_behavior);
+    }
+
+    // Set request ship after the behavior is initialized so it can override the blackboard variable.
+    if (request_ship) {
+      bot->execute_ctx.blackboard.Set("request_ship", *request_ship - 1);
+    }
   }
 
   virtual void HandleEvent(const BotController::UpdateEvent& event) override {}

@@ -35,6 +35,18 @@ struct Config {
     return (int)strtol(map_iter->second.data(), nullptr, 10);
   }
 
+  // Try to get an integer from a list of groups by order of priority.
+  inline std::optional<int> GetInt(const char** groups, size_t group_count, const char* key) {
+    for (size_t i = 0; i < group_count; ++i) {
+      auto result = GetInt(groups[i], key);
+      if (result) {
+        return result;
+      }
+    }
+
+    return {};
+  }
+
   inline std::optional<const char*> GetString(const std::string& group, const char* key) {
     auto group_iter = groups.find(group);
     if (group_iter == groups.end()) return {};
@@ -43,6 +55,18 @@ struct Config {
     if (map_iter == group_iter->second.map.end()) return {};
 
     return map_iter->second.data();
+  }
+
+  // Try to get a string from a list of groups by order of priority.
+  inline std::optional<const char*> GetString(const char** groups, size_t group_count, const char* key) {
+    for (size_t i = 0; i < group_count; ++i) {
+      auto result = GetString(groups[i], key);
+      if (result) {
+        return result;
+      }
+    }
+
+    return {};
   }
 
   static std::unique_ptr<Config> Load(const char* file_path);

@@ -12,6 +12,16 @@ Encryption = Subspace
 # Sets the log level threshold so only log messages of that level or higher are displayed.
 # Must be one of these: Jabber, Debug, Info, Warning, Error
 LogLevel = Info
+# Sets the default ship. This can overridden in a zone-specific section with the same key name.
+RequestShip = 1
+# Sets the default behavior. This can be overriden in a zone-specific section with the same key name.
+#Behavior = center
+
+[Subgame]
+RequestShip = 5
+
+[Hyperspace]
+Behavior = center-jav
 
 # Only these servers are supported. The names must not be changed.
 [Servers]
