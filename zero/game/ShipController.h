@@ -110,6 +110,7 @@ struct Ship {
   Vector2f portal_location;
 
   bool multifire;
+  bool gravity_effect;
 
   ShipCapabilityFlags capability;
 };

@@ -15,6 +15,19 @@ struct Steering {
     rotation = 0.0f;
   }
 
+  inline static float GetMaxSpeed(Game& game) {
+    Player* self = game.player_manager.GetSelf();
+    if (!self) return 0.0f;
+
+    u32 int_speed = game.ship_controller.ship.speed;
+
+    if (game.ship_controller.ship.gravity_effect) {
+      int_speed = (u32)game.connection.settings.ShipSettings[self->ship].GravityTopSpeed;
+    }
+
+    return int_speed / 16.0f / 10.0f;
+  }
+
   void Face(Game& game, const Vector2f& target) {
     Player* self = game.player_manager.GetSelf();
 
@@ -37,7 +50,7 @@ struct Steering {
   void Seek(Game& game, const Vector2f& target) {
     Player* self = game.player_manager.GetSelf();
 
-    float max_speed = game.player_manager.ship_controller->ship.speed / 16.0f / 10.0f;
+    float max_speed = GetMaxSpeed(game);
 
     Vector2f desired_velocity = Normalize(target - self->position) * max_speed;
 
@@ -61,7 +74,7 @@ struct Steering {
 
     Vector2f to_target = target - self->position;
     float distance = to_target.Length();
-    float max_speed = game.ship_controller.ship.speed / 16.0f / 10.0f;
+    float max_speed = GetMaxSpeed(game);
 
     if (distance > 0) {
       float multiplier = 1.0f;
@@ -78,7 +91,7 @@ struct Steering {
 
   void Pursue(Game& game, const Vector2f& target_position, const Player& target, float target_distance) {
     Player* self = game.player_manager.GetSelf();
-    float max_speed = game.ship_controller.ship.speed / 16.0f / 10.0f;
+    float max_speed = GetMaxSpeed(game);
     Vector2f to_target = target_position - self->position;
     float t = to_target.Length() / (max_speed + target.velocity.Length());
 
@@ -117,7 +130,7 @@ struct Steering {
       feelers[i + 1] = Rotate(feelers[0], -kDegToRad * (90.0f / kFeelerCount) * i);
     }
 
-    float max_speed = game.ship_controller.ship.speed / 16.0f / 10.0f;
+    float max_speed = GetMaxSpeed(game);
     float thrust = (game.ship_controller.ship.thrust * (10.0f / 16.0f));
     // Seconds to go to zero from max
     float max_ttz = max_speed / thrust;

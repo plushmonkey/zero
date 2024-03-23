@@ -1,3 +1,5 @@
+#include "Hyperspace.h"
+
 #include <zero/BotController.h>
 #include <zero/Utility.h>
 #include <zero/ZeroBot.h>
@@ -5,6 +7,7 @@
 #include <zero/game/Logger.h>
 #include <zero/zones/ZoneController.h>
 #include <zero/zones/hyperspace/CommandBehavior.h>
+#include <zero/zones/hyperspace/base/TestBehavior.h>
 #include <zero/zones/hyperspace/center/BallBehavior.h>
 #include <zero/zones/hyperspace/center/CenterBehavior.h>
 #include <zero/zones/hyperspace/center/CenterJavBehavior.h>
@@ -203,6 +206,7 @@ void HyperspaceController::CreateBehaviors(const char* arena_name) {
     repo.Add("center-levi", std::make_unique<CenterLeviBehavior>());
     repo.Add("center-jav", std::make_unique<CenterJavBehavior>());
     repo.Add("center", std::make_unique<CenterBehavior>());
+    repo.Add("test", std::make_unique<TestBehavior>());
 
     command_behavior = std::make_unique<CommandBehavior>();
 

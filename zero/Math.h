@@ -50,9 +50,9 @@ struct Vector2f {
     float values[2];
   };
 
-  Vector2f() : x(0), y(0) {}
-  Vector2f(float x, float y) : x(x), y(y) {}
-  Vector2f(const Vector2f& other) : x(other.x), y(other.y) {}
+  constexpr Vector2f() : x(0), y(0) {}
+  constexpr Vector2f(float x, float y) : x(x), y(y) {}
+  constexpr Vector2f(const Vector2f& other) : x(other.x), y(other.y) {}
 
   Vector2f& operator=(const Vector2f& other) {
     x = other.x;

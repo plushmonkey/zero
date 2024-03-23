@@ -82,6 +82,7 @@ void ShipController::Update(const InputState& input, float dt) {
   bool engine_shutdown = TICK_GT(ship.shutdown_end_tick, tick);
 
   u32 ship_speed = ship.speed;
+  ship.gravity_effect = false;
 
   if (self->ship != 8) {
     AnimatedTileSet& wormholes = connection.map.GetAnimatedTileSet(AnimatedTile::Wormhole);
@@ -111,6 +112,7 @@ void ShipController::Update(const InputState& input, float dt) {
 
         if (abs(gravity_thrust) >= 1) {
           ship_speed = (u32)connection.settings.ShipSettings[self->ship].GravityTopSpeed;
+          ship.gravity_effect = true;
         }
       }
     }

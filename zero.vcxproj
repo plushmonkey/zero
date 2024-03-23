@@ -82,6 +82,7 @@
     <ClCompile Include="zero\game\Soccer.cpp" />
     <ClCompile Include="zero\game\WeaponManager.cpp" />
     <ClCompile Include="zero\game\WorkQueue.cpp" />
+    <ClCompile Include="zero\zones\hyperspace\base\TestBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\center\BallBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\center\CenterJavBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\center\CenterLeviBehavior.cpp" />
@@ -183,12 +184,16 @@
     <ClInclude Include="zero\Types.h" />
     <ClInclude Include="zero\game\WeaponManager.h" />
     <ClInclude Include="zero\game\WorkQueue.h" />
+    <ClInclude Include="zero\zones\hyperspace\base\TestBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\center\BallBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\center\CenterJavBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\center\CenterLeviBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\center\CenterBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\CommandBehavior.h" />
+    <ClInclude Include="zero\zones\hyperspace\Hyperspace.h" />
     <ClInclude Include="zero\zones\hyperspace\nodes\CommandNode.h" />
+    <ClInclude Include="zero\zones\hyperspace\nodes\FlagSectorNode.h" />
+    <ClInclude Include="zero\zones\hyperspace\nodes\GlobalGoToNode.h" />
     <ClInclude Include="zero\zones\metalgear\GunnerBehavior.h" />
     <ClInclude Include="zero\zones\metalgear\JuggBehavior.h" />
     <ClInclude Include="zero\zones\metalgear\SniperBehavior.h" />
