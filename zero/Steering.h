@@ -69,7 +69,7 @@ struct Steering {
     Seek(game, target);
   }
 
-  void Arrive(Game& game, const Vector2f& target, float slow_radius) {
+  void Arrive(Game& game, const Vector2f& target, float slow_radius, float min_multiplier = 0.0f) {
     Player* self = game.player_manager.GetSelf();
 
     Vector2f to_target = target - self->position;
@@ -81,6 +81,7 @@ struct Steering {
 
       if (distance < slow_radius) {
         multiplier = distance / slow_radius;
+        if (multiplier < min_multiplier) multiplier = min_multiplier;
       }
 
       Vector2f desired = Normalize(to_target) * max_speed * multiplier;

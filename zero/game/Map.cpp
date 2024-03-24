@@ -888,19 +888,34 @@ CastResult Map::CastShip(Player* player, float radius, const Vector2f& to) const
 
   direction = Normalize(direction);
 
+  Vector2f radius_vec(radius, radius);
+
   CastResult center = Cast(from, direction, distance, player->frequency);
   if (center.hit) {
-    return center;
+    // Calculate where the should would be upon hitting this spot and see if it overlaps the target position.
+    Vector2f new_pos = center.position - radius_vec;
+    
+    if (!BoxContainsPoint(new_pos - radius_vec, new_pos + radius_vec, to)) {
+      return center;
+    }
   }
 
   CastResult side1 = Cast(from + side * radius, direction, distance, player->frequency);
   if (side1.hit) {
-    return side1;
+    Vector2f new_pos = side1.position - side * radius - radius_vec;
+
+    if (!BoxContainsPoint(new_pos - radius_vec, new_pos + radius_vec, to)) {
+      return side1;
+    }
   }
 
   CastResult side2 = Cast(from - side * radius, direction, distance, player->frequency);
   if (side2.hit) {
-    return side2;
+    Vector2f new_pos = side2.position + side * radius - radius_vec;
+
+    if (!BoxContainsPoint(new_pos - radius_vec, new_pos + radius_vec, to)) {
+      return side2;
+    }
   }
 
   return center;

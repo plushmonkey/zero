@@ -198,7 +198,7 @@ struct GoToNode : public BehaviorNode {
     } else {
       float speed_sq = self->velocity.LengthSq();
 
-      steering.Arrive(game, movement_target, .0f);
+      steering.Arrive(game, movement_target, 8.0f, 0.3f);
 
       // Avoid walls when moving fast so it slows down while approaching a wall.
       if (speed_sq > 8.0f * 8.0f) {

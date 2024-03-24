@@ -54,7 +54,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                 .End()
             .Sequence()
                 .Child<GlobalGoToNode>("random_position")
-                .Child<RenderPathNode>(Vector3f(1, 0, 0))
+                .Child<RenderPathNode>(Vector3f(0, 0, 0))
                 .End()
             .End()
         .End();

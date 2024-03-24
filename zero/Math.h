@@ -349,10 +349,10 @@ struct Vector3f {
     float values[3];
   };
 
-  Vector3f() : x(0), y(0), z(0) {}
-  Vector3f(float x, float y, float z) : x(x), y(y), z(z) {}
-  Vector3f(const Vector2f& v2, float z) : x(v2.x), y(v2.y), z(z) {}
-  Vector3f(const Vector3f& other) : x(other.x), y(other.y), z(other.z) {}
+  constexpr Vector3f() : x(0), y(0), z(0) {}
+  constexpr Vector3f(float x, float y, float z) : x(x), y(y), z(z) {}
+  constexpr Vector3f(const Vector2f& v2, float z) : x(v2.x), y(v2.y), z(z) {}
+  constexpr Vector3f(const Vector3f& other) : x(other.x), y(other.y), z(other.z) {}
 
   Vector3f& operator=(const Vector3f& other) {
     x = other.x;

@@ -33,9 +33,18 @@ struct RenderPathNode : public BehaviorNode {
       prev_position = ctx.bot->game->player_manager.GetSelf()->position;
     }
 
+    static constexpr Vector3f kColors[] = {Vector3f(1, 0, 0), Vector3f(0, 1, 0), Vector3f(0, 0, 1)};
+
     bool render = false;
     for (size_t i = path.index; i < path.points.size(); ++i) {
-      ctx.bot->game->line_renderer.PushLine(prev_position, color, path.points[i], color);
+      Vector3f this_color = color;
+
+      // Create a special override for coloring each line of a path differently.
+      if (color.x <= 0.0f && color.y <= 0.0f && color.z <= 0.0f) {
+        this_color = kColors[i % 3];
+      }
+
+      ctx.bot->game->line_renderer.PushLine(prev_position, this_color, path.points[i], this_color);
       prev_position = path.points[i];
       render = true;
     }
