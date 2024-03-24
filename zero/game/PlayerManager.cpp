@@ -1452,6 +1452,12 @@ bool PlayerManager::SimulateAxis(Player& player, float dt, int axis, bool extrap
     }
 
     player.position.values[axis] = previous;
+
+    // Move us out of the wall if our old position was in a wall.
+    if (player.id == player_id && map.IsSolid(player.position, player.frequency)) {
+      player.position.values[axis] -= 1.0f;
+    }
+
     player.velocity.values[axis] *= -bounce_factor;
     player.velocity.values[axis_flip] *= bounce_factor;
 

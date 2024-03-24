@@ -4,6 +4,7 @@
 #include <zero/ZeroBot.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/game/Game.h>
+#include <zero/game/Logger.h>
 
 namespace zero {
 namespace behavior {
@@ -122,6 +123,13 @@ struct GoToNode : public BehaviorNode {
 
         CastResult cast = map.CastShip(self, radius, next);
 
+        // Try to walk the path backwards to re-use the nodes.
+        while (cast.hit && current_path.index > 0) {
+          --current_path.index;
+          next = current_path.GetCurrent();
+          cast = map.CastShip(self, radius, next);
+        }
+
         if (!cast.hit) {
           build = false;
         }
@@ -129,6 +137,7 @@ struct GoToNode : public BehaviorNode {
     }
 
     if (build) {
+      Log(LogLevel::Debug, "Rebuilding path");
       current_path = pathfinder->FindPath(game.connection.map, self->position, target, radius);
     }
 
@@ -150,10 +159,13 @@ struct GoToNode : public BehaviorNode {
     while (!current_path.IsOnGoalNode()) {
       Vector2f next = current_path.GetNext();
 
-      if (!CanMoveBetween(game, self->position, next, radius, self->frequency)) {
+      CastResult cast = map.CastShip(self, radius, next);
+      if (cast.hit) {
         break;
       }
 
+      // Reset the stuck counter when we successfully move to a new node.
+      ctx.blackboard.Set<u32>("bounce_count", 0);
       movement_target = current_path.Advance();
     }
 
@@ -165,9 +177,10 @@ struct GoToNode : public BehaviorNode {
       current_path.Clear();
     }
 
-    float speed_sq = self->velocity.LengthSq();
     auto& steering = ctx.bot->bot_controller->steering;
-    if (speed_sq < 0.3f * 0.3f) {
+    bool is_stuck = IsStuck(*self, ctx);
+
+    if (is_stuck) {
       Vector2f direction = Normalize(movement_target - self->position);
       Vector2f new_direction;
 
@@ -177,17 +190,15 @@ struct GoToNode : public BehaviorNode {
         new_direction = Normalize(Reflect(direction, Vector2f(1, 0)));
       }
 
+      Log(LogLevel::Debug, "Unstucking");
+
       // Face a reflected vector so it rotates away from the wall.
       steering.Face(game, self->position + new_direction);
       steering.Seek(game, movement_target);
     } else {
-      if (speed_sq > 1.0f * 1.0f) {
-        // Arrive to node when moving fast enough.
-        steering.Arrive(game, movement_target, 0.25f);
-      } else {
-        // Seek when going slow so it can get around corners.
-        steering.Seek(game, movement_target);
-      }
+      float speed_sq = self->velocity.LengthSq();
+
+      steering.Arrive(game, movement_target, .0f);
 
       // Avoid walls when moving fast so it slows down while approaching a wall.
       if (speed_sq > 8.0f * 8.0f) {
@@ -199,18 +210,24 @@ struct GoToNode : public BehaviorNode {
   }
 
  private:
-  bool CanMoveBetween(Game& game, Vector2f from, Vector2f to, float radius, u32 frequency) {
-    Vector2f trajectory = to - from;
-    Vector2f direction = Normalize(trajectory);
-    Vector2f side = Perpendicular(direction);
+  // Determine if we are stuck by checking last wall collision ticks and having a counter.
+  static bool IsStuck(const Player& self, ExecuteContext& ctx) {
+    u32 last_stored_bounce_tick = ctx.blackboard.ValueOr<u32>("last_bounce_tick", 0);
+    u32 bounce_count = ctx.blackboard.ValueOr<u32>("bounce_count", 0);
 
-    float distance = from.Distance(to);
+    if (last_stored_bounce_tick != self.last_bounce_tick) {
+      ++bounce_count;
 
-    CastResult center = game.GetMap().Cast(from, direction, distance, frequency);
-    CastResult side1 = game.GetMap().Cast(from + side * radius, direction, distance, frequency);
-    CastResult side2 = game.GetMap().Cast(from - side * radius, direction, distance, frequency);
+      ctx.blackboard.Set("bounce_count", bounce_count);
+      ctx.blackboard.Set("last_bounce_tick", self.last_bounce_tick);
+    } else {
+      if (bounce_count > 0) --bounce_count;
+      if (bounce_count > 100) bounce_count = 100;
 
-    return !center.hit && !side1.hit && !side2.hit;
+      ctx.blackboard.Set("bounce_count", bounce_count);
+    }
+
+    return bounce_count >= 50;
   }
 
   Vector2f position;

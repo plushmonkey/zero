@@ -804,6 +804,13 @@ CastResult Map::Cast(const Vector2f& from, const Vector2f& direction, float max_
 
   Vector2f step;
 
+  if (IsSolid(from, frequency)) {
+    result.hit = true;
+    result.distance = 0.0f;
+    result.position = from;
+    return result;
+  }
+
   if (direction.x < 0) {
     step.x = -1.0f;
     travel.x = (from.x - check.x) * unit_step.x;
@@ -874,7 +881,7 @@ CastResult Map::CastTo(const Vector2f& from, const Vector2f& to, u32 frequency) 
 }
 
 CastResult Map::CastShip(Player* player, float radius, const Vector2f& to) const {
-  Vector2f& from = player->position;
+  Vector2f from = player->position;
   Vector2f side = Perpendicular(Normalize(to - from));
   Vector2f direction = to - from;
   float distance = direction.Length();
