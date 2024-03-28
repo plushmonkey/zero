@@ -109,6 +109,25 @@ static void OnSetCoordinatesPkt(void* user, u8* pkt, size_t size) {
   self->velocity.y = 0.0f;
   self->togglables |= Status_Flash;
   self->warp_anim_t = 0.0f;
+
+  if (self->ship < 8) {
+    float radius = manager->connection.settings.ShipSettings[self->ship].GetRadius();
+
+    // Move us out of the wall if the new position is inside.
+    while (manager->connection.map.IsColliding(self->position, radius, self->frequency)) {
+      self->position = Vector2f(floorf(self->position.x - 1), floorf(self->position.y - 1));
+
+      if (self->position.x < 0) {
+        self->position.x = 0;
+        break;
+      }
+
+      if (self->position.y < 0) {
+        self->position.y = 0;
+        break;
+      }
+    }
+  }
 }
 
 inline bool IsPlayerVisible(Player& self, u32 self_freq, Player& player) {
@@ -1453,11 +1472,6 @@ bool PlayerManager::SimulateAxis(Player& player, float dt, int axis, bool extrap
     }
 
     player.position.values[axis] = previous;
-
-    // Move us out of the wall if our old position was in a wall.
-    if (player.id == player_id && map.IsColliding(player.position, radius, player.frequency)) {
-      player.position.values[axis] -= 1.0f;
-    }
 
     player.velocity.values[axis] *= -bounce_factor;
     player.velocity.values[axis_flip] *= bounce_factor;
