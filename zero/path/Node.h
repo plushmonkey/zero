@@ -30,9 +30,10 @@ struct Node {
 
   float g;
   float f;
+  float f_last;
   float weight;
 
-  Node() : parent(nullptr), flags(0), g(0.0f), f(0.0f), weight(1.0f) {}
+  Node() : parent(nullptr), flags(0), g(0.0f), f(0.0f), f_last(0.0f), weight(1.0f) {}
 };
 
 }  // namespace path

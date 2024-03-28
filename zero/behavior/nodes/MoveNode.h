@@ -137,8 +137,10 @@ struct GoToNode : public BehaviorNode {
     }
 
     if (build) {
-      Log(LogLevel::Debug, "Rebuilding path");
       current_path = pathfinder->FindPath(game.connection.map, self->position, target, radius);
+      if (current_path.points.size() > 10) {
+        Log(LogLevel::Debug, "Rebuilding path");
+      }
     }
 
     if (current_path.IsDone()) {
@@ -151,10 +153,6 @@ struct GoToNode : public BehaviorNode {
 
     Vector2f movement_target = current_path.GetCurrent();
 
-    if (current_path.IsCurrentTile(self->position)) {
-      movement_target = current_path.Advance();
-    }
-
     // Cull future nodes if they are all unobstructed from current position.
     while (!current_path.IsOnGoalNode()) {
       Vector2f next = current_path.GetNext();
@@ -165,7 +163,7 @@ struct GoToNode : public BehaviorNode {
       }
 
       // Reset the stuck counter when we successfully move to a new node.
-      ctx.blackboard.Set<u32>("bounce_count", 0);
+      ctx.blackboard.Set("bounce_count", 0);
       movement_target = current_path.Advance();
     }
 
@@ -181,26 +179,37 @@ struct GoToNode : public BehaviorNode {
     bool is_stuck = IsStuck(*self, ctx);
 
     if (is_stuck) {
-      Vector2f direction = Normalize(movement_target - self->position);
-      Vector2f new_direction;
+      // Calculate the corners of the ship.
+      Vector2f corners[] = {
+          self->position + Vector2f(-radius, -radius),
+          self->position + Vector2f(radius, -radius),
+          self->position + Vector2f(-radius, radius),
+          self->position + Vector2f(radius, radius),
+      };
+      float best_dist_sq = 1024 * 1024;
+      size_t best_corner = 0;
 
-      if (fabsf(direction.x) < fabsf(direction.y)) {
-        new_direction = Normalize(Reflect(direction, Vector2f(0, 1)));
-      } else {
-        new_direction = Normalize(Reflect(direction, Vector2f(1, 0)));
+      // Find the closest corner to the movement target.
+      for (size_t i = 0; i < ZERO_ARRAY_SIZE(corners); ++i) {
+        float dist_sq = movement_target.DistanceSq(corners[i]);
+        if (dist_sq < best_dist_sq) {
+          best_dist_sq = dist_sq;
+          best_corner = i;
+        }
       }
+
+      // Use the closest corner as our new target movement, so we rotate toward our closest corner.
+      Vector2f new_target = corners[best_corner];
 
       Log(LogLevel::Debug, "Unstucking");
 
-      // Face a reflected vector so it rotates away from the wall.
-      steering.Face(game, self->position + new_direction);
-      steering.Seek(game, movement_target);
+      steering.Face(game, new_target);
+      // Avoid using seek because it wants to correct for velocity.
+      steering.force += new_target - self->position;
     } else {
       float speed_sq = self->velocity.LengthSq();
 
-      steering.Arrive(game, movement_target, 8.0f, 0.3f);
-
-      // Avoid walls when moving fast so it slows down while approaching a wall.
+      steering.Arrive(game, movement_target, 7.0f, 0.15f);
       if (speed_sq > 8.0f * 8.0f) {
         steering.AvoidWalls(game);
       }
@@ -212,8 +221,17 @@ struct GoToNode : public BehaviorNode {
  private:
   // Determine if we are stuck by checking last wall collision ticks and having a counter.
   static bool IsStuck(const Player& self, ExecuteContext& ctx) {
+    // How many ticks of bouncing against a wall before it's considered stuck.
+    constexpr u32 kStuckTickThreshold = 50;
+    // The max number of bounces stored, which are depleted when not bouncing against a wall to eventually become
+    // unstuck when below kStickTickThreshold again.
+    constexpr u32 kStuckTickMax = 100;
+    // How many ticks we are allowed to be in the stuck state.
+    constexpr u32 kStuckTickMaxDuration = 400;
+
     u32 last_stored_bounce_tick = ctx.blackboard.ValueOr<u32>("last_bounce_tick", 0);
     u32 bounce_count = ctx.blackboard.ValueOr<u32>("bounce_count", 0);
+    u32 previous_bounce_count = bounce_count;
 
     if (last_stored_bounce_tick != self.last_bounce_tick) {
       ++bounce_count;
@@ -222,12 +240,29 @@ struct GoToNode : public BehaviorNode {
       ctx.blackboard.Set("last_bounce_tick", self.last_bounce_tick);
     } else {
       if (bounce_count > 0) --bounce_count;
-      if (bounce_count > 100) bounce_count = 100;
+      if (bounce_count > kStuckTickMax) bounce_count = kStuckTickMax;
 
       ctx.blackboard.Set("bounce_count", bounce_count);
     }
 
-    return bounce_count >= 50;
+    if (bounce_count >= kStuckTickThreshold) {
+      Tick current_tick = GetCurrentTick();
+
+      // Set the start tick so we can remove stuck status if it lasts too long.
+      if (previous_bounce_count < kStuckTickThreshold) {
+        ctx.blackboard.Set("stuck_start_tick", current_tick);
+      }
+
+      Tick start_tick = ctx.blackboard.ValueOr("stuck_start_tick", 0U);
+
+      if (TICK_DIFF(current_tick, start_tick) >= kStuckTickMaxDuration) {
+        ctx.blackboard.Set("bounce_count", 0);
+        Log(LogLevel::Debug, "Unstuck for more than %u ticks.", kStuckTickMaxDuration);
+        return false;
+      }
+    }
+
+    return bounce_count >= kStuckTickThreshold;
   }
 
   Vector2f position;

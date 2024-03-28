@@ -21,9 +21,14 @@ void BotController::HandleEvent(const PlayerFreqAndShipChangeEvent& event) {
   if (event.player.id != game.player_manager.player_id) return;
   if (event.new_ship >= 8 || event.old_ship == event.new_ship) return;
 
+  float radius = game.connection.settings.ShipSettings[event.new_ship].GetRadius();
+
+  current_path.Clear();
+
+  if (pathfinder && pathfinder->config.ship_radius == radius) return;
+
   Log(LogLevel::Info, "Creating new registry and pathfinder.");
 
-  float radius = game.connection.settings.ShipSettings[event.new_ship].GetRadius();
   auto processor = std::make_unique<path::NodeProcessor>(game);
 
   region_registry = std::make_unique<RegionRegistry>();
@@ -31,7 +36,21 @@ void BotController::HandleEvent(const PlayerFreqAndShipChangeEvent& event) {
 
   pathfinder = std::make_unique<path::Pathfinder>(std::move(processor), *region_registry);
 
-  pathfinder->CreateMapWeights(game.GetMap(), radius);
+  path::Pathfinder::WeightConfig cfg = {};
+
+  cfg.ship_radius = radius;
+  cfg.frequency = event.new_frequency;
+  cfg.wall_distance = 5;
+  cfg.weight_type = path::Pathfinder::WeightType::Exponential;
+
+  pathfinder->CreateMapWeights(game.temp_arena, game.GetMap(), cfg);
+}
+
+void BotController::HandleEvent(const DoorToggleEvent& event) {
+  if (current_path.dynamic) {
+    Log(LogLevel::Debug, "Clearing current path from door update.");
+    current_path.Clear();
+  }
 }
 
 void BotController::Update(RenderContext& rc, float dt, InputState& input, behavior::ExecuteContext& execute_ctx) {

@@ -18,7 +18,6 @@ struct SetRandomPositionNode : public behavior::BehaviorNode {
         Vector2f(155, 585), Vector2f(210, 205), Vector2f(370, 229), Vector2f(505, 615), Vector2f(50, 50),
     };
 
-    srand((unsigned int)time(nullptr));
     int index = rand() % ZERO_ARRAY_SIZE(kPositions);
 
     Vector2f next = kPositions[index];
@@ -33,6 +32,8 @@ struct SetRandomPositionNode : public behavior::BehaviorNode {
 
 std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
+
+  srand((unsigned int)time(nullptr));
 
   BehaviorBuilder builder;
 

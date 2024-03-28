@@ -21,7 +21,9 @@ struct ExecuteContext;
 
 }  // namespace behavior
 
-struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>, EventHandler<JoinGameEvent> {
+struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>,
+                       EventHandler<JoinGameEvent>,
+                       EventHandler<DoorToggleEvent> {
   Game& game;
 
   std::unique_ptr<path::Pathfinder> pathfinder;
@@ -43,6 +45,7 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>, EventHandler<
 
   void HandleEvent(const JoinGameEvent& event) override;
   void HandleEvent(const PlayerFreqAndShipChangeEvent& event) override;
+  void HandleEvent(const DoorToggleEvent& event) override;
 
   struct UpdateEvent : public Event {
     BotController& controller;

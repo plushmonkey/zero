@@ -10,6 +10,7 @@ namespace path {
 struct Path {
   size_t index = 0;
   std::vector<Vector2f> points;
+  bool dynamic = false;
 
   inline void Clear() {
     points.clear();

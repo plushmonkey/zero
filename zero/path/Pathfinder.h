@@ -1,6 +1,7 @@
 #pragma once
 
 #include <zero/RegionRegistry.h>
+#include <zero/game/Memory.h>
 #include <zero/path/NodeProcessor.h>
 #include <zero/path/Path.h>
 
@@ -45,13 +46,22 @@ class PriorityQueue {
 
 struct Pathfinder {
  public:
+  enum class WeightType { Flat, Linear, Exponential };
+  struct WeightConfig {
+    float ship_radius = 0.0f;
+    u32 frequency = 0;
+    WeightType weight_type = WeightType::Flat;
+    s32 wall_distance = 1;
+  };
+
+  WeightConfig config;
+
   Pathfinder(std::unique_ptr<NodeProcessor> processor, RegionRegistry& regions);
   Path FindPath(const Map& map, const Vector2f& from, const Vector2f& to, float radius);
 
-  void CreateMapWeights(const Map& map, float ship_radius);
+  void CreateMapWeights(MemoryArena& temp_arena, const Map& map, WeightConfig config);
 
  private:
-  float GetWallDistance(const Map& map, u16 x, u16 y, u16 radius);
   struct NodeCompare {
     bool operator()(const Node* lhs, const Node* rhs) const { return lhs->f > rhs->f; }
   };

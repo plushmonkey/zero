@@ -1,12 +1,16 @@
-#include <xmmintrin.h>
 #include <zero/game/Game.h>
 #include <zero/path/NodeProcessor.h>
 #include <zero/path/Pathfinder.h>
+//
+#include <math.h>
+#include <xmmintrin.h>
+
+#include <thread>
 
 namespace zero {
 namespace path {
 
-inline float fast_sqrt(float v) {
+static inline float fast_sqrt(float v) {
   __m128 v_x4 = _mm_set1_ps(v);
 
   __m128 result = _mm_sqrt_ps(v_x4);
@@ -16,7 +20,7 @@ inline float fast_sqrt(float v) {
   return v;
 }
 
-inline NodePoint ToNodePoint(const Vector2f v) {
+static inline NodePoint ToNodePoint(const Vector2f v) {
   NodePoint np;
 
   np.x = (uint16_t)v.x;
@@ -25,7 +29,7 @@ inline NodePoint ToNodePoint(const Vector2f v) {
   return np;
 }
 
-inline float Euclidean(NodeProcessor& processor, const Node* from, const Node* to) {
+static inline float Euclidean(NodeProcessor& processor, const Node* from, const Node* to) {
   NodePoint from_p = processor.GetPoint(from);
   NodePoint to_p = processor.GetPoint(to);
 
@@ -35,7 +39,7 @@ inline float Euclidean(NodeProcessor& processor, const Node* from, const Node* t
   return sqrt(dx * dx + dy * dy);
 }
 
-inline float Euclidean(const NodePoint& __restrict from_p, const NodePoint& __restrict to_p) {
+static inline float Euclidean(const NodePoint& __restrict from_p, const NodePoint& __restrict to_p) {
   float dx = static_cast<float>(from_p.x - to_p.x);
   float dy = static_cast<float>(from_p.y - to_p.y);
 
@@ -49,8 +53,7 @@ Pathfinder::Pathfinder(std::unique_ptr<NodeProcessor> processor, RegionRegistry&
     : processor_(std::move(processor)), regions_(regions) {}
 
 Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& to, float radius) {
-  Path path;
-
+  Path path = {};
   Node* start = processor_->GetNode(ToNodePoint(from));
   Node* goal = processor_->GetNode(ToNodePoint(to));
 
@@ -86,30 +89,53 @@ Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& 
 
     node->flags |= NodeFlag_Closed;
 
+    if (node->f > 0 && node->f == node->f_last) {
+      // This node was re-added to the openset because its fitness was better, so skip reprocessing the same node.
+      // This reduces pathing time by about 20%.
+      continue;
+    }
+    node->f_last = node->f;
+
     NodePoint node_point = processor_->GetPoint(node);
 
-    // returns neighbor nodes that are not solid
-    NodeConnections connections = processor_->FindEdges(node, start, goal, radius);
+    // Returns neighbor nodes that are not solid.
+    EdgeSet edges = processor_->FindEdges(node, radius);
 
-    for (std::size_t i = 0; i < connections.count; ++i) {
-      Node* edge = connections.neighbors[i];
-      NodePoint edge_point = processor_->GetPoint(edge);
+    if (edges.dynamic != 0) {
+      // If we considered any possible dynamic tiles then consider the path to be dynamic.
+      // This will cause it to be cleared and re-evaluated on door update.
+      path.dynamic = true;
+    }
+
+    for (size_t i = 0; i < 8; ++i) {
+      if (!edges.IsSet(i)) continue;
+
+      CoordOffset offset = CoordOffset::FromIndex(i);
+
+      NodePoint edge_point(node_point.x + offset.x, node_point.y + offset.y);
+      Node* edge = processor_->GetNode(edge_point);
 
       touched_.push_back(edge);
 
+      // The cost to this neighbor is the cost to the current node plus the edge weight times the distance between the
+      // nodes.
       float cost = node->g + edge->weight * Euclidean(node_point, edge_point);
 
+      // If the new cost is lower than the previously closed cost then remove it from the closed set.
       if ((edge->flags & NodeFlag_Closed) && cost < edge->g) {
         edge->flags &= ~NodeFlag_Closed;
       }
 
+      // Compute a heuristic from this neighbor to the end goal.
       float h = Euclidean(edge_point, goal_p);
 
+      // If this neighbor hasn't been considered or is better than its original fitness test, then add it back to the
+      // open set.
       if (!(edge->flags & NodeFlag_Openset) || cost + h < edge->f) {
-        edge->parent = node;
-        edge->flags |= NodeFlag_Openset;
         edge->g = cost;
         edge->f = edge->g + h;
+        edge->parent = node;
+        edge->flags |= NodeFlag_Openset;
 
         openset_.Push(edge);
       }
@@ -133,9 +159,10 @@ Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& 
   // Reverse and store as vector
   for (std::size_t i = 0; i < points.size(); ++i) {
     std::size_t index = points.size() - i - 1;
-    Vector2f pos(points[index].x, points[index].y);
+    Vector2f pos(points[index].x + 0.5f, points[index].y + 0.5f);
 
-    pos = map.GetOccupyCenter(pos, radius, 0xFFFF);
+    pos = map.ResolveShipCollision(pos, radius, 0xFFFF);
+
     path.Add(pos);
   }
 
@@ -147,44 +174,9 @@ Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& 
   return path;
 }
 
-inline Vector2f ClosestWall(const Map& map, Vector2f pos, int search) {
-  float closest_dist = std::numeric_limits<float>::max();
-  Vector2f closest;
-
-  Vector2f base(std::floor(pos.x), std::floor(pos.y));
-  for (int y = -search; y <= search; ++y) {
-    for (int x = -search; x <= search; ++x) {
-      Vector2f current = base + Vector2f((float)x, (float)y);
-
-      if (!map.IsSolid((unsigned short)current.x, (unsigned short)current.y, 0xFFFF)) {
-        continue;
-      }
-
-      float dist = BoxPointDistance(current, Vector2f(1, 1), pos);
-
-      if (dist < closest_dist) {
-        closest_dist = dist;
-        closest = current;
-      }
-    }
-  }
-
-  return closest;
-}
-
-bool IsPassablePath(const Map& map, Vector2f from, Vector2f to, float radius, u32 frequency) {
-  const Vector2f direction = Normalize(to - from);
-  const Vector2f side = Perpendicular(direction) * radius;
-  const float distance = from.Distance(to);
-
-  CastResult cast_center = map.Cast(from, direction, distance, frequency);
-  CastResult cast_side1 = map.Cast(from + side, direction, distance, frequency);
-  CastResult cast_side2 = map.Cast(from - side, direction, distance, frequency);
-
-  return !cast_center.hit && !cast_side1.hit && !cast_side2.hit;
-}
-
-float Pathfinder::GetWallDistance(const Map& map, u16 x, u16 y, u16 radius) {
+// This is pretty expensive to happen on a ship change.
+// TODO: It could be faster by using simd solid checks.
+inline static float GetWallDistance(const Map& map, u16 x, u16 y, u16 radius) {
   float closest_sq = std::numeric_limits<float>::max();
 
   for (s16 offset_y = -radius; offset_y <= radius; ++offset_y) {
@@ -192,7 +184,7 @@ float Pathfinder::GetWallDistance(const Map& map, u16 x, u16 y, u16 radius) {
       u16 check_x = x + offset_x;
       u16 check_y = y + offset_y;
 
-      if (map.IsSolid(check_x, check_y, 0xFFFF)) {
+      if (map.IsSolidEmptyDoors(check_x, check_y, 0xFFFF)) {
         float dist_sq = (float)(offset_x * offset_x + offset_y * offset_y);
 
         if (dist_sq < closest_sq) {
@@ -201,31 +193,135 @@ float Pathfinder::GetWallDistance(const Map& map, u16 x, u16 y, u16 radius) {
       }
     }
   }
+
   return sqrt(closest_sq);
 }
 
-void Pathfinder::CreateMapWeights(const Map& map, float ship_radius) {
-  for (u16 y = 0; y < 1024; ++y) {
-    for (u16 x = 0; x < 1024; ++x) {
-      Node* node = this->processor_->GetNode(NodePoint(x, y));
+static void CalculateTraversables(const Map& map, NodeProcessor& processor, float ship_radius, s16 x_start, s16 y_start,
+                                  s16 x_end, s16 y_end, OccupiedRect* scratch_rects) {
+  u32 frequency = 0xFFFF;
 
-      if (map.CanOverlapTile(Vector2f(x, y), ship_radius, 0xFFFF)) {
+  for (u16 y = y_start; y < y_end; ++y) {
+    for (u16 x = x_start; x < x_end; ++x) {
+      if (map.IsSolidEmptyDoors(x, y, 0xFFFF)) continue;
+
+      Node* node = processor.GetNode(NodePoint(x, y));
+
+      if (map.CanOverlapTile(Vector2f(x, y), ship_radius, frequency)) {
         node->flags |= NodeFlag_Traversable;
+
+        size_t rect_count = map.GetAllOccupiedRects(Vector2f(x, y), ship_radius, frequency, scratch_rects);
+
+        // This might be a diagonal tile
+        if (rect_count == 2) {
+          // Check if the two occupied rects are offset on both axes.
+          if (scratch_rects[0].start_x != scratch_rects[1].start_x &&
+              scratch_rects[0].start_y != scratch_rects[1].start_y) {
+            // This is a diagonal-only tile, so skip it.
+            node->flags &= ~NodeFlag_Traversable;
+          }
+        }
       }
-
-#if 0 // Disable because it increases pathing time a lot.
-      if (map.IsSolid(x, y, 0xFFFF)) continue;
-
-      int close_distance = 5;
-      float distance = GetWallDistance(map, x, y, close_distance);
-
-      if (distance < close_distance) {
-        float weight = close_distance / distance;
-        //node->weight = powf(weight, 4.0f);
-        node->weight = weight;
-      }
-#endif
     }
+  }
+}
+
+static void CalculateEdges(const Map& map, NodeProcessor& processor, float ship_radius, Pathfinder::WeightConfig config,
+                           s16 x_start, s16 y_start, s16 x_end, s16 y_end) {
+  u32 frequency = 0xFFFF;
+
+  for (u16 y = y_start; y < y_end; ++y) {
+    for (u16 x = x_start; x < x_end; ++x) {
+      if (map.IsSolidEmptyDoors(x, y, frequency)) continue;
+
+      Node* node = processor.GetNode(NodePoint(x, y));
+      NodePoint current_point = processor.GetPoint(node);
+      EdgeSet edges = processor.CalculateEdges(node, ship_radius);
+
+      node->weight = 1.0f;
+
+      processor.SetEdgeSet(x, y, edges);
+
+      if (config.weight_type != Pathfinder::WeightType::Flat) {
+        int close_distance = config.wall_distance;
+        float distance = GetWallDistance(map, x, y, close_distance);
+
+        if (distance < 1) distance = 1;
+
+        if (distance < close_distance) {
+          if (config.weight_type == Pathfinder::WeightType::Linear) {
+            node->weight = close_distance / distance;
+          } else {
+            float inv_dist = close_distance - distance;
+            node->weight = inv_dist * inv_dist;
+          }
+        }
+      }
+
+      TileId tile_id = map.GetTileId(current_point.x, current_point.y);
+
+      if (tile_id == kTileSafeId) {
+        node->weight = 30.0f;
+      }
+    }
+  }
+}
+
+void Pathfinder::CreateMapWeights(MemoryArena& temp_arena, const Map& map, WeightConfig config) {
+  float ship_radius = config.ship_radius;
+  u32 frequency = config.frequency;
+
+  MemoryRevert reverter = temp_arena.GetReverter();
+  OccupiedRect* scratch_rects = memory_arena_push_type_count(&temp_arena, OccupiedRect, 256);
+
+  this->config = config;
+
+  constexpr size_t kThreadCount = 12;
+  std::thread threads[kThreadCount];
+
+  // First loop over tiles and calculate all of the traversables.
+  for (size_t i = 0; i < kThreadCount; ++i) {
+    s16 per_thread = 1024 / (s16)kThreadCount;
+
+    s16 x_start = (s16)i * per_thread;
+    s16 y_start = 0;
+    s16 x_end = ((s16)i + 1) * per_thread;
+    s16 y_end = 1024;
+
+    if (i == kThreadCount - 1) {
+      s16 remainder = (s16)kThreadCount % 1024;
+      x_end += remainder;
+    }
+
+    threads[i] = std::thread(CalculateTraversables, map, std::ref(*processor_), ship_radius, x_start, y_start, x_end,
+                             y_end, scratch_rects + i * (256 / kThreadCount));
+  }
+
+  // We must wait for all of the traversables to be calculated before we start calculating edges.
+  for (size_t i = 0; i < kThreadCount; ++i) {
+    threads[i].join();
+  }
+
+  // Loop over tiles to calculate the node edges.
+  for (size_t i = 0; i < kThreadCount; ++i) {
+    s16 per_thread = 1024 / (s16)kThreadCount;
+
+    s16 x_start = (s16)i * per_thread;
+    s16 y_start = 0;
+    s16 x_end = ((s16)i + 1) * per_thread;
+    s16 y_end = 1024;
+
+    if (i == kThreadCount - 1) {
+      s16 remainder = (s16)kThreadCount % 1024;
+      x_end += remainder;
+    }
+
+    threads[i] =
+        std::thread(CalculateEdges, map, std::ref(*processor_), ship_radius, config, x_start, y_start, x_end, y_end);
+  }
+
+  for (size_t i = 0; i < kThreadCount; ++i) {
+    threads[i].join();
   }
 }
 

@@ -220,11 +220,24 @@ struct Rectangle {
     Vector2f half_extents = (max - min) * (scale * 0.5f);
     return Rectangle(center - half_extents, center + half_extents);
   }
+  inline Rectangle Grow(Vector2f amount) const { return Rectangle(min - amount, max + amount); }
 
   inline Vector2f GetCenter() const { return (min + max) * 0.5f; }
 
   inline bool Contains(Vector2f point) const {
     return (point.x >= min.x && point.x < max.x) && (point.y >= min.y && point.y < max.y);
+  }
+
+  inline bool ContainsExclusive(Vector2f point) const {
+    return (point.x > min.x && point.x < max.x) && (point.y > min.y && point.y < max.y);
+  }
+
+  inline bool ContainsInclusive(Vector2f point) const {
+    return (point.x >= min.x && point.x <= max.x) && (point.y >= min.y && point.y <= max.y);
+  }
+
+  inline static Rectangle FromPositionRadius(const Vector2f& position, float radius) {
+    return Rectangle(position - Vector2f(radius, radius), position + Vector2f(radius, radius));
   }
 };
 

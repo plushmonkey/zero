@@ -21,6 +21,14 @@ constexpr size_t Gigabytes(size_t n) {
 
 using ArenaSnapshot = u8*;
 
+struct MemoryRevert {
+  struct MemoryArena& arena;
+  ArenaSnapshot snapshot;
+
+  inline MemoryRevert(MemoryArena& arena, ArenaSnapshot snapshot) : arena(arena), snapshot(snapshot) {}
+  inline ~MemoryRevert();
+};
+
 struct MemoryArena {
   u8* base;
   u8* current;
@@ -35,6 +43,8 @@ struct MemoryArena {
   void Reset();
 
   ArenaSnapshot GetSnapshot() { return current; }
+  MemoryRevert GetReverter() { return MemoryRevert(*this, GetSnapshot()); }
+
   void Revert(ArenaSnapshot snapshot) { current = snapshot; }
 };
 
@@ -47,6 +57,10 @@ struct MemoryArena {
 
 // Allocate virtual pages that mirror the first half
 u8* AllocateMirroredBuffer(size_t size);
+
+inline MemoryRevert::~MemoryRevert() {
+  arena.Revert(snapshot);
+}
 
 extern MemoryArena* perm_global;
 }  // namespace zero

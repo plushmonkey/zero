@@ -508,7 +508,7 @@ Player* PlayerManager::GetPlayerByName(const char* name) {
 
 void PlayerManager::OnPlayerIdChange(u8* pkt, size_t size) {
   player_id = *(u16*)(pkt + 1);
-  Log(LogLevel::Info, "Player id: %d", player_id);
+  Log(LogLevel::Debug, "Player id: %d", player_id);
 
   this->player_count = 0;
   this->received_initial_list = false;
@@ -831,11 +831,12 @@ void PlayerManager::OnPlayerFreqAndShipChange(u8* pkt, size_t size) {
 
     weapon_manager->ClearWeapons(*player);
 
-    Event::Dispatch(PlayerFreqAndShipChangeEvent(*player, old_freq, freq, old_ship, ship));
-
     if (player->id == player_id) {
       Spawn(true);
     }
+
+    // Dispatch this event after spawn so it sends a new position packet with the new ship while pathfinder is building.
+    Event::Dispatch(PlayerFreqAndShipChangeEvent(*player, old_freq, freq, old_ship, ship));
   }
 }
 
@@ -1454,7 +1455,7 @@ bool PlayerManager::SimulateAxis(Player& player, float dt, int axis, bool extrap
     player.position.values[axis] = previous;
 
     // Move us out of the wall if our old position was in a wall.
-    if (player.id == player_id && map.IsSolid(player.position, player.frequency)) {
+    if (player.id == player_id && map.IsColliding(player.position, radius, player.frequency)) {
       player.position.values[axis] -= 1.0f;
     }
 

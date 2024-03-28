@@ -181,6 +181,11 @@ Connection::TickResult Connection::Tick() {
       if (1) {
 #endif
         ProcessPacket(pkt, size);
+        if (encrypt_method == EncryptMethod::Continuum && encrypt.expanding) {
+          // Early exit here in case buffer contains two packets.
+          // We want to full expand before we read the next one.
+          return TickResult::Success;
+        }
       }
     }
   }
@@ -546,6 +551,8 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
         for (size_t i = 0; i < sizeof(settings->PrizeWeights); ++i) {
           this->prize_weight_total += weights[i];
         }
+
+        Event::Dispatch(ArenaSettingsEvent(this->settings));
       } break;
       case ProtocolS2C::Security: {
         security.prize_seed = buffer.ReadU32();
@@ -559,8 +566,6 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
         if (security.checksum_key && map.checksum) {
           SendSecurityPacket();
         }
-
-        Event::Dispatch(ArenaSettingsEvent(this->settings));
       } break;
       case ProtocolS2C::FlagPosition: {
       } break;

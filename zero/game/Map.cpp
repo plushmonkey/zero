@@ -7,15 +7,13 @@
 #include <zero/game/ArenaSettings.h>
 #include <zero/game/BrickManager.h>
 #include <zero/game/Clock.h>
+#include <zero/game/GameEvent.h>
 #include <zero/game/PlayerManager.h>
 #include <zero/game/net/Connection.h>
 
 namespace zero {
 
-constexpr int kFirstDoorId = 162;
-constexpr int kLastDoorId = 169;
-
-inline bool CornerPointCheck(const Map& map, int sX, int sY, int diameter, u32 frequency) {
+inline static bool CornerPointCheck(const Map& map, int sX, int sY, int diameter, u32 frequency) {
   for (int y = 0; y < diameter; ++y) {
     for (int x = 0; x < diameter; ++x) {
       uint16_t world_x = (uint16_t)(sX + x);
@@ -27,17 +25,6 @@ inline bool CornerPointCheck(const Map& map, int sX, int sY, int diameter, u32 f
     }
   }
   return true;
-}
-
-// TODO: Fast lookup map
-bool IsSolid(TileId id) {
-  if (id == 0) return false;
-  if (id >= 162 && id <= 169) return true;
-  if (id < 170) return true;
-  if (id >= 192 && id <= 240) return true;
-  if (id >= 242 && id <= 252) return true;
-
-  return false;
 }
 
 bool Map::CanTraverse(const Vector2f& start, const Vector2f& end, float radius, u32 frequency) const {
@@ -96,7 +83,7 @@ bool Map::CanOverlapTile(const Vector2f& position, float radius, u32 frequency) 
   if (far_top > 1023) far_top = 0;
   if (far_bottom > 1023) far_bottom = 1023;
 
-  bool solid = IsSolid(start_x, start_y, frequency);
+  bool solid = IsSolidEmptyDoors(start_x, start_y, frequency);
   if (d < 1 || solid) return !solid;
 
   // Loop over the entire check region and move in the direction of the check tile.
@@ -116,7 +103,7 @@ bool Map::CanOverlapTile(const Vector2f& position, float radius, u32 frequency) 
 
       for (s16 y = check_y; std::abs(y - check_y) <= d && can_fit; y += dir_y) {
         for (s16 x = check_x; std::abs(x - check_x) <= d; x += dir_x) {
-          if (IsSolid(x, y, frequency)) {
+          if (IsSolidEmptyDoors(x, y, frequency)) {
             can_fit = false;
             break;
           }
@@ -491,6 +478,95 @@ Vector2f Map::GetOccupyCenter(const Vector2f& position, float radius, u32 freque
   return accum * (1.0f / count);
 }
 
+// Rects must be initialized memory that can contain all possible occupy rects.
+size_t Map::GetAllOccupiedRects(Vector2f position, float radius, u32 frequency, OccupiedRect* rects) const {
+  size_t count = 0;
+
+  u16 d = (u16)(radius * 2.0f);
+  u16 start_x = (u16)position.x;
+  u16 start_y = (u16)position.y;
+
+  u16 far_left = start_x - d;
+  u16 far_right = start_x + d;
+  u16 far_top = start_y - d;
+  u16 far_bottom = start_y + d;
+
+  // Handle wrapping that can occur from using unsigned short
+  if (far_left > 1023) far_left = 0;
+  if (far_right > 1023) far_right = 1023;
+  if (far_top > 1023) far_top = 0;
+  if (far_bottom > 1023) far_bottom = 1023;
+
+  bool solid = IsSolidEmptyDoors(start_x, start_y, frequency);
+  if (d < 1 || solid) {
+    rects->start_x = (u16)position.x;
+    rects->start_y = (u16)position.y;
+    rects->end_x = (u16)position.x;
+    rects->end_y = (u16)position.y;
+
+    return !solid;
+  }
+
+  // Loop over the entire check region and move in the direction of the check tile.
+  // This makes sure that the check tile is always contained within the found region.
+  for (u16 check_y = far_top; check_y <= far_bottom; ++check_y) {
+    s16 dir_y = (start_y - check_y) > 0 ? 1 : (start_y == check_y ? 0 : -1);
+
+    // Skip cardinal directions because the radius is >1 and must be found from a corner region.
+    if (dir_y == 0) continue;
+
+    for (u16 check_x = far_left; check_x <= far_right; ++check_x) {
+      s16 dir_x = (start_x - check_x) > 0 ? 1 : (start_x == check_x ? 0 : -1);
+
+      if (dir_x == 0) continue;
+
+      bool can_fit = true;
+
+      for (s16 y = check_y; std::abs(y - check_y) <= d && can_fit; y += dir_y) {
+        for (s16 x = check_x; std::abs(x - check_x) <= d; x += dir_x) {
+          if (IsSolidEmptyDoors(x, y, frequency)) {
+            can_fit = false;
+            break;
+          }
+        }
+      }
+
+      if (can_fit) {
+        // Calculate the final region. Not necessary for simple overlap check, but might be useful
+        u16 found_start_x = 0;
+        u16 found_start_y = 0;
+        u16 found_end_x = 0;
+        u16 found_end_y = 0;
+
+        if (check_x > start_x) {
+          found_start_x = check_x - d;
+          found_end_x = check_x;
+        } else {
+          found_start_x = check_x;
+          found_end_x = check_x + d;
+        }
+
+        if (check_y > start_y) {
+          found_start_y = check_y - d;
+          found_end_y = check_y;
+        } else {
+          found_start_y = check_y;
+          found_end_y = check_y + d;
+        }
+
+        OccupiedRect* rect = rects + count++;
+
+        rect->start_x = found_start_x;
+        rect->start_y = found_start_y;
+        rect->end_x = found_end_x;
+        rect->end_y = found_end_y;
+      }
+    }
+  }
+
+  return count;
+}
+
 bool Map::Load(MemoryArena& arena, const char* filename) {
   assert(strlen(filename) < 1024);
 
@@ -664,6 +740,10 @@ void Map::UpdateDoors(const ArenaSettings& settings) {
       seed = (u8)settings.DoorMode;
     }
 
+    if (settings.DoorDelay > 0 && door_count > 0) {
+      Event::Dispatch(DoorToggleEvent());
+    }
+
     SeedDoors(seed);
     last_seed_tick = current_tick;
   }
@@ -736,6 +816,91 @@ bool Map::CanFit(const Vector2f& position, float radius, u32 frequency) const {
   return true;
 }
 
+Vector2f Map::ResolveShipCollision(Vector2f position, float radius, u32 frequency) const {
+  position = position.PixelRounded();
+
+  Vector2f half_extents(radius, radius);
+  Rectangle player_bounds(position - half_extents, position + half_extents);
+
+  int start_y = (int)player_bounds.min.y - 1;
+  int end_y = (int)player_bounds.max.y + 1;
+  int start_x = (int)player_bounds.min.x - 1;
+  int end_x = (int)player_bounds.max.x + 1;
+
+  constexpr int kMaxIterations = 5;
+
+  bool moved = true;
+  for (size_t i = 0; i < kMaxIterations && moved; ++i) {
+    moved = false;
+
+    // Loop over nearby tiles to find collisions, then resolve them by msoving the position.
+    for (int y = start_y; y <= end_y; ++y) {
+      for (int x = start_x; x <= end_x; ++x) {
+        if (IsSolid((u16)x, (u16)y, frequency)) {
+          Rectangle tile_bounds(Vector2f((float)x, (float)y), Vector2f((float)x + 1.0f, (float)y + 1.0f));
+          Rectangle minkowski_tile_collider = tile_bounds.Grow(half_extents);
+
+          if (minkowski_tile_collider.ContainsExclusive(position)) {
+            Vector2f center = minkowski_tile_collider.GetCenter();
+            float req_dist = 0.5f + radius;
+            float dx = position.x - center.x;
+            float dy = position.y - center.y;
+
+            if (fabsf(dx) > 0.5f) {
+              float x_move_req = req_dist - fabsf(dx);
+
+              if (x_move_req > 0.0f) {
+                position.x += x_move_req * (signbit(dx) ? -1.0f : 1.0f);
+              }
+            }
+
+            if (fabsf(dy) > 0.5f) {
+              float y_move_req = req_dist - fabsf(dy);
+
+              if (y_move_req > 0.0f) {
+                position.y += y_move_req * (signbit(dy) ? -1.0f : 1.0f);
+              }
+            }
+
+            moved = true;
+          }
+        }
+      }
+    }
+  }
+
+  return position.PixelRounded();
+}
+
+bool Map::IsColliding(const Vector2f& position, float radius, u32 frequency) const {
+  s16 start_x = (s16)(position.x - radius - 1);
+  s16 start_y = (s16)(position.y - radius - 1);
+
+  s16 end_x = (s16)(position.x + radius + 1);
+  s16 end_y = (s16)(position.y + radius + 1);
+
+  if (start_x < 0) start_x = 0;
+  if (start_y < 0) start_y = 0;
+
+  if (end_x > 1023) end_x = 1023;
+  if (end_y > 1023) end_y = 1023;
+
+  for (s16 y = start_y; y <= end_y; ++y) {
+    for (s16 x = start_x; x <= end_x; ++x) {
+      if (!IsSolid(x, y, frequency)) continue;
+
+      Rectangle tile_collider(Vector2f((float)x, (float)y), Vector2f((float)x + 1, (float)y + 1));
+      Rectangle minkowski_collider = tile_collider.Grow(Vector2f(radius, radius));
+
+      if (minkowski_collider.ContainsInclusive(position)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 TileId Map::GetTileId(u16 x, u16 y) const {
   if (!tiles) return 0;
   if (x >= 1024 || y >= 1024) return 20;
@@ -766,6 +931,20 @@ bool Map::IsSolid(u16 x, u16 y, u32 frequency) const {
   }
 
   return zero::IsSolid(id);
+}
+
+bool Map::IsSolidEmptyDoors(u16 x, u16 y, u32 frequency) const {
+  TileId id = GetTileId(x, y);
+
+  if (id == 250 && brick_manager) {
+    Brick* brick = brick_manager->GetBrick(x, y);
+
+    if (brick && brick->team == frequency) {
+      return false;
+    }
+  }
+
+  return zero::IsSolidEmptyDoors(id);
 }
 
 u32 Map::GetChecksum(u32 key) const {
@@ -880,45 +1059,140 @@ CastResult Map::CastTo(const Vector2f& from, const Vector2f& to, u32 frequency) 
   return Cast(from, direction, dist, frequency);
 }
 
+// Loop over entire casted area to find minimal tiles to check against.
+// When a solid tile is found, perform a minkowski sum so the new rect can be checked against a ray.
 CastResult Map::CastShip(Player* player, float radius, const Vector2f& to) const {
-  Vector2f from = player->position;
-  Vector2f side = Perpendicular(Normalize(to - from));
-  Vector2f direction = to - from;
-  float distance = direction.Length();
+  CastResult result = {};
+  Vector2f trajectory = to.PixelRounded() - player->position.PixelRounded();
+  Vector2f direction = Normalize(trajectory);
+  float max_distance = trajectory.Length();
+  u32 frequency = player->frequency;
 
-  direction = Normalize(direction);
+  Vector2f sides[] = {Perpendicular(direction), -Perpendicular(direction)};
 
-  Vector2f radius_vec(radius, radius);
+  Ray ray(player->position.PixelRounded(), direction);
 
-  CastResult center = Cast(from, direction, distance, player->frequency);
-  if (center.hit) {
-    // Calculate where the should would be upon hitting this spot and see if it overlaps the target position.
-    Vector2f new_pos = center.position - radius_vec;
-    
-    if (!BoxContainsPoint(new_pos - radius_vec, new_pos + radius_vec, to)) {
-      return center;
+  Vector2f from_start = player->position.PixelRounded();
+  // Ignore 1 pixel in growth so it does exclusive check.
+  Vector2f minkowski_growth(radius - 1.0f / 16.0f, radius - 1.0f / 16.0f);
+
+  Vector2f e = to.PixelRounded();
+  Vector2f s = player->position.PixelRounded();
+
+  // Ignore any casts that end up in the current tile.
+  if ((u16)e.x == (u16)s.x && (u16)e.y == (u16)s.y) return result;
+
+  // Walk along each side and for each tile, do another walk forward along the trajectory to find solid tiles.
+  for (Vector2f side : sides) {
+    Vector2f from = from_start;
+    Vector2f unit_step(sqrtf(1 + (side.y / side.x) * (side.y / side.x)),
+                       sqrtf(1 + (side.x / side.y) * (side.x / side.y)));
+
+    Vector2f check = Vector2f(floorf(from.x), floorf(from.y));
+    Vector2f travel;
+    Vector2f step;
+
+    if (side.x < 0) {
+      step.x = -1.0f;
+      travel.x = (from.x - check.x) * unit_step.x;
+    } else {
+      step.x = 1.0f;
+      travel.x = (check.x + 1 - from.x) * unit_step.x;
+    }
+
+    if (side.y < 0) {
+      step.y = -1.0f;
+      travel.y = (from.y - check.y) * unit_step.y;
+    } else {
+      step.y = 1.0f;
+      travel.y = (check.y + 1 - from.y) * unit_step.y;
+    }
+
+    float distance = 0.0f;
+
+    while (distance < radius + 1) {
+      // We've reached a new tile, we should now travel along the trajectory
+      {
+        Vector2f traj_start = check;
+        Vector2f forward_unit_step(sqrtf(1 + (direction.y / direction.x) * (direction.y / direction.x)),
+                                   sqrtf(1 + (direction.x / direction.y) * (direction.x / direction.y)));
+
+        Vector2f traj_check = Vector2f(floorf(traj_start.x), floorf(traj_start.y));
+        Vector2f travel;
+        Vector2f step;
+
+        if (direction.x < 0) {
+          step.x = -1.0f;
+          travel.x = (traj_start.x - traj_check.x) * forward_unit_step.x;
+        } else {
+          step.x = 1.0f;
+          travel.x = (traj_check.x + 1 - traj_start.x) * forward_unit_step.x;
+        }
+
+        if (direction.y < 0) {
+          step.y = -1.0f;
+          travel.y = (traj_start.y - traj_check.y) * forward_unit_step.y;
+        } else {
+          step.y = 1.0f;
+          travel.y = (traj_check.y + 1 - traj_start.y) * forward_unit_step.y;
+        }
+
+        float distance = 0.0f;
+
+        while (distance < max_distance) {
+          if (IsSolid((unsigned short)floorf(traj_check.x), (unsigned short)floorf(traj_check.y), frequency)) {
+            Vector2f top_left(floorf(traj_check.x), floorf(traj_check.y));
+            Rectangle rect(top_left, top_left + Vector2f(1, 1));
+            Rectangle collider = rect.Grow(minkowski_growth);
+
+            if (RayBoxIntersect(ray, collider, &result.distance, nullptr)) {
+              if (result.distance < max_distance) {
+                result.hit = true;
+                result.position = ray.origin + ray.direction * result.distance;
+                return result;
+              }
+            }
+          }
+
+          if (travel.x < travel.y) {
+            traj_check.x += step.x;
+            distance = travel.x;
+            travel.x += forward_unit_step.x;
+          } else {
+            traj_check.y += step.y;
+            distance = travel.y;
+            travel.y += forward_unit_step.y;
+          }
+        }
+      }
+
+      if (IsSolid((unsigned short)floorf(check.x), (unsigned short)floorf(check.y), frequency)) {
+        Vector2f top_left(floorf(check.x), floorf(check.y));
+        Rectangle rect(top_left, top_left + Vector2f(1, 1));
+        Rectangle collider = rect.Grow(minkowski_growth);
+
+        if (RayBoxIntersect(ray, collider, &result.distance, nullptr)) {
+          if (result.distance < max_distance) {
+            result.hit = true;
+            result.position = ray.origin + ray.direction * result.distance;
+            return result;
+          }
+        }
+      }
+
+      if (travel.x < travel.y) {
+        check.x += step.x;
+        distance = travel.x;
+        travel.x += unit_step.x;
+      } else {
+        check.y += step.y;
+        distance = travel.y;
+        travel.y += unit_step.y;
+      }
     }
   }
 
-  CastResult side1 = Cast(from + side * radius, direction, distance, player->frequency);
-  if (side1.hit) {
-    Vector2f new_pos = side1.position - side * radius - radius_vec;
-
-    if (!BoxContainsPoint(new_pos - radius_vec, new_pos + radius_vec, to)) {
-      return side1;
-    }
-  }
-
-  CastResult side2 = Cast(from - side * radius, direction, distance, player->frequency);
-  if (side2.hit) {
-    Vector2f new_pos = side2.position + side * radius - radius_vec;
-
-    if (!BoxContainsPoint(new_pos - radius_vec, new_pos + radius_vec, to)) {
-      return side2;
-    }
-  }
-
-  return center;
+  return result;
 }
 
 }  // namespace zero

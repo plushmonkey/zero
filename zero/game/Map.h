@@ -27,6 +27,8 @@ struct BrickManager;
 using TileId = u8;
 constexpr u32 kTileSafeId = 171;
 constexpr u32 kGoalTileId = 172;
+constexpr int kFirstDoorId = 162;
+constexpr int kLastDoorId = 169;
 
 constexpr size_t kAnimatedTileCount = 7;
 
@@ -52,10 +54,51 @@ struct OccupyRect {
   u16 end_y;
 };
 
+// Reduced version of OccupyRect to remove bool so it fits more in a cache line
+struct OccupiedRect {
+  u16 start_x;
+  u16 start_y;
+  u16 end_x;
+  u16 end_y;
+
+  bool operator==(const OccupiedRect& other) const {
+    return start_x == other.start_x && start_y == other.start_y && end_x == other.end_x && end_y == other.end_y;
+  }
+
+  inline bool Contains(Vector2f position) const {
+    u16 x = (u16)position.x;
+    u16 y = (u16)position.y;
+
+    return x >= start_x && x <= end_x && y >= start_y && y <= end_y;
+  }
+};
+
+inline bool IsSolid(TileId id) {
+  if (id == 0) return false;
+  if (id >= 162 && id <= 169) return true;
+  if (id < 170) return true;
+  if (id >= 192 && id <= 240) return true;
+  if (id >= 242 && id <= 252) return true;
+
+  return false;
+}
+
+inline bool IsSolidEmptyDoors(TileId id) {
+  if (id == 0) return false;
+  if (id >= 162 && id <= 169) return false;
+  if (id < 170) return true;
+  if (id >= 192 && id <= 240) return true;
+  if (id >= 242 && id <= 252) return true;
+
+  return false;
+}
+
 struct Map {
   bool Load(MemoryArena& arena, const char* filename);
 
   bool IsSolid(u16 x, u16 y, u32 frequency) const;
+  bool IsSolidEmptyDoors(u16 x, u16 y, u32 frequency) const;
+
   TileId GetTileId(u16 x, u16 y) const;
   TileId GetTileId(const Vector2f& position) const;
   void SetTileId(u16 x, u16 y, TileId id);
@@ -67,11 +110,18 @@ struct Map {
   OccupyRect GetClosestOccupyRect(Vector2f position, float radius, Vector2f point) const;
   Vector2f GetOccupyCenter(const Vector2f& position, float radius, u32 frequency) const;
 
+  // Rects must be initialized memory that can contain all possible occupy rects.
+  size_t GetAllOccupiedRects(Vector2f position, float radius, u32 frequency, OccupiedRect* rects) const;
+
   bool CanTraverse(const Vector2f& start, const Vector2f& end, float radius, u32 frequency) const;
   bool CanOverlapTile(const Vector2f& position, float radius, u32 frequency) const;
   bool CanOccupy(const Vector2f& position, float radius, u32 frequency) const;
   bool CanOccupyRadius(const Vector2f& position, float radius, u32 frequency) const;
   bool CanFit(const Vector2f& position, float radius, u32 frequency) const;
+
+  Vector2f ResolveShipCollision(Vector2f position, float radius, u32 frequency) const;
+  // Checks if a ship is currently overlapping any tiles.
+  bool IsColliding(const Vector2f& position, float radius, u32 frequency) const;
 
   void UpdateDoors(const ArenaSettings& settings);
   void SeedDoors(u32 seed);

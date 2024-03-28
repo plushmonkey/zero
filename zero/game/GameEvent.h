@@ -279,4 +279,6 @@ struct GreenPickupEvent : public Event {
   GreenPickupEvent(PrizeGreen& green) : green(green) {}
 };
 
+struct DoorToggleEvent : public Event {};
+
 }  // namespace zero
