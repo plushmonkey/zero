@@ -104,6 +104,13 @@ class NodeProcessor {
     return NodePoint(world_x, world_y);
   }
 
+  inline Node* GetNodeFromIndex(u32 index) {
+    if (index >= kMaxNodes) return nullptr;
+    return nodes_ + index;
+  }
+
+  inline u32 GetNodeIndex(Node* node) const { return (u32)(node - nodes_); }
+
  private:
   EdgeSet edges_[kMaxNodes];
   Node nodes_[kMaxNodes];

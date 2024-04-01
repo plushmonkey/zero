@@ -10,6 +10,10 @@
 namespace zero {
 namespace path {
 
+// The edge weight for entering a safe zone from a non-safe tile.
+// This is set here instead of stored in a node so traveling through multiple safe tiles isn't very expensive.
+constexpr float kSafetyWeight = 300.0f;
+
 static inline float fast_sqrt(float v) {
   __m128 v_x4 = _mm_set1_ps(v);
 
@@ -80,21 +84,12 @@ Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& 
     // grab front item then delete it
     Node* node = openset_.Pop();
 
-    touched_.push_back(node);
-
     // this is the only way to break the pathfinder
     if (node == goal) {
       break;
     }
 
-    node->flags |= NodeFlag_Closed;
-
-    if (node->f > 0 && node->f == node->f_last) {
-      // This node was re-added to the openset because its fitness was better, so skip reprocessing the same node.
-      // This reduces pathing time by about 20%.
-      continue;
-    }
-    node->f_last = node->f;
+    node->flags &= ~NodeFlag_Openset;
 
     NodePoint node_point = processor_->GetPoint(node);
 
@@ -119,30 +114,39 @@ Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& 
 
       // The cost to this neighbor is the cost to the current node plus the edge weight times the distance between the
       // nodes.
-      float cost = node->g + edge->weight * Euclidean(node_point, edge_point);
+      // Euclidean could be calculated based on edge index if all 8 are considered again.
+      float cost = node->g + edge->GetWeight();
 
-      // If the new cost is lower than the previously closed cost then remove it from the closed set.
-      if ((edge->flags & NodeFlag_Closed) && cost < edge->g) {
-        edge->flags &= ~NodeFlag_Closed;
+      // Only set a very high movement cost upon first entering a safety tile.
+      if ((edge->flags & NodeFlag_Safety) && !(node->flags & NodeFlag_Safety)) {
+        cost = node->g + kSafetyWeight;
       }
 
       // Compute a heuristic from this neighbor to the end goal.
       float h = Euclidean(edge_point, goal_p);
 
-      // If this neighbor hasn't been considered or is better than its original fitness test, then add it back to the
-      // open set.
-      if (!(edge->flags & NodeFlag_Openset) || cost + h < edge->f) {
+      // The path to this node is lower than it was previously, so update its values.
+      if (cost < edge->g || !(edge->flags & NodeFlag_Touched)) {
         edge->g = cost;
         edge->f = edge->g + h;
-        edge->parent = node;
-        edge->flags |= NodeFlag_Openset;
 
-        openset_.Push(edge);
+        edge->parent_id = processor_->GetNodeIndex(node);
+
+        if (!(edge->flags & NodeFlag_Touched)) {
+          touched_.push_back(edge);
+          edge->flags |= NodeFlag_Touched;
+        }
+
+        if (!(edge->flags & NodeFlag_Openset)) {
+          // The node is not in the openset so add it.
+          edge->flags |= NodeFlag_Openset;
+          openset_.Push(edge);
+        }
       }
     }
   }
 
-  if (goal->parent) {
+  if (goal->parent_id != ~0) {
     path.Add(Vector2f(start_p.x + 0.5f, start_p.y + 0.5f));
   }
 
@@ -153,7 +157,7 @@ Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& 
   while (current != nullptr && current != start) {
     NodePoint p = processor_->GetPoint(current);
     points.push_back(p);
-    current = current->parent;
+    current = processor_->GetNodeFromIndex(current->parent_id);
   }
 
   // Reverse and store as vector
@@ -238,7 +242,7 @@ static void CalculateEdges(const Map& map, NodeProcessor& processor, float ship_
       NodePoint current_point = processor.GetPoint(node);
       EdgeSet edges = processor.CalculateEdges(node, ship_radius);
 
-      node->weight = 1.0f;
+      node->SetWeight(1.0f);
 
       processor.SetEdgeSet(x, y, edges);
 
@@ -250,10 +254,10 @@ static void CalculateEdges(const Map& map, NodeProcessor& processor, float ship_
 
         if (distance < close_distance) {
           if (config.weight_type == Pathfinder::WeightType::Linear) {
-            node->weight = close_distance / distance;
+            node->SetWeight(close_distance / distance);
           } else {
             float inv_dist = close_distance - distance;
-            node->weight = inv_dist * inv_dist;
+            node->SetWeight(inv_dist * inv_dist);
           }
         }
       }
@@ -261,7 +265,7 @@ static void CalculateEdges(const Map& map, NodeProcessor& processor, float ship_
       TileId tile_id = map.GetTileId(current_point.x, current_point.y);
 
       if (tile_id == kTileSafeId) {
-        node->weight = 30.0f;
+        node->flags |= NodeFlag_Safety;
       }
     }
   }

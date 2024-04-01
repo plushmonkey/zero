@@ -165,9 +165,10 @@ Node* NodeProcessor::GetNode(NodePoint point) {
   Node* node = &nodes_[index];
 
   if (!(node->flags & NodeFlag_Initialized)) {
-    node->g = node->f = node->f_last = 0.0f;
-    node->flags = NodeFlag_Initialized | (node->flags & NodeFlag_Traversable);
-    node->parent = nullptr;
+    node->parent_id = ~0;
+    // Set the node as initialized and clear openset/touched while keeping any other flags set.
+    node->flags = NodeFlag_Initialized | (node->flags & ~(NodeFlag_Openset | NodeFlag_Touched));
+    node->g = node->f = 0.0f;
   }
 
   return &nodes_[index];

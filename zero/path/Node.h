@@ -17,23 +17,38 @@ struct NodePoint {
 
 enum NodeFlag {
   NodeFlag_Openset = (1 << 0),
-  NodeFlag_Closed = (1 << 1),
+  NodeFlag_Touched = (1 << 1),
   NodeFlag_Initialized = (1 << 2),
-  NodeFlag_Traversable = (1 << 3)
+  NodeFlag_Traversable = (1 << 3),
+  NodeFlag_Safety = (1 << 4),
 };
 typedef u32 NodeFlags;
 
 struct Node {
-  Node* parent;
-
-  u32 flags;
+  u32 parent_id;
 
   float g;
   float f;
-  float f_last;
-  float weight;
 
-  Node() : parent(nullptr), flags(0), g(0.0f), f(0.0f), f_last(0.0f), weight(1.0f) {}
+  u8 flags;
+
+ private:
+  // Fixed point weight where every 10 is 1
+  u8 weight;
+
+ public:
+  Node() : flags(0), parent_id(~0), g(0.0f), f(0.0f), weight(10) {}
+
+  inline float GetWeight() const { return weight / 10.0f; }
+  inline void SetWeight(float v) {
+    u32 calc = (u32)(v * 10.0f);
+
+    if (calc <= 255) {
+      weight = (u8)(calc);
+    } else {
+      weight = 255;
+    }
+  }
 };
 
 }  // namespace path
