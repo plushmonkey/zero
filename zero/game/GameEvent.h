@@ -87,6 +87,12 @@ struct SpawnEvent : public Event {
   SpawnEvent(Player& self) : self(self) {}
 };
 
+// This event occurs when receiving set coord packet or own position packet.
+struct TeleportEvent : public Event {
+  Player& self;
+  TeleportEvent(Player& self) : self(self) {}
+};
+
 struct PlayerFreqChangeEvent : public Event {
   Player& player;
   u16 old_frequency;

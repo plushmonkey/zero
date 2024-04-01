@@ -82,6 +82,10 @@
     <ClCompile Include="zero\game\Soccer.cpp" />
     <ClCompile Include="zero\game\WeaponManager.cpp" />
     <ClCompile Include="zero\game\WorkQueue.cpp" />
+    <ClCompile Include="zero\zones\devastation\BaseManager.cpp" />
+    <ClCompile Include="zero\zones\devastation\base\TestBehavior.cpp" />
+    <ClCompile Include="zero\zones\devastation\center\CenterBehavior.cpp" />
+    <ClCompile Include="zero\zones\devastation\Devastation.cpp" />
     <ClCompile Include="zero\zones\hyperspace\base\TestBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\center\BallBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\center\CenterJavBehavior.cpp" />
@@ -184,6 +188,10 @@
     <ClInclude Include="zero\Types.h" />
     <ClInclude Include="zero\game\WeaponManager.h" />
     <ClInclude Include="zero\game\WorkQueue.h" />
+    <ClInclude Include="zero\zones\devastation\BaseManager.h" />
+    <ClInclude Include="zero\zones\devastation\base\TestBehavior.h" />
+    <ClInclude Include="zero\zones\devastation\center\CenterBehavior.h" />
+    <ClInclude Include="zero\zones\devastation\nodes\GetSpawnNode.h" />
     <ClInclude Include="zero\zones\hyperspace\base\TestBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\center\BallBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\center\CenterJavBehavior.h" />
@@ -308,6 +316,7 @@
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -330,6 +339,7 @@
       <FloatingPointModel>Fast</FloatingPointModel>
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <BufferSecurityCheck>false</BufferSecurityCheck>
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

@@ -131,6 +131,7 @@ static void OnSetCoordinatesPkt(void* user, u8* pkt, size_t size) {
   self->warp_anim_t = 0.0f;
 
   UnstuckSelf(*manager, *self);
+  Event::Dispatch(TeleportEvent(*self));
 }
 
 inline bool IsPlayerVisible(Player& self, u32 self_freq, Player& player) {
@@ -1182,6 +1183,7 @@ void PlayerManager::OnPositionPacket(Player& player, const Vector2f& position, c
   // We received a packet telling us where we are, so make sure it didn't put is in a wall. (Hyperspace)
   if (player.id == player_id) {
     UnstuckSelf(*this, player);
+    Event::Dispatch(TeleportEvent(player));
   }
 }
 

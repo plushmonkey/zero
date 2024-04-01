@@ -15,6 +15,9 @@ void BotController::HandleEvent(const JoinGameEvent& event) {
 
   behaviors.Clear();
   chat_queue.Reset();
+
+  // Clear the pathfinder so it will rebuild on ship change.
+  pathfinder = nullptr;
 }
 
 void BotController::HandleEvent(const PlayerFreqAndShipChangeEvent& event) {

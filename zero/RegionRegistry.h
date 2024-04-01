@@ -1,5 +1,6 @@
 #pragma once
 
+#include <zero/Event.h>
 #include <zero/Hash.h>
 #include <zero/Math.h>
 #include <zero/game/Map.h>
@@ -23,6 +24,7 @@ struct MapCoord {
   MapCoord() : x(0), y(0) {}
   MapCoord(uint16_t x, uint16_t y) : x(x), y(y) {}
   MapCoord(Vector2f vec) : x((uint16_t)vec.x), y((uint16_t)vec.y) {}
+  Vector2f ToVector() const { return Vector2f((float)x, (float)y); }
 
   bool operator==(const MapCoord& other) const { return x == other.x && y == other.y; }
 };
@@ -32,6 +34,14 @@ struct MapCoord {
 MAKE_HASHABLE(zero::MapCoord, t.x, t.y);
 
 namespace zero {
+
+struct RegionBuildEvent : public Event {};
+struct RegionTileAddEvent : public Event {
+  MapCoord coord;
+  RegionIndex region_index;
+
+  RegionTileAddEvent(RegionIndex region_index, MapCoord coord) : region_index(region_index), coord(coord) {}
+};
 
 struct SharedRegionOwnership {
   static constexpr size_t kMaxOwners = 4;
@@ -108,12 +118,11 @@ class RegionRegistry {
   int GetTileCount(MapCoord coord) const;
   void CreateAll(const Map& map, float radius);
 
-  void DebugUpdate(Vector2f position);
+  RegionIndex GetRegionIndex(MapCoord coord) const;
 
  private:
   bool IsRegistered(MapCoord coord) const;
   void Insert(MapCoord coord, RegionIndex index);
-  std::size_t GetRegionIndex(MapCoord coord);
 
   RegionIndex CreateRegion();
 
