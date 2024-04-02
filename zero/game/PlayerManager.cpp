@@ -1261,6 +1261,7 @@ AttachRequestResponse PlayerManager::AttachSelf(Player* destination) {
   }
 
   self->attach_parent = destination->id;
+  requesting_attach = true;
 
   return AttachRequestResponse::Success;
 }
@@ -1299,6 +1300,10 @@ void PlayerManager::OnCreateTurretLink(u8* pkt, size_t size) {
 
   Player* requester = GetPlayerById(request_id);
 
+  if (requester && requester->id == player_id) {
+    requesting_attach = false;
+  }
+
   if (requester && destination_id == kInvalidPlayerId) {
     DetachPlayer(*requester);
   } else {
@@ -1335,6 +1340,7 @@ void PlayerManager::OnDestroyTurretLink(u8* pkt, size_t size) {
   if (player) {
     Player* self = GetSelf();
     if (self && self->attach_parent == pid && self->enter_delay <= 0.0f) {
+      requesting_attach = false;
       connection.SendAttachRequest(kInvalidPlayerId);
     }
     DetachAllChildren(*player);
@@ -1346,6 +1352,7 @@ void PlayerManager::DetachPlayer(Player& player) {
     Player* parent = GetPlayerById(player.attach_parent);
 
     if (player.id == player_id) {
+      requesting_attach = false;
       connection.SendAttachRequest(kInvalidPlayerId);
     }
 
@@ -1398,6 +1405,7 @@ void PlayerManager::DetachAllChildren(Player& player) {
       Player* self = GetSelf();
 
       if (child == self) {
+        requesting_attach = false;
         connection.SendAttachRequest(0xFFFF);
       }
     }

@@ -123,6 +123,17 @@ class SayCommand : public CommandExecutor {
       }
     }
 
+    // Handle private messages
+    if (!arg.empty() && arg[0] == ':') {
+      size_t pm_end = arg.find(':', 1);
+      if (pm_end != std::string::npos) {
+        std::string to = arg.substr(1, pm_end - 1);
+    
+        Event::Dispatch(ChatQueueEvent::Private(to.data(), arg.data() + pm_end + 1));
+        return;
+      }
+    }
+
     Event::Dispatch(ChatQueueEvent::Public(arg.data()));
   }
 

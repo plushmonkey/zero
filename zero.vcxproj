@@ -107,6 +107,7 @@
     <ClInclude Include="zero\behavior\BehaviorTree.h" />
     <ClInclude Include="zero\behavior\Blackboard.h" />
     <ClInclude Include="zero\behavior\nodes\AimNode.h" />
+    <ClInclude Include="zero\behavior\nodes\AttachNode.h" />
     <ClInclude Include="zero\behavior\nodes\BehaviorNode.h" />
     <ClInclude Include="zero\behavior\nodes\BlackboardNode.h" />
     <ClInclude Include="zero\behavior\nodes\MathNode.h" />
@@ -191,6 +192,7 @@
     <ClInclude Include="zero\zones\devastation\BaseManager.h" />
     <ClInclude Include="zero\zones\devastation\base\TestBehavior.h" />
     <ClInclude Include="zero\zones\devastation\center\CenterBehavior.h" />
+    <ClInclude Include="zero\zones\devastation\nodes\GetAttachTargetNode.h" />
     <ClInclude Include="zero\zones\devastation\nodes\GetSpawnNode.h" />
     <ClInclude Include="zero\zones\hyperspace\base\TestBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\center\BallBehavior.h" />

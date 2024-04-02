@@ -25,7 +25,11 @@ struct BaseInfo {
   BaseInfo() : region(kUndefinedRegion) {}
 };
 
-struct BaseManager : EventHandler<RegionTileAddEvent>, EventHandler<RegionBuildEvent>, EventHandler<TeleportEvent> {
+struct BaseManager : EventHandler<RegionTileAddEvent>,
+                     EventHandler<RegionBuildEvent>,
+                     EventHandler<TeleportEvent>,
+                     EventHandler<PlayerAttachEvent>,
+                     EventHandler<PlayerFreqAndShipChangeEvent> {
   BaseInfo current_base;
 
   BaseManager(ZeroBot& bot) : bot(bot) {}
@@ -41,8 +45,12 @@ struct BaseManager : EventHandler<RegionTileAddEvent>, EventHandler<RegionBuildE
   void HandleEvent(const RegionBuildEvent& event) override;
   void HandleEvent(const RegionTileAddEvent& event) override;
   void HandleEvent(const TeleportEvent& event) override;
+  void HandleEvent(const PlayerAttachEvent& event) override;
+  void HandleEvent(const PlayerFreqAndShipChangeEvent& event) override;
 
  private:
+  void UpdateActiveBase(const Vector2f& position);
+
   ZeroBot& bot;
 
   std::unordered_map<RegionIndex, BasePoints> base_points;
