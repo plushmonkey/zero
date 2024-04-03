@@ -154,6 +154,14 @@ void ChatQueue::Update() {
     auto& connection = chat_controller.connection;
     connection.packet_sequencer.SendReliableMessage(connection, buffer.data, buffer.GetSize());
     ++sent_message_count;
+
+    // Add the sent message to the chat output box.
+    ChatEntry* controller_entry = chat_controller.PushEntry(entry->message, size, entry->type);
+
+    Player* self = chat_controller.player_manager.GetSelf();
+    if (self) {
+      memcpy(controller_entry->sender, self->name, 20);
+    }
   }
 }
 

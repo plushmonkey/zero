@@ -110,6 +110,7 @@
     <ClInclude Include="zero\behavior\nodes\AttachNode.h" />
     <ClInclude Include="zero\behavior\nodes\BehaviorNode.h" />
     <ClInclude Include="zero\behavior\nodes\BlackboardNode.h" />
+    <ClInclude Include="zero\behavior\nodes\ChatNode.h" />
     <ClInclude Include="zero\behavior\nodes\MathNode.h" />
     <ClInclude Include="zero\behavior\nodes\MoveNode.h" />
     <ClInclude Include="zero\behavior\nodes\InputActionNode.h" />

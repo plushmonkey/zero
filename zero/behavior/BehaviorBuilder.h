@@ -47,7 +47,8 @@ class CompositeBuilder {
   CompositeBuilder& Selector(CompositeDecorator decorator = CompositeDecorator::None);
   CompositeBuilder& Parallel(CompositeDecorator decorator = CompositeDecorator::None);
 
-  CompositeBuilder& Composite(std::unique_ptr<BehaviorNode> node, CompositeDecorator decorator = CompositeDecorator::None);
+  CompositeBuilder& Composite(std::unique_ptr<BehaviorNode> node,
+                              CompositeDecorator decorator = CompositeDecorator::None);
 
   CompositeBuilder& End();
 

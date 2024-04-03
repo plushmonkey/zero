@@ -3,9 +3,13 @@
 #include <zero/behavior/BehaviorBuilder.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/behavior/nodes/BlackboardNode.h>
+#include <zero/behavior/nodes/ChatNode.h>
 #include <zero/behavior/nodes/MapNode.h>
+#include <zero/behavior/nodes/MathNode.h>
+#include <zero/behavior/nodes/PlayerNode.h>
 #include <zero/behavior/nodes/RenderNode.h>
 #include <zero/behavior/nodes/ShipNode.h>
+#include <zero/behavior/nodes/TimerNode.h>
 #include <zero/zones/hyperspace/nodes/GlobalGoToNode.h>
 
 namespace zero {
@@ -45,6 +49,23 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
             .Child<ShipRequestNode>("request_ship")
             .End()
         .Sequence()
+            .Selector()
+                .Selector() // Check if we are on a flagging frequency.
+                    .Sequence()
+                        .Child<PlayerFrequencyQueryNode>("self_freq")
+                        .Child<EqualityNode<u16>>("self_freq", 90)
+                        .End()
+                    .Sequence()
+                        .Child<PlayerFrequencyQueryNode>("self_freq")
+                        .Child<EqualityNode<u16>>("self_freq", 91)
+                        .End()
+                    .End()
+                .Sequence() // We aren't on a flagging frequency, so try to join one.
+                    .Child<TimerExpiredNode>("join_flag_timer")
+                    .Child<TimerSetNode>("join_flag_timer", 300)
+                    .InvertChild<ChatMessageNode>(ChatMessageNode::Public("?flag")) // Invert so this fails and freq is reevaluated.
+                    .End()
+                .End()
             .Sequence(CompositeDecorator::Success)
                 .InvertChild<BlackboardSetQueryNode>("random_position")
                 .Child<SetRandomPositionNode>()

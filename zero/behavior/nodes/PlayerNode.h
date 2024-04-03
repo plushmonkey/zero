@@ -50,6 +50,31 @@ struct PlayerNearPositionNode : public behavior::BehaviorNode {
   Vector2f position;
 };
 
+struct PlayerFrequencyQueryNode : public BehaviorNode {
+  PlayerFrequencyQueryNode(const char* output_key) : output_key(output_key) {}
+  PlayerFrequencyQueryNode(const char* player_key, const char* output_key)
+      : player_key(player_key), output_key(output_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto player = ctx.bot->game->player_manager.GetSelf();
+
+    if (player_key) {
+      auto opt_player = ctx.blackboard.Value<Player*>(player_key);
+      if (!opt_player) return ExecuteResult::Failure;
+      player = *opt_player;
+    }
+
+    if (!player) return ExecuteResult::Failure;
+
+    ctx.blackboard.Set(output_key, player->frequency);
+
+    return ExecuteResult::Success;
+  }
+
+  const char* player_key = nullptr;
+  const char* output_key = nullptr;
+};
+
 struct PlayerChangeFrequencyNode : public behavior::BehaviorNode {
   PlayerChangeFrequencyNode(u16 frequency) : frequency_key(nullptr), frequency(frequency) {}
   PlayerChangeFrequencyNode(const char* frequency_key) : frequency_key(frequency_key), frequency(0) {}
@@ -204,13 +229,13 @@ struct PlayerEnergyPercentThresholdNode : public behavior::BehaviorNode {
 };
 
 struct PlayerCurrentEnergyQueryNode : public behavior::BehaviorNode {
-  PlayerCurrentEnergyQueryNode(const char* output_key) : output_key(output_key) { }
-  
+  PlayerCurrentEnergyQueryNode(const char* output_key) : output_key(output_key) {}
+
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
     Player* player = ctx.bot->game->player_manager.GetSelf();
 
     if (!player) return ExecuteResult::Failure;
-    
+
     ctx.blackboard.Set(output_key, player->energy);
 
     return ExecuteResult::Success;
