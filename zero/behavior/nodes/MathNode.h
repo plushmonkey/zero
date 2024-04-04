@@ -38,6 +38,138 @@ struct EqualityNode : public BehaviorNode {
 };
 
 template <typename T>
+struct GreaterThanNode : public BehaviorNode {
+  GreaterThanNode(const T& a_value, const char* b_key) : a_value(a_value), b_key(b_key) {}
+  GreaterThanNode(const char* b_key, const T& a_value) : a_value(a_value), b_key(b_key), flipped(true) {}
+  GreaterThanNode(const char* a_key, const char* b_key) : a_key(a_key), b_key(b_key), a_value(T()) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    if (!b_key) return ExecuteResult::Failure;
+
+    auto opt_b = ctx.blackboard.Value<T>(b_key);
+    if (!opt_b) return ExecuteResult::Failure;
+
+    T a_check = a_value;
+
+    if (a_key) {
+      auto opt_a = ctx.blackboard.Value<T>(a_key);
+      if (!opt_a) return ExecuteResult::Failure;
+      a_check = *opt_a;
+    }
+
+    if (flipped) {
+      return *opt_b < a_check ? ExecuteResult::Success : ExecuteResult::Failure;
+    }
+
+    return a_check > *opt_b ? ExecuteResult::Success : ExecuteResult::Failure;
+  }
+
+  T a_value;
+  const char* a_key = nullptr;
+  const char* b_key = nullptr;
+  bool flipped = false;
+};
+
+template <typename T>
+struct GreaterOrEqualThanNode : public BehaviorNode {
+  GreaterOrEqualThanNode(const T& a_value, const char* b_key) : a_value(a_value), b_key(b_key) {}
+  GreaterOrEqualThanNode(const char* b_key, const T& a_value) : a_value(a_value), b_key(b_key), flipped(true) {}
+  GreaterOrEqualThanNode(const char* a_key, const char* b_key) : a_key(a_key), b_key(b_key), a_value(T()) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    if (!b_key) return ExecuteResult::Failure;
+
+    auto opt_b = ctx.blackboard.Value<T>(b_key);
+    if (!opt_b) return ExecuteResult::Failure;
+
+    T a_check = a_value;
+
+    if (a_key) {
+      auto opt_a = ctx.blackboard.Value<T>(a_key);
+      if (!opt_a) return ExecuteResult::Failure;
+      a_check = *opt_a;
+    }
+
+    if (flipped) {
+      return *opt_b < a_check ? ExecuteResult::Success : ExecuteResult::Failure;
+    }
+
+    return a_check >= *opt_b ? ExecuteResult::Success : ExecuteResult::Failure;
+  }
+
+  T a_value;
+  const char* a_key = nullptr;
+  const char* b_key = nullptr;
+  bool flipped = false;
+};
+
+template <typename T>
+struct LessThanNode : public BehaviorNode {
+  LessThanNode(const T& a_value, const char* b_key) : a_value(a_value), b_key(b_key) {}
+  LessThanNode(const char* b_key, const T& a_value) : a_value(a_value), b_key(b_key), flipped(true) {}
+  LessThanNode(const char* a_key, const char* b_key) : a_key(a_key), b_key(b_key), a_value(T()) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    if (!b_key) return ExecuteResult::Failure;
+
+    auto opt_b = ctx.blackboard.Value<T>(b_key);
+    if (!opt_b) return ExecuteResult::Failure;
+
+    T a_check = a_value;
+
+    if (a_key) {
+      auto opt_a = ctx.blackboard.Value<T>(a_key);
+      if (!opt_a) return ExecuteResult::Failure;
+      a_check = *opt_a;
+    }
+
+    if (flipped) {
+      return *opt_b < a_check ? ExecuteResult::Success : ExecuteResult::Failure;
+    }
+
+    return a_check < *opt_b ? ExecuteResult::Success : ExecuteResult::Failure;
+  }
+
+  T a_value;
+  const char* a_key = nullptr;
+  const char* b_key = nullptr;
+  bool flipped = false;
+};
+
+template <typename T>
+struct LessOrEqualThanNode : public BehaviorNode {
+  LessOrEqualThanNode(const T& a_value, const char* b_key) : a_value(a_value), b_key(b_key) {}
+  LessOrEqualThanNode(const char* b_key, const T& a_value) : a_value(a_value), b_key(b_key), flipped(true) {}
+  LessOrEqualThanNode(const char* a_key, const char* b_key) : a_key(a_key), b_key(b_key), a_value(T()) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    if (!b_key) return ExecuteResult::Failure;
+
+    auto opt_b = ctx.blackboard.Value<T>(b_key);
+    if (!opt_b) return ExecuteResult::Failure;
+
+    T a_check = a_value;
+
+    if (a_key) {
+      auto opt_a = ctx.blackboard.Value<T>(a_key);
+      if (!opt_a) return ExecuteResult::Failure;
+      a_check = *opt_a;
+    }
+
+    if (flipped) {
+      return *opt_b < a_check ? ExecuteResult::Success : ExecuteResult::Failure;
+    }
+
+    return a_check <= *opt_b ? ExecuteResult::Success : ExecuteResult::Failure;
+  }
+
+  T a_value;
+  const char* a_key = nullptr;
+  const char* b_key = nullptr;
+  bool flipped = false;
+};
+
+template <typename T>
 struct RandomIntNode : public BehaviorNode {
   RandomIntNode(T min, T max, const char* output_key) : min(min), max(max), output_key(output_key) {}
   RandomIntNode(T min, const char* max_key, const char* output_key)

@@ -388,7 +388,12 @@ bool Game::Update(const InputState& input, float dt) {
         u32 carry = connection.settings.CarryFlags;
         bool can_carry = carry > 0 && (carry == 1 || player->flags < carry - 1);
 
+#if 0
         u32 view_tick = connection.login_tick + connection.settings.EnterGameFlaggingDelay;
+#else
+        // Continuum seems to show flags immediately.
+        u32 view_tick = 0;
+#endif
 
         if (TICK_GT(tick, view_tick) && (can_carry || (flag->flags & GameFlag_Turf))) {
           if (player->id == player_manager.player_id &&

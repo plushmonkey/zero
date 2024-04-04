@@ -111,6 +111,7 @@
     <ClInclude Include="zero\behavior\nodes\BehaviorNode.h" />
     <ClInclude Include="zero\behavior\nodes\BlackboardNode.h" />
     <ClInclude Include="zero\behavior\nodes\ChatNode.h" />
+    <ClInclude Include="zero\behavior\nodes\FlagNode.h" />
     <ClInclude Include="zero\behavior\nodes\MathNode.h" />
     <ClInclude Include="zero\behavior\nodes\MoveNode.h" />
     <ClInclude Include="zero\behavior\nodes\InputActionNode.h" />
@@ -203,7 +204,7 @@
     <ClInclude Include="zero\zones\hyperspace\CommandBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\Hyperspace.h" />
     <ClInclude Include="zero\zones\hyperspace\nodes\CommandNode.h" />
-    <ClInclude Include="zero\zones\hyperspace\nodes\FlagSectorNode.h" />
+    <ClInclude Include="zero\zones\hyperspace\nodes\SectorNode.h" />
     <ClInclude Include="zero\zones\hyperspace\nodes\GlobalGoToNode.h" />
     <ClInclude Include="zero\zones\metalgear\GunnerBehavior.h" />
     <ClInclude Include="zero\zones\metalgear\JuggBehavior.h" />

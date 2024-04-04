@@ -8,8 +8,8 @@ namespace hyperspace {
 
 // A position within each sector from 1 to 8, center, then warp ring.
 // To be used with the region registry to find out which region a coord is connected to.
-constexpr Vector2f kSectorPositions[] = {Vector2f(800, 350), Vector2f(800, 475), Vector2f(800, 735), Vector2f(500, 735),
-                                         Vector2f(150, 735), Vector2f(150, 500), Vector2f(150, 350), Vector2f(620, 280),
+constexpr Vector2f kSectorPositions[] = {Vector2f(820, 230), Vector2f(840, 525), Vector2f(750, 830), Vector2f(488, 842),
+                                         Vector2f(288, 820), Vector2f(162, 586), Vector2f(201, 222), Vector2f(620, 280),
                                          Vector2f(512, 512), Vector2f(50, 50)};
 
 constexpr size_t kCenterSectorIndex = 8;
