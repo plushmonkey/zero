@@ -94,6 +94,15 @@ float HeuristicEnergyTracker::GetEnergy(Player& player) const {
   return player_energy[player.id].energy;
 }
 
+float HeuristicEnergyTracker::GetEnergyPercent(Player& player) const {
+  float current = GetEnergy(player);
+  float max_energy = GetEstimatedEnergy(estimate_type, player_manager, player);
+
+  if (max_energy <= 0.0f) return 1.0f;
+
+  return current / max_energy;
+}
+
 void HeuristicEnergyTracker::HandleEvent(const WeaponFireEvent& event) {
   if (event.player.ship >= 8) return;
   if (estimate_type == EnergyHeuristicType::None) return;

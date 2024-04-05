@@ -9,16 +9,19 @@ namespace zero {
 namespace behavior {
 
 struct PlayerEnergyQueryNode : public BehaviorNode {
+  PlayerEnergyQueryNode(const char* output_key) : output_key(output_key) {}
   PlayerEnergyQueryNode(const char* player_key, const char* output_key)
       : player_key(player_key), output_key(output_key) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
-    if (!player_key) return ExecuteResult::Failure;
+    Player* player = ctx.bot->game->player_manager.GetSelf();
 
-    auto opt_player = ctx.blackboard.Value<Player*>(player_key);
-    if (!opt_player) return ExecuteResult::Failure;
+    if (player_key) {
+      auto opt_player = ctx.blackboard.Value<Player*>(player_key);
+      if (!opt_player) return ExecuteResult::Failure;
+      player = *opt_player;
+    }
 
-    Player* player = *opt_player;
     if (!player) return ExecuteResult::Failure;
 
     float energy = ctx.bot->bot_controller->energy_tracker.GetEnergy(*player);

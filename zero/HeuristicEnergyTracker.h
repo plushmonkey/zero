@@ -33,6 +33,7 @@ struct HeuristicEnergyTracker : EventHandler<WeaponFireEvent>,
   HeuristicEnergyTracker(PlayerManager& player_manager);
 
   float GetEnergy(Player& player) const;
+  float GetEnergyPercent(Player& player) const;
 
   void Update();
 
