@@ -92,7 +92,7 @@ std::unique_ptr<behavior::BehaviorNode> CommandBehavior::CreateTree(behavior::Ex
             .Composite(CreateTransactionTree<SellNode>(ctx), CompositeDecorator::Success)
             .End()
         .Sequence() // If nothing is being executed, restore the old tree.
-            .Child<BehaviorSetFromKeyNode>(CommandExecuteState::TreeKey())
+            .Child<BehaviorSetFromKeyNode>(CommandExecuteState::TreeKey(), false)
             .End()
         .End();
   // clang-format on

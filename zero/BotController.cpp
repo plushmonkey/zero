@@ -6,7 +6,7 @@
 
 namespace zero {
 
-BotController::BotController(Game& game) : game(game), chat_queue(game.chat) {
+BotController::BotController(Game& game) : game(game), chat_queue(game.chat), energy_tracker(game.player_manager) {
   this->input = nullptr;
 }
 
@@ -65,6 +65,7 @@ void BotController::Update(RenderContext& rc, float dt, InputState& input, behav
   execute_ctx.blackboard.Set("ui_camera", game.ui_camera);
 
   Event::Dispatch(UpdateEvent(*this, execute_ctx));
+  energy_tracker.Update();
 
   static behavior::TreePrinter tree_printer;
 

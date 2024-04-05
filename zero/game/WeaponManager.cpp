@@ -218,6 +218,8 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon) {
         ship_controller->OnWeaponHit(weapon);
       }
 
+      Event::Dispatch(WeaponHitEvent(weapon, hit_player));
+
       weapon.position = previous_position;
 
       return WeaponSimulateResult::PlayerExplosion;
@@ -292,10 +294,12 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon) {
         }
       }
 
-      if (hit && (is_bomb || player->id == player_manager.player_id) && !HasLinkRemoved(weapon.link_id)) {
-        if (ship_controller) {
+      if (hit && !HasLinkRemoved(weapon.link_id)) {
+        if (ship_controller && (is_bomb || player->id == player_manager.player_id)) {
           ship_controller->OnWeaponHit(weapon);
         }
+
+        Event::Dispatch(WeaponHitEvent(weapon, player));
       }
 
       // Move the position back so shrap spawns correctly
@@ -407,6 +411,7 @@ WeaponSimulateResult WeaponManager::SimulatePosition(Weapon& weapon) {
       if (weapon.bounces_remaining == 0) {
         if ((type == WeaponType::Bomb || type == WeaponType::ProximityBomb) && ship_controller) {
           ship_controller->OnWeaponHit(weapon);
+          Event::Dispatch(WeaponHitEvent(weapon, nullptr));
         }
 
         return WeaponSimulateResult::WallExplosion;
@@ -819,6 +824,8 @@ bool WeaponManager::FireWeapons(Player& player, WeaponData weapon, u32 pos_x, u3
   } else {
     GenerateWeapon(pid, weapon, timestamp, pos_x, pos_y, vel_x, vel_y, OrientationToHeading(direction), kInvalidLink);
   }
+
+  Event::Dispatch(WeaponFireEvent(weapon, player));
 
   return true;
 }

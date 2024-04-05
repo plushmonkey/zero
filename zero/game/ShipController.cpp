@@ -1989,7 +1989,7 @@ void ShipController::OnWeaponHit(Weapon& weapon) {
     self->energy -= damage;
   }
 
-  Event::Dispatch(WeaponDamageEvent(weapon, *shooter, damage, died));
+  Event::Dispatch(WeaponSelfDamageEvent(weapon, *shooter, damage, died));
 }
 
 }  // namespace zero

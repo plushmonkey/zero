@@ -216,6 +216,9 @@ void HyperspaceController::CreateBehaviors(const char* arena_name) {
     bot->commands->RegisterCommand(std::make_shared<ShipItemsCommand>());
     bot->commands->RegisterCommand(std::make_shared<BuyCommand>());
     bot->commands->RegisterCommand(std::make_shared<SellCommand>());
+
+    // Every player has different settings in Hyperspace, so just use average to get any idea.
+    bot->bot_controller->energy_tracker.estimate_type = EnergyHeuristicType::Average;
   } else {
     Log(LogLevel::Info, "No hyperspace behaviors defined for arena '%s'.", arena_name);
   }

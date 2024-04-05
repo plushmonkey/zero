@@ -40,6 +40,7 @@ void DevastationController::CreateBehaviors(const char* arena_name) {
     SetBehavior("center");
 
     bot->execute_ctx.blackboard.Set("base_manager", base_manager.get());
+    bot->bot_controller->energy_tracker.estimate_type = EnergyHeuristicType::Maximum;
   } else {
     Log(LogLevel::Info, "No Devastation behaviors defined for arena '%s'.", arena_name);
   }

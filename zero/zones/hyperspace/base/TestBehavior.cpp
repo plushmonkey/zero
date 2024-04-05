@@ -11,8 +11,8 @@
 #include <zero/behavior/nodes/RenderNode.h>
 #include <zero/behavior/nodes/ShipNode.h>
 #include <zero/behavior/nodes/TimerNode.h>
-#include <zero/zones/hyperspace/nodes/SectorNode.h>
 #include <zero/zones/hyperspace/nodes/GlobalGoToNode.h>
+#include <zero/zones/hyperspace/nodes/SectorNode.h>
 
 namespace zero {
 namespace hyperspace {
@@ -49,6 +49,9 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
         .Sequence() // Enter the specified ship if not already in it.
             .InvertChild<ShipQueryNode>("request_ship")
             .Child<ShipRequestNode>("request_ship")
+            .End()
+        .Sequence() // We want this sequence to succeed if we are in spec so the selector ends.
+            .Child<ShipQueryNode>(8)
             .End()
         .Sequence()
             .Selector()

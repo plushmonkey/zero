@@ -649,6 +649,7 @@ void PlayerManager::OnPlayerDeath(u8* pkt, size_t size) {
     killed->flags = 0;
     killed->flag_timer = 0;
     killed->ball_carrier = false;
+    killed->energy = 0;
 
     DetachPlayer(*killed);
     DetachAllChildren(*killed);
@@ -813,10 +814,11 @@ void PlayerManager::OnPlayerFrequencyChange(u8* pkt, size_t size) {
     player->enter_delay = 0.0f;
     player->flags = 0;
     player->ball_carrier = false;
+    player->energy = 0;
 
     weapon_manager->ClearWeapons(*player);
 
-    Event::Dispatch(PlayerFreqChangeEvent(*player, old_freq, frequency));
+    Event::Dispatch(PlayerFreqAndShipChangeEvent(*player, old_freq, frequency, player->ship, player->ship));
 
     if (player->id == player_id) {
       Spawn(true);
@@ -851,6 +853,7 @@ void PlayerManager::OnPlayerFreqAndShipChange(u8* pkt, size_t size) {
     player->enter_delay = 0.0f;
     player->flags = 0;
     player->ball_carrier = false;
+    player->energy = 0;
 
     weapon_manager->ClearWeapons(*player);
 

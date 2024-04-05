@@ -1,11 +1,36 @@
 #pragma once
 
+#include <zero/BotController.h>
 #include <zero/ZeroBot.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/game/Game.h>
 
 namespace zero {
 namespace behavior {
+
+struct PlayerEnergyQueryNode : public BehaviorNode {
+  PlayerEnergyQueryNode(const char* player_key, const char* output_key)
+      : player_key(player_key), output_key(output_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    if (!player_key) return ExecuteResult::Failure;
+
+    auto opt_player = ctx.blackboard.Value<Player*>(player_key);
+    if (!opt_player) return ExecuteResult::Failure;
+
+    Player* player = *opt_player;
+    if (!player) return ExecuteResult::Failure;
+
+    float energy = ctx.bot->bot_controller->energy_tracker.GetEnergy(*player);
+
+    ctx.blackboard.Set(output_key, energy);
+
+    return ExecuteResult::Success;
+  }
+
+  const char* player_key = nullptr;
+  const char* output_key = nullptr;
+};
 
 struct PlayerNearPositionNode : public behavior::BehaviorNode {
   PlayerNearPositionNode(const char* player_key, const char* position_key, float near_distance)

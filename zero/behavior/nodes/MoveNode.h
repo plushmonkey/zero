@@ -139,7 +139,7 @@ struct GoToNode : public BehaviorNode {
     if (build) {
       current_path = pathfinder->FindPath(game.connection.map, self->position, target, radius);
       if (current_path.points.size() > 10) {
-        Log(LogLevel::Debug, "Rebuilding path");
+        Log(LogLevel::Jabber, "Rebuilding path");
       }
     }
 

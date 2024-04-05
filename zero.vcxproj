@@ -54,6 +54,7 @@
     <ClCompile Include="zero\game\render\Shader.cpp" />
     <ClCompile Include="zero\game\render\SpriteRenderer.cpp" />
     <ClCompile Include="zero\game\render\TileRenderer.cpp" />
+    <ClCompile Include="zero\HeuristicEnergyTracker.cpp" />
     <ClCompile Include="zero\ZeroBot.cpp" />
     <ClCompile Include="zero\game\BrickManager.cpp" />
     <ClCompile Include="zero\game\Buffer.cpp" />
@@ -134,6 +135,7 @@
     <ClInclude Include="zero\game\GameEvent.h" />
     <ClInclude Include="zero\game\Logger.h" />
     <ClInclude Include="zero\game\render\LineRenderer.h" />
+    <ClInclude Include="zero\HeuristicEnergyTracker.h" />
     <ClInclude Include="zero\InfluenceMap.h" />
     <ClInclude Include="zero\game\render\AnimatedTileRenderer.h" />
     <ClInclude Include="zero\game\render\Animation.h" />

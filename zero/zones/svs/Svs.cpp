@@ -25,6 +25,8 @@ void SvsController::CreateBehaviors(const char* arena_name) {
   repo.Add("warbird", std::make_unique<WarbirdBehavior>());
 
   SetBehavior("warbird");
+
+  bot->bot_controller->energy_tracker.estimate_type = EnergyHeuristicType::Average;
 }
 
 }  // namespace svs

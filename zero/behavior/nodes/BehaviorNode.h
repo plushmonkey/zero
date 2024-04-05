@@ -28,7 +28,8 @@ struct BehaviorSetNode : public BehaviorNode {
 };
 
 struct BehaviorSetFromKeyNode : public BehaviorNode {
-  BehaviorSetFromKeyNode(const char* key_name) : key_name(key_name) {}
+  BehaviorSetFromKeyNode(const char* key_name, bool run_initializer = true)
+      : key_name(key_name), run_initializer(run_initializer) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
     auto name_opt = ctx.blackboard.Value<std::string>(key_name);
@@ -38,13 +39,17 @@ struct BehaviorSetFromKeyNode : public BehaviorNode {
 
     if (!behavior) return ExecuteResult::Failure;
 
-    behavior->OnInitialize(ctx);
+    if (run_initializer) {
+      behavior->OnInitialize(ctx);
+    }
+
     ctx.bot->bot_controller->SetBehavior(name_opt.value(), behavior->CreateTree(ctx));
 
     return ExecuteResult::Success;
   }
 
-  const char* key_name;
+  const char* key_name = nullptr;
+  bool run_initializer = false;
 };
 
 }  // namespace behavior

@@ -40,6 +40,8 @@ void MetalGearController::CreateBehaviors(const char* arena_name) {
   repo.Add("gunner", std::make_unique<GunnerBehavior>());
 
   SetBehavior("jugg");
+
+  bot->bot_controller->energy_tracker.estimate_type = EnergyHeuristicType::Initial;
 }
 
 }  // namespace mg

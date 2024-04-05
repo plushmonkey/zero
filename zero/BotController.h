@@ -2,6 +2,7 @@
 
 #include <zero/Actuator.h>
 #include <zero/ChatQueue.h>
+#include <zero/HeuristicEnergyTracker.h>
 #include <zero/InfluenceMap.h>
 #include <zero/RenderContext.h>
 #include <zero/Steering.h>
@@ -13,7 +14,6 @@
 #include <memory>
 
 namespace zero {
-
 namespace behavior {
 
 class BehaviorNode;
@@ -37,6 +37,7 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>,
   Actuator actuator;
   path::Path current_path;
 
+  HeuristicEnergyTracker energy_tracker;
   InfluenceMap influence_map;
 
   BotController(Game& game);

@@ -23,6 +23,10 @@ RequestShip = 5
 [Hyperspace]
 Behavior = center-jav
 
+[MetalGear]
+Behavior = jugg
+RequestShip = 6
+
 # Only these servers are supported. The names must not be changed.
 [Servers]
 Local = 127.0.0.1:5000

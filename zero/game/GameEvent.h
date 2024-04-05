@@ -93,15 +93,6 @@ struct TeleportEvent : public Event {
   TeleportEvent(Player& self) : self(self) {}
 };
 
-struct PlayerFreqChangeEvent : public Event {
-  Player& player;
-  u16 old_frequency;
-  u16 new_frequency;
-
-  PlayerFreqChangeEvent(Player& player, u16 old_freq, u16 new_freq)
-      : player(player), old_frequency(old_freq), new_frequency(new_freq) {}
-};
-
 struct PlayerFreqAndShipChangeEvent : public Event {
   Player& player;
   u16 old_frequency;
@@ -175,13 +166,13 @@ struct PrizeEvent : public Event {
 
 struct ShipResetEvent : public Event {};
 
-struct WeaponDamageEvent : public Event {
+struct WeaponSelfDamageEvent : public Event {
   Weapon& weapon;
   Player& shooter;
   int damage;
   bool death;
 
-  WeaponDamageEvent(Weapon& weapon, Player& shooter, int damage, bool death)
+  WeaponSelfDamageEvent(Weapon& weapon, Player& shooter, int damage, bool death)
       : weapon(weapon), shooter(shooter), damage(damage), death(death) {}
 };
 
@@ -225,6 +216,7 @@ struct BallGoalEvent : public Event {
   BallGoalEvent(Powerball& ball) : ball(ball) {}
 };
 
+// This event is fired when any weapon is created. This includes shrap and multifire bullets.
 struct WeaponSpawnEvent : public Event {
   Weapon& weapon;
   Player& player;
@@ -232,10 +224,28 @@ struct WeaponSpawnEvent : public Event {
   WeaponSpawnEvent(Weapon& weapon, Player& player) : weapon(weapon), player(player) {}
 };
 
+// This event is fired once when a weapon packet is received. Listening to this over the spawn event is better when
+// wanting to know exactly when they fired a weapon type rather than the individual particles.
+struct WeaponFireEvent : public Event {
+  WeaponData data;
+  Player& player;
+
+  WeaponFireEvent(WeaponData data, Player& player) : data(data), player(player) {}
+};
+
 struct WeaponDestroyEvent : public Event {
   Weapon& weapon;
 
   WeaponDestroyEvent(Weapon& weapon) : weapon(weapon) {}
+};
+
+// This event is fired when a weapon hits a player or a bomb explodes anywhere.
+// Player target will be null when a bomb explodes against a wall.
+struct WeaponHitEvent : public Event {
+  Weapon& weapon;
+  Player* target;
+
+  WeaponHitEvent(Weapon& weapon, Player* target) : weapon(weapon), target(target) {}
 };
 
 struct ShipToggleEvent : public Event {
