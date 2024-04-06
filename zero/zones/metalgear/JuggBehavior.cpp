@@ -21,6 +21,37 @@
 namespace zero {
 namespace mg {
 
+struct IncomingBombQueryNode : public behavior::BehaviorNode {
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto self = ctx.bot->game->player_manager.GetSelf();
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    constexpr float kNearbyDistanceSq = 6.0f * 6.0f;
+    constexpr int kLevelRequirement = 1;
+
+    float radius = ctx.bot->game->connection.settings.ShipSettings[self->ship].GetRadius();
+    Rectangle self_collider = Rectangle::FromPositionRadius(self->position, radius + 3.0f / 16.0f);
+
+    auto& weapon_man = ctx.bot->game->weapon_manager;
+    for (size_t i = 0; i < weapon_man.weapon_count; ++i) {
+      Weapon& weapon = weapon_man.weapons[i];
+
+      if (weapon.frequency == self->frequency) continue;
+      if (weapon.data.type != WeaponType::Bomb && weapon.data.type != WeaponType::ProximityBomb) continue;
+      if (weapon.position.DistanceSq(self->position) > kNearbyDistanceSq) continue;
+      if (weapon.data.level < kLevelRequirement) continue;
+
+      Ray ray(weapon.position, Normalize(weapon.velocity));
+
+      if (RayBoxIntersect(ray, self_collider, nullptr, nullptr)) {
+        return behavior::ExecuteResult::Success;
+      }
+    }
+
+    return behavior::ExecuteResult::Failure;
+  }
+};
+
 std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
@@ -47,6 +78,13 @@ std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::Execu
                     .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
                     .End()
                 .Selector()
+                    .Sequence() // Use repels when in danger
+                        .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Repel)
+                        .Child<TimerExpiredNode>("defense_timer")
+                        .Child<IncomingBombQueryNode>()
+                        .Child<InputActionNode>(InputAction::Repel)
+                        .Child<TimerSetNode>("defense_timer", 100)
+                        .End()
                     .Sequence()
                         .Child<InfluenceMapPopulateWeapons>()
                         .Child<InfluenceMapGradientDodge>()
