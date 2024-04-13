@@ -157,6 +157,13 @@ int main(int argc, char* argv[]) {
       }
     }
 
+    auto owner_str = cfg->GetString("General", "Owner");
+    if (owner_str) {
+      bot.owner = *owner_str;
+    } else {
+      bot.owner = "*unset*";
+    }
+
     auto render_window = cfg->GetString("Debug", "RenderWindow");
     if (render_window) {
       zero::g_Settings.debug_window = strtol(*render_window, nullptr, 10) != 0;

@@ -10,7 +10,6 @@
 namespace zero {
 
 constexpr int kArenaSecurityLevel = 5;
-const char* kOwner = "monkey";
 
 class BehaviorsCommand : public CommandExecutor {
  public:
@@ -260,7 +259,7 @@ class HelpCommand : public CommandExecutor {
 
     Event::Dispatch(ChatQueueEvent::Private(player->name, "-- !commands {.c} -- see command list (pm)"));
     Event::Dispatch(ChatQueueEvent::Private(player->name, "Code: https://github.com/plushmonkey/zero"));
-    auto owner_msg = std::string("Owner: ") + kOwner;
+    auto owner_msg = std::string("Owner: ") + bot.owner;
     Event::Dispatch(ChatQueueEvent::Private(player->name, owner_msg.data()));
   }
 

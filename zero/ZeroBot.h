@@ -1,5 +1,6 @@
 #pragma once
 
+#include <zero/Config.h>
 #include <zero/DebugRenderer.h>
 #include <zero/Event.h>
 #include <zero/behavior/BehaviorTree.h>
@@ -7,7 +8,6 @@
 #include <zero/game/Game.h>
 #include <zero/game/InputState.h>
 #include <zero/game/Memory.h>
-#include <zero/Config.h>
 
 #include <memory>
 #include <string>
@@ -69,8 +69,9 @@ struct ZeroBot {
   behavior::ExecuteContext execute_ctx;
   CommandSystem* commands = nullptr;
 
-  char name[20] = {0};
+  char name[32] = {0};
   char password[256] = {0};
+  std::string owner;
 
   ZeroBot();
 

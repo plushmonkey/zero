@@ -9,6 +9,8 @@ Server = Local
 Encryption = Subspace
 
 [General]
+# Sets the name of the owner of the bot. This is shown in the !help command.
+Owner = *unset*
 # Sets the log level threshold so only log messages of that level or higher are displayed.
 # Must be one of these: Jabber, Debug, Info, Warning, Error
 LogLevel = Info
