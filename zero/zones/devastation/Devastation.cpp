@@ -27,8 +27,7 @@ static DevastationController controller;
 
 void DevastationController::CreateBehaviors(const char* arena_name) {
   // Create behaviors depending on arena name
-  if (isdigit(arena_name[0])) {
-    Log(LogLevel::Info, "Registering Devastation behaviors for public arena.");
+    Log(LogLevel::Info, "Registering Devastation behaviors.");
 
     base_manager = std::make_unique<BaseManager>(*this->bot);
 
@@ -41,9 +40,6 @@ void DevastationController::CreateBehaviors(const char* arena_name) {
 
     bot->execute_ctx.blackboard.Set("base_manager", base_manager.get());
     bot->bot_controller->energy_tracker.estimate_type = EnergyHeuristicType::Maximum;
-  } else {
-    Log(LogLevel::Info, "No Devastation behaviors defined for arena '%s'.", arena_name);
-  }
 }
 
 }  // namespace deva

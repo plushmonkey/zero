@@ -107,17 +107,24 @@ struct AimNode : public BehaviorNode {
     auto opt_target = ctx.blackboard.Value<Player*>(target_player_key);
     if (!opt_target.has_value()) return ExecuteResult::Failure;
 
-    float weapon_speed = GetWeaponSpeed(*ctx.bot->game, *self, weapon_type);
-
     Player* target = opt_target.value();
+    if (!target) return ExecuteResult::Failure;
+
+    float weapon_speed = GetWeaponSpeed(*ctx.bot->game, *self, weapon_type);
+    Vector2f weapon_velocity = self->velocity + self->GetHeading() * weapon_speed;
 
     Vector2f direction = Normalize(target->position - self->position);
-    float amount = target->velocity.Dot(direction);
-    // Remove the "away" velocity from the target so it's only moving side to side.
-    Vector2f horizontal_vel = target->velocity - direction * amount;
+    float away_amount = target->velocity.Dot(direction);
+
+    Vector2f target_velocity = target->velocity;
+    // If the enemy is moving away too fast, ignore the away movement for this calculation.
+    if (away_amount > weapon_speed) {
+      // Remove the "away" velocity from the target so it's only moving side to side.
+      target_velocity = target->velocity - direction * away_amount;
+    }
 
     std::optional<Vector2f> calculated_shot =
-        CalculateShot(self->position, target->position, self->velocity, horizontal_vel, weapon_speed);
+        CalculateShot(self->position, target->position, self->velocity, target_velocity, weapon_velocity.Length());
 
     // Default to target's position if the calculated shot fails.
     Vector2f aimshot = target->position;

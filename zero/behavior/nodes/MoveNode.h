@@ -10,7 +10,10 @@ namespace zero {
 namespace behavior {
 
 struct SeekNode : public BehaviorNode {
-  SeekNode(const char* position_key) : position_key(position_key), target_distance_key(nullptr) {}
+  enum class DistanceResolveType { Static, Zero, Dynamic };
+  SeekNode(const char* position_key) : position_key(position_key) {}
+  SeekNode(const char* position_key, float target_distance, DistanceResolveType type)
+      : position_key(position_key), target_distance(target_distance), distance_type(type) {}
   SeekNode(const char* position_key, const char* target_distance_key)
       : position_key(position_key), target_distance_key(target_distance_key) {}
 
@@ -20,14 +23,13 @@ struct SeekNode : public BehaviorNode {
 
     Vector2f position = opt_position.value();
 
-    float target_distance = 0.0f;
+    float target_distance = this->target_distance;
 
     if (target_distance_key) {
       auto opt_distance = ctx.blackboard.Value<float>(target_distance_key);
+      if (!opt_distance) return ExecuteResult::Failure;
 
-      if (opt_distance.has_value()) {
-        target_distance = opt_distance.value();
-      }
+      target_distance = *opt_distance;
     }
 
     if (target_distance > 0.0f) {
@@ -35,7 +37,11 @@ struct SeekNode : public BehaviorNode {
       Vector2f to_target = position - self->position;
 
       if (to_target.LengthSq() <= target_distance * target_distance) {
-        ctx.bot->bot_controller->steering.SeekZero(*ctx.bot->game);
+        if (distance_type == DistanceResolveType::Zero) {
+          ctx.bot->bot_controller->steering.SeekZero(*ctx.bot->game);
+        } else if (distance_type == DistanceResolveType::Dynamic) {
+          ctx.bot->bot_controller->steering.Seek(*ctx.bot->game, position, target_distance);
+        }
       } else {
         ctx.bot->bot_controller->steering.Seek(*ctx.bot->game, position, target_distance);
       }
@@ -46,8 +52,10 @@ struct SeekNode : public BehaviorNode {
     return ExecuteResult::Success;
   }
 
-  const char* position_key;
-  const char* target_distance_key;
+  DistanceResolveType distance_type = DistanceResolveType::Zero;
+  float target_distance = 0.0f;
+  const char* position_key = nullptr;
+  const char* target_distance_key = nullptr;
 };
 
 struct SeekZeroNode : public BehaviorNode {

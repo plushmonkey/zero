@@ -26,6 +26,8 @@ static void OnAction(void* user, InputAction action) {
 
   if (!self) return;
 
+  bool dirty_radar = false;
+
   switch (action) {
     case InputAction::Multifire: {
       if (game->ship_controller.ship.capability & ShipCapability_Multifire) {
@@ -37,6 +39,8 @@ static void OnAction(void* user, InputAction action) {
     } break;
     case InputAction::Stealth: {
       ToggleStatus(game, self, ShipCapability_Stealth, Status_Stealth);
+
+      dirty_radar = true;
     } break;
     case InputAction::Cloak: {
       ToggleStatus(game, self, ShipCapability_Cloak, Status_Cloak);
@@ -51,6 +55,8 @@ static void OnAction(void* user, InputAction action) {
       if (self->ship == 8 && !game->connection.settings.NoXRadar) {
         self->togglables ^= Status_XRadar;
       }
+
+      dirty_radar = true;
     } break;
     case InputAction::Antiwarp: {
       ToggleStatus(game, self, ShipCapability_Antiwarp, Status_Antiwarp);
@@ -59,7 +65,9 @@ static void OnAction(void* user, InputAction action) {
     } break;
   }
 
-  game->RecreateRadar();
+  if (dirty_radar) {
+    game->RecreateRadar();
+  }
 }
 
 static void OnFlagClaimPkt(void* user, u8* pkt, size_t size) {

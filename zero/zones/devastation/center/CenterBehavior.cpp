@@ -17,6 +17,8 @@
 #include <zero/behavior/nodes/ThreatNode.h>
 #include <zero/behavior/nodes/TimerNode.h>
 #include <zero/behavior/nodes/WaypointNode.h>
+#include <zero/zones/svs/nodes/BurstAreaQueryNode.h>
+#include <zero/zones/svs/nodes/IncomingDamageQueryNode.h>
 
 namespace zero {
 namespace deva {
@@ -47,39 +49,35 @@ std::unique_ptr<behavior::BehaviorNode> CenterBehavior::CreateTree(behavior::Exe
                         .InvertChild<VisibilityQueryNode>("nearest_target_position")
                         .Child<GoToNode>("nearest_target_position")
                         .End()
-                    .Sequence() // Aim at target and shoot while seeking them.
-                        .Child<AimNode>(WeaponType::Bullet, "nearest_target", "aimshot")
-                        .Parallel()
-                            .Selector() // Select between hovering around a territory position and seeking to enemy.
+                    .Parallel()
+                        .Sequence(CompositeDecorator::Success) // Always check incoming damage so we can use it in repel and portal sequences.
+                            .Child<ShipItemCountThresholdNode>(ShipItemType::Repel)
+                            .Child<TimerExpiredNode>("defense_timer")
+                            .Child<svs::IncomingDamageQueryNode>(5.0f, "incoming_damage")
+                            .Child<PlayerCurrentEnergyQueryNode>("self_energy")
+                            .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
+                            .Child<InputActionNode>(InputAction::Repel)
+                            .Child<TimerSetNode>("defense_timer", 100)
+                            .End()
+                        .Sequence(CompositeDecorator::Success) // Use burst when near a wall.
+                            .Child<ShipItemCountThresholdNode>(ShipItemType::Burst)
+                            .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
+                            .InvertChild<DistanceThresholdNode>("nearest_target_position", 15.0f)
+                            .Child<svs::BurstAreaQueryNode>()
+                            .Child<InputActionNode>(InputAction::Burst)
+                            .End()
+                        .Sequence() // Aim at target and shoot while seeking them.
+                            .Child<AimNode>(WeaponType::Bullet, "nearest_target", "aimshot")
+                            .Child<FaceNode>("aimshot")
+                            .Selector()
                                 .Sequence()
-                                    .Child<FindTerritoryPosition>("nearest_target", "leash_distance", "territory_position")
-                                    .Sequence(CompositeDecorator::Success)
-                                        .Child<PositionThreatQueryNode>("self_position", "self_threat", 8.0f, 3.0f)
-                                        .Child<RenderTextNode>("ui_camera", Vector2f(512, 600), [](ExecuteContext& ctx) {
-                                          std::string str = std::string("Self threat: ") + std::to_string(ctx.blackboard.ValueOr<float>("self_threat", 0.0f));
-
-                                          return RenderTextNode::Request(str, TextColor::White, Layer::TopMost, TextAlignment::Center);
-                                        })
-                                        .Child<PositionThreatQueryNode>("territory_position", "territory_threat", 8.0f, 3.0f)
-                                        .Child<RenderTextNode>("world_camera", "territory_position", [](ExecuteContext& ctx) {
-                                          std::string str = std::string("Threat: ") + std::to_string(ctx.blackboard.ValueOr<float>("territory_threat", 0.0f));
-
-                                          return RenderTextNode::Request(str, TextColor::White, Layer::TopMost, TextAlignment::Center);
-                                        })
-                                        .Child<ScalarThresholdNode<float>>("territory_threat", 0.2f)
-                                        .Child<FindTerritoryPosition>("nearest_target", "leash_distance", "territory_position", true)
-                                        .End()
-                                    .Sequence(CompositeDecorator::Success)
-                                        .InvertChild<ScalarThresholdNode<float>>("self_threat", 0.2f)
-                                        .Child<FaceNode>("aimshot")
-                                        .End()
-                                    .Child<ArriveNode>("territory_position", 25.0f)
-                                    .Child<RectangleNode>("territory_position", Vector2f(2.0f, 2.0f), "territory_rect")
-                                    .Child<RenderRectNode>("world_camera", "territory_rect", Vector3f(0.0f, 1.0f, 0.0f))
+                                    .Child<PlayerEnergyQueryNode>("nearest_target", "target_energy")
+                                    .Child<PlayerEnergyQueryNode>("self_energy")
+                                    .Child<GreaterOrEqualThanNode<float>>("self_energy", "target_energy")
+                                    .Child<SeekNode>("aimshot", "leash_distance")
                                     .End()
                                 .Sequence()
-                                    .Child<FaceNode>("aimshot")
-                                    .Child<SeekNode>("aimshot", "leash_distance")
+                                    .Child<SeekNode>("aimshot", 25.0f, SeekNode::DistanceResolveType::Dynamic)
                                     .End()
                                 .End()
                             .Sequence(CompositeDecorator::Success) // Determine if a shot should be fired by using weapon trajectory and bounding boxes.
