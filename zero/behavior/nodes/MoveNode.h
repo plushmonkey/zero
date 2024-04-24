@@ -277,5 +277,42 @@ struct GoToNode : public BehaviorNode {
   const char* position_key;
 };
 
+struct PathDistanceQueryNode : public BehaviorNode {
+  PathDistanceQueryNode(const char* output_key) : output_key(output_key) {}
+  PathDistanceQueryNode(const char* path_key, const char* output_key) : path_key(path_key), output_key(output_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    path::Path path;
+
+    if (path_key) {
+      auto opt_path = ctx.blackboard.Value<path::Path>(path_key);
+      if (!opt_path) return ExecuteResult::Failure;
+      path = *opt_path;
+    } else {
+      path = ctx.bot->bot_controller->current_path;
+    }
+
+    float distance = 0.0f;
+
+    if (!path.Empty() && path.index < path.points.size() - 1) {
+      Vector2f previous = ctx.bot->game->player_manager.GetSelf()->position;
+
+      for (size_t i = path.index; i < path.points.size(); ++i) {
+        Vector2f current = path.points[i];
+
+        distance += current.Distance(previous);
+        previous = current;
+      }
+    }
+
+    ctx.blackboard.Set<float>(output_key, distance);
+
+    return ExecuteResult::Success;
+  }
+
+  const char* path_key = nullptr;
+  const char* output_key = nullptr;
+};
+
 }  // namespace behavior
 }  // namespace zero

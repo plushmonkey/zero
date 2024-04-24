@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -196,8 +196,11 @@
     <ClInclude Include="zero\zones\devastation\BaseManager.h" />
     <ClInclude Include="zero\zones\devastation\base\TestBehavior.h" />
     <ClInclude Include="zero\zones\devastation\center\CenterBehavior.h" />
+    <ClInclude Include="zero\zones\devastation\Devastation.h" />
+    <ClInclude Include="zero\zones\devastation\nodes\BounceShotQueryNode.h" />
     <ClInclude Include="zero\zones\devastation\nodes\GetAttachTargetNode.h" />
     <ClInclude Include="zero\zones\devastation\nodes\GetSpawnNode.h" />
+    <ClInclude Include="zero\zones\devastation\nodes\CombatRoleNode.h" />
     <ClInclude Include="zero\zones\hyperspace\base\TestBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\center\BallBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\center\CenterJavBehavior.h" />

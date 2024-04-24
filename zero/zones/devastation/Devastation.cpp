@@ -11,6 +11,44 @@
 namespace zero {
 namespace deva {
 
+struct WarpToCommand : public CommandExecutor {
+  void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
+    auto split_pos = arg.find(',');
+
+    if (split_pos == std::string::npos) {
+      SendUsage(sender);
+      return;
+    }
+
+    int first_coord = (int)strtol(arg.data(), nullptr, 10);
+    int second_coord = (int)strtol(arg.data() + split_pos + 1, nullptr, 10);
+
+    if (first_coord < 0 || second_coord < 0 || first_coord > 1023 || second_coord > 1023) {
+      SendUsage(sender);
+      return;
+    }
+
+    auto self = bot.game->player_manager.GetSelf();
+    if (self) {
+      self->position = Vector2f((float)first_coord + 0.5f, (float)second_coord + 0.5f);
+      self->togglables |= Status_Flash;
+
+      Event::Dispatch(TeleportEvent(*self));
+    }
+  }
+
+  void SendUsage(const std::string& target_player) {
+    std::string usage = "Requires coordinate in x, y form. Ex: warpto 512, 600";
+    Event::Dispatch(ChatQueueEvent::Private(target_player.data(), usage.data()));
+  }
+
+  CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
+  void SetAccess(CommandAccessFlags flags) override {}
+  std::vector<std::string> GetAliases() override { return { "warpto"}; }
+  std::string GetDescription() override { return "Warps to a provided coord."; }
+  int GetSecurityLevel() override { return 10; }
+};
+
 struct DevastationController : ZoneController {
   std::unique_ptr<BaseManager> base_manager;
 
@@ -40,6 +78,8 @@ void DevastationController::CreateBehaviors(const char* arena_name) {
 
     bot->execute_ctx.blackboard.Set("base_manager", base_manager.get());
     bot->bot_controller->energy_tracker.estimate_type = EnergyHeuristicType::Maximum;
+
+    bot->commands->RegisterCommand(std::make_shared<WarpToCommand>());
 }
 
 }  // namespace deva

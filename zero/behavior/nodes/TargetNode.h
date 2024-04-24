@@ -66,7 +66,10 @@ struct NearestTargetNode : public behavior::BehaviorNode {
 
     Player* nearest = GetNearestTarget(*ctx.bot->game, *self, *ctx.bot->bot_controller->region_registry);
 
-    if (!nearest) return behavior::ExecuteResult::Failure;
+    if (!nearest) {
+      ctx.blackboard.Erase(player_key);
+      return behavior::ExecuteResult::Failure;
+    }
 
     ctx.blackboard.Set(player_key, nearest);
 

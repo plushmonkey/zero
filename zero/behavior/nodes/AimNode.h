@@ -62,6 +62,36 @@ inline float GetWeaponSpeed(Game& game, Player& player, WeaponType type) {
   return weapon_speed;
 }
 
+struct BulletDistanceNode : public BehaviorNode {
+  BulletDistanceNode(const char* output_key) : output_key(output_key) {}
+  BulletDistanceNode(const char* player_key, const char* output_key) : player_key(player_key), output_key(output_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto player = ctx.bot->game->player_manager.GetSelf();
+    if (player_key) {
+      auto opt_player = ctx.blackboard.Value<Player*>(player_key);
+      if (!opt_player) return ExecuteResult::Failure;
+      player = *opt_player;
+    }
+
+    if (!player) return ExecuteResult::Failure;
+    if (player->ship >= 8) return ExecuteResult::Failure;
+
+    float weapon_speed = GetWeaponSpeed(*ctx.bot->game, *player, WeaponType::Bullet);
+    float alive_time = ctx.bot->game->connection.settings.BulletAliveTime / 100.0f;
+
+    Vector2f velocity = player->velocity + player->GetHeading() * weapon_speed;
+    Vector2f trajectory = velocity * alive_time;
+
+    ctx.blackboard.Set<float>(output_key, trajectory.Length());
+
+    return ExecuteResult::Success;
+  }
+
+  const char* player_key = nullptr;
+  const char* output_key = nullptr;
+};
+
 struct ShotVelocityQueryNode : public BehaviorNode {
   ShotVelocityQueryNode(WeaponType weapon, const char* velocity_key)
       : weapon_type(weapon), player_key(nullptr), velocity_key(velocity_key) {}
@@ -91,8 +121,8 @@ struct ShotVelocityQueryNode : public BehaviorNode {
     return ExecuteResult::Success;
   }
 
-  const char* player_key;
-  const char* velocity_key;
+  const char* player_key = nullptr;
+  const char* velocity_key = nullptr;
   WeaponType weapon_type;
 };
 

@@ -3,6 +3,7 @@
 #include <zero/ZeroBot.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/game/Game.h>
+#include <zero/behavior/nodes/AimNode.h>
 
 namespace zero {
 namespace behavior {

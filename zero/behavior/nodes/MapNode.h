@@ -64,6 +64,8 @@ struct DistanceThresholdNode : public BehaviorNode {
       : position_a_key(position_key), position_b_key(nullptr), threshold_sq(threshold * threshold) {}
   DistanceThresholdNode(const char* position_a_key, const char* position_b_key, float threshold)
       : position_a_key(position_a_key), position_b_key(position_b_key), threshold_sq(threshold * threshold) {}
+  DistanceThresholdNode(const char* position_a_key, const char* position_b_key, const char* threshold_key)
+      : position_a_key(position_a_key), position_b_key(position_b_key), threshold_key(threshold_key) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
     auto opt_position_a = ctx.blackboard.Value<Vector2f>(position_a_key);
@@ -85,12 +87,20 @@ struct DistanceThresholdNode : public BehaviorNode {
       position_b = self->position;
     }
 
+    float threshold = threshold_sq;
+    if (threshold_key) {
+      auto opt_threshold = ctx.blackboard.Value<float>(threshold_key);
+      if (!opt_threshold) return ExecuteResult::Failure;
+      threshold = *opt_threshold * *opt_threshold;
+    }
+
     return position_a.DistanceSq(position_b) >= threshold_sq ? ExecuteResult::Success : ExecuteResult::Failure;
   }
 
-  const char* position_a_key;
-  const char* position_b_key;
-  float threshold_sq;
+  const char* position_a_key = nullptr;
+  const char* position_b_key = nullptr;
+  const char* threshold_key = nullptr;
+  float threshold_sq = 0.0f;
 };
 
 // Finds the closest tile and stores it in the provided key.
