@@ -94,7 +94,7 @@ struct DistanceThresholdNode : public BehaviorNode {
       threshold = *opt_threshold * *opt_threshold;
     }
 
-    return position_a.DistanceSq(position_b) >= threshold_sq ? ExecuteResult::Success : ExecuteResult::Failure;
+    return position_a.DistanceSq(position_b) >= threshold ? ExecuteResult::Success : ExecuteResult::Failure;
   }
 
   const char* position_a_key = nullptr;

@@ -61,6 +61,7 @@ std::unique_ptr<behavior::BehaviorNode> CreateJavTree(behavior::ExecuteContext& 
                   .Sequence() // Aim at target and shoot while seeking them.
                       .Child<AimNode>(WeaponType::Bullet, "nearest_target", "aimshot")
                       .Child<FaceNode>("aimshot")
+                      .Child<RotationThresholdSetNode>(0.25f) // Set the threshold low so it will prioritize pursuit over aiming directly at.
                       .Selector()
                           .Sequence()
                               .Child<PlayerEnergyQueryNode>("nearest_target", "target_energy")
@@ -89,13 +90,14 @@ std::unique_ptr<behavior::BehaviorNode> CreateJavTree(behavior::ExecuteContext& 
           .End();
   // clang-format on
 
-    return builder.Build();
+  return builder.Build();
 }
 
 std::unique_ptr<behavior::BehaviorNode> CenterBehavior::CreateTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
   BehaviorBuilder builder;
+  Rectangle center_rect = Rectangle::FromPositionRadius(Vector2f(512, 512), 64.0f);
 
   // clang-format off
   builder
@@ -104,13 +106,18 @@ std::unique_ptr<behavior::BehaviorNode> CenterBehavior::CreateTree(behavior::Exe
             .InvertChild<ShipQueryNode>("request_ship")
             .Child<ShipRequestNode>("request_ship")
             .End()
+        .Sequence()
+            .Child<PlayerPositionQueryNode>("self_position")
+            .InvertChild<RectangleContainsNode>(center_rect, "self_position")
+            .Child<DebugPrintNode>("Warping")
+            .Child<InputActionNode>(InputAction::Warp)
+            .End()
         .Selector() // Choose to fight the player or follow waypoints.
             .Sequence() // Execute jav center behavior
-                .Child<ShipQueryNode>(1)
+                //.Child<ShipQueryNode>(1)
                 .Composite(CreateJavTree(ctx))
                 .End()
             .Sequence() // Follow set waypoints.
-                .Child<DebugPrintNode>("Waypoint")
                 .Child<WaypointNode>("waypoints", "waypoint_index", "waypoint_position", 15.0f)
                 .Selector()
                     .Sequence()

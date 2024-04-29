@@ -2,7 +2,7 @@
 
 namespace zero {
 
-void Actuator::Update(Game& game, InputState& input, const Vector2f& force, float rotation) {
+void Actuator::Update(Game& game, InputState& input, const Vector2f& force, float rotation, float rotation_threshold) {
   float enter_delay = (game.connection.settings.EnterDelay / 100.0f);
   Player* self = game.player_manager.GetSelf();
 
@@ -42,7 +42,7 @@ void Actuator::Update(Game& game, InputState& input, const Vector2f& force, floa
   // This is used as a way to rectify having a force and rotation target. Having both means that there must be some
   // blend of the two. It keeps the heading locked around the rotate target with some wiggle room for also aiming at the
   // steering direction.
-  if (steering_direction.Dot(rotate_target) < 0.75f) {
+  if (steering_direction.Dot(rotate_target) < rotation_threshold) {
     float rotation = 0.1f;
     int sign = leftside ? 1 : -1;
 

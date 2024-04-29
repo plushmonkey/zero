@@ -83,6 +83,30 @@ struct ArriveNode : public BehaviorNode {
   float deceleration;
 };
 
+struct RotationThresholdSetNode : public BehaviorNode {
+  RotationThresholdSetNode(const char* threshold_key) : threshold_key(threshold_key) {}
+  RotationThresholdSetNode(float threshold) : threshold(threshold) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    float threshold = this->threshold;
+
+    if (threshold_key) {
+      auto opt_threshold = ctx.blackboard.Value<float>(threshold_key);
+
+      if (!opt_threshold) return ExecuteResult::Failure;
+
+      threshold = *opt_threshold;
+    }
+
+    ctx.bot->bot_controller->steering.SetRotationThreshold(threshold);
+
+    return ExecuteResult::Success;
+  }
+
+  float threshold = 0.0f;
+  const char* threshold_key = nullptr;
+};
+
 struct FaceNode : public BehaviorNode {
   FaceNode(const char* position_key) : position_key(position_key) {}
 

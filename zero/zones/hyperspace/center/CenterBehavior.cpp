@@ -17,6 +17,7 @@
 #include <zero/behavior/nodes/ThreatNode.h>
 #include <zero/behavior/nodes/TimerNode.h>
 #include <zero/behavior/nodes/WaypointNode.h>
+#include <zero/zones/svs/nodes/IncomingDamageQueryNode.h>
 
 namespace zero {
 namespace hyperspace {
@@ -64,6 +65,15 @@ std::unique_ptr<behavior::BehaviorNode> CenterBehavior::CreateTree(behavior::Exe
                     .Sequence() // Aim at target and shoot while seeking them.
                         .Child<AimNode>(WeaponType::Bullet, "nearest_target", "aimshot")
                         .Parallel()
+                            .Sequence(CompositeDecorator::Success) // Always check incoming damage so we can use it in repel and portal sequences.
+                                .Child<ShipItemCountThresholdNode>(ShipItemType::Repel)
+                                .Child<TimerExpiredNode>("defense_timer")
+                                .Child<svs::IncomingDamageQueryNode>(5.0f, "incoming_damage")
+                                .Child<PlayerCurrentEnergyQueryNode>("self_energy")
+                                .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
+                                .Child<InputActionNode>(InputAction::Repel)
+                                .Child<TimerSetNode>("defense_timer", 100)
+                                .End()
                             .Selector() // Select between hovering around a territory position and seeking to enemy.
                                 .Sequence() // If we have enough energy, rush at them.
                                     .Child<PlayerEnergyQueryNode>("nearest_target", "nearest_target_energy")

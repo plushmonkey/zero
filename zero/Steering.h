@@ -9,10 +9,12 @@ namespace zero {
 struct Steering {
   Vector2f force;
   float rotation = 0.0f;
+  float rotation_threshold = 0.75f;
 
   void Reset() {
     force = Vector2f(0, 0);
     rotation = 0.0f;
+    rotation_threshold = 0.75f;
   }
 
   inline static float GetMaxSpeed(Game& game) {
@@ -38,6 +40,8 @@ struct Steering {
 
     this->rotation += WrapToPi(rotation);
   }
+
+  inline void SetRotationThreshold(float threshold) { this->rotation_threshold = threshold; }
 
   void SeekZero(Game& game) {
     Player* self = game.player_manager.GetSelf();
