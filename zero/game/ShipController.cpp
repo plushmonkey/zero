@@ -1935,7 +1935,7 @@ void ShipController::OnWeaponHit(Weapon& weapon) {
       }
     } break;
     case WeaponType::Burst: {
-      damage = connection.settings.BurstDamageLevel;
+      damage = connection.settings.BurstDamageLevel / 1000;
     } break;
     default: {
     } break;
