@@ -247,6 +247,13 @@ struct Ray {
 
   Ray() {}
   Ray(Vector2f origin, Vector2f direction) : origin(origin), direction(direction) {}
+
+  // Project a position onto the ray to get the closest position
+  inline Vector2f GetClosestPosition(Vector2f position) const {
+    float t = (position - origin).Dot(direction);
+    if (t < 0) t = 0.0f;
+    return origin + direction * t;
+  }
 };
 
 inline bool PointInsideBox(const Vector2f& min, const Vector2f& max, const Vector2f& point) {

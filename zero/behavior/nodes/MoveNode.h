@@ -16,6 +16,8 @@ struct SeekNode : public BehaviorNode {
       : position_key(position_key), target_distance(target_distance), distance_type(type) {}
   SeekNode(const char* position_key, const char* target_distance_key)
       : position_key(position_key), target_distance_key(target_distance_key) {}
+  SeekNode(const char* position_key, const char* target_distance_key, DistanceResolveType type)
+      : position_key(position_key), target_distance_key(target_distance_key), distance_type(type) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
     auto opt_position = ctx.blackboard.Value<Vector2f>(position_key);

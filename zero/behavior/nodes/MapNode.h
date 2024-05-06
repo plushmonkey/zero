@@ -62,6 +62,8 @@ struct TileQueryNode : public BehaviorNode {
 struct DistanceThresholdNode : public BehaviorNode {
   DistanceThresholdNode(const char* position_key, float threshold)
       : position_a_key(position_key), position_b_key(nullptr), threshold_sq(threshold * threshold) {}
+  DistanceThresholdNode(const char* position_key, const char* threshold_key)
+    : position_a_key(position_key), position_b_key(nullptr), threshold_key(threshold_key) {}
   DistanceThresholdNode(const char* position_a_key, const char* position_b_key, float threshold)
       : position_a_key(position_a_key), position_b_key(position_b_key), threshold_sq(threshold * threshold) {}
   DistanceThresholdNode(const char* position_a_key, const char* position_b_key, const char* threshold_key)

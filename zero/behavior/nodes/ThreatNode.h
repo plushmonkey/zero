@@ -15,6 +15,129 @@
 namespace zero {
 namespace behavior {
 
+struct IncomingDamageReport {
+  Vector2f average_direction;
+  Vector2f average_origin;
+  float average_damage;
+  u32 weapon_count;
+};
+
+struct DodgeIncomingDamage : public behavior::BehaviorNode {
+  DodgeIncomingDamage(float damage_percent_threshold, float distance)
+      : damage_percent_threshold(damage_percent_threshold), distance(distance) {}
+  DodgeIncomingDamage(float damage_percent_threshold, const char* distance_key)
+      : damage_percent_threshold(damage_percent_threshold), distance_key(distance_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    Player* self = ctx.bot->game->player_manager.GetSelf();
+
+    if (!self) return behavior::ExecuteResult::Failure;
+    if (self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    float check_distance = distance;
+    if (distance_key != nullptr) {
+      auto opt_distance = ctx.blackboard.Value<float>(distance_key);
+      if (!opt_distance) return behavior::ExecuteResult::Failure;
+
+      check_distance = *opt_distance;
+    }
+
+    IncomingDamageReport report = GetIncomingDamage(ctx, self, check_distance);
+    float est_damage = report.weapon_count * report.average_damage;
+    float damage_percent = est_damage / (float)ctx.bot->game->ship_controller.ship.energy;
+
+    if (damage_percent < damage_percent_threshold) {
+      // Nothing needs to be done
+      return behavior::ExecuteResult::Failure;
+    }
+
+    Vector2f incoming_direction = Normalize(report.average_direction);
+    Ray ray(report.average_origin, incoming_direction);
+    Vector2f closest_hit = ray.GetClosestPosition(self->position);
+
+    Vector2f side = Normalize(self->position - closest_hit);
+
+    ctx.bot->game->line_renderer.PushLine(self->position, Vector3f(1, 1, 0), self->position + side * 5.0f,
+                                          Vector3f(1, 1, 0));
+    ctx.bot->game->line_renderer.Render(ctx.bot->game->camera);
+    ctx.bot->bot_controller->steering.force = side * 10000.0f;
+
+    return behavior::ExecuteResult::Success;
+  }
+
+  IncomingDamageReport GetIncomingDamage(behavior::ExecuteContext& ctx, Player* self, float check_distance) {
+    float distance_sq = check_distance * check_distance;
+    float ship_radius = ctx.bot->game->connection.settings.ShipSettings[self->ship].GetRadius();
+    float bounds_extent = ship_radius * 2.0f;
+
+    Rectangle self_bounds(self->position - Vector2f(bounds_extent, bounds_extent),
+                          self->position + Vector2f(bounds_extent, bounds_extent));
+
+    Vector2f average_direction;
+    Vector2f average_origin;
+    float average_damage = 0.0f;
+    size_t incoming_count = 0;
+
+    links.clear();
+
+    auto& weapon_man = ctx.bot->game->weapon_manager;
+    for (size_t i = 0; i < weapon_man.weapon_count; ++i) {
+      Weapon& weapon = weapon_man.weapons[i];
+
+      if (weapon.frequency == self->frequency) continue;
+      if (weapon.data.type == WeaponType::Repel || weapon.data.type == WeaponType::Decoy) continue;
+      if (weapon.data.type == WeaponType::Burst && !(weapon.flags & WEAPON_FLAG_BURST_ACTIVE)) continue;
+      if (weapon.position.DistanceSq(self->position) > distance_sq) continue;
+      if (links.contains(weapon.link_id)) continue;
+
+      float dist = 0.0f;
+
+      Vector2f relative_velocity = weapon.velocity - self->velocity;
+      Vector2f direction = Normalize(relative_velocity);
+      Rectangle check_bounds = self_bounds;
+
+      if ((weapon.data.type == WeaponType::Bomb || weapon.data.type == WeaponType::ProximityBomb) &&
+          weapon.velocity.LengthSq() <= 0.0f) {
+        check_bounds = self_bounds.Scale(3.0f);
+      }
+
+      if (RayBoxIntersect(Ray(weapon.position, direction), check_bounds, &dist, nullptr)) {
+        float damage = (float)GetEstimatedWeaponDamage(weapon, ctx.bot->game->connection);
+        Vector2f weighted_direction = direction;
+
+        // Reduce the effect of this direction if the damage is lower than average.
+        if (average_damage > 0) {
+          weighted_direction *= damage / average_damage;
+        }
+
+        average_direction +=
+            (weighted_direction + (float)incoming_count * average_direction) / ((float)incoming_count + 1);
+        average_origin += (weapon.position + (float)incoming_count * average_origin) / ((float)incoming_count + 1);
+        average_damage += (damage + (float)incoming_count * average_damage) / ((float)incoming_count + 1);
+        ++incoming_count;
+      }
+
+      if (weapon.link_id != kInvalidLink) {
+        links.insert(weapon.link_id);
+      }
+    }
+
+    IncomingDamageReport report;
+    report.average_damage = average_damage;
+    report.average_direction = average_direction;
+    report.average_origin = average_origin;
+    report.weapon_count = (u32)incoming_count;
+
+    return report;
+  }
+
+  float damage_percent_threshold = 0.0f;
+  float distance = 0.0f;
+  const char* distance_key = nullptr;
+
+  std::unordered_set<u32> links;
+};
+
 struct InfluenceMapGradientDodge : public BehaviorNode {
   ExecuteResult Execute(ExecuteContext& ctx) override {
     bool dodged = Dodge(ctx);

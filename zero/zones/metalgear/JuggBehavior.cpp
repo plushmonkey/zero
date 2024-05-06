@@ -86,8 +86,7 @@ std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::Execu
                         .Child<TimerSetNode>("defense_timer", 100)
                         .End()
                     .Sequence()
-                        .Child<InfluenceMapPopulateWeapons>()
-                        .Child<InfluenceMapGradientDodge>()
+                        .Child<DodgeIncomingDamage>(0.5f, 20.0f)
                         .End()
                     .Sequence() // Path to target if they aren't immediately visible.
                         .InvertChild<VisibilityQueryNode>("nearest_target_position")
