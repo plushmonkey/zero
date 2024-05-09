@@ -11,7 +11,7 @@ struct CenterBehavior : public behavior::Behavior {
   void OnInitialize(behavior::ExecuteContext& ctx) override {
     // Setup blackboard here for this specific behavior
     ctx.blackboard.Set("request_ship", 0);
-    ctx.blackboard.Set("leash_distance", 45.0f);
+    ctx.blackboard.Set("leash_distance", 25.0f);
 
     std::vector<Vector2f> waypoints{
         Vector2f(440, 460),

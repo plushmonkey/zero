@@ -366,7 +366,7 @@ WeaponSimulateResult WeaponManager::SimulateRepel(Weapon& weapon) {
     }
   }
 
-  return WeaponSimulateResult::TimedOut;
+  return WeaponSimulateResult::Continue;
 }
 
 bool WeaponManager::SimulateAxis(Weapon& weapon, float dt, int axis) {
@@ -1019,7 +1019,7 @@ int WeaponManager::GetWeaponTotalAliveTime(WeaponType type, bool alternate) {
       }
     } break;
     case WeaponType::Repel: {
-      result = 1;
+      result = 100;
     } break;
     case WeaponType::Decoy: {
       result = connection.settings.DecoyAliveTime;

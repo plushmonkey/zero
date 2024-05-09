@@ -221,6 +221,9 @@ struct Rectangle {
     return Rectangle(center - half_extents, center + half_extents);
   }
   inline Rectangle Grow(Vector2f amount) const { return Rectangle(min - amount, max + amount); }
+  inline Rectangle Grow(float amount) const {
+    return Rectangle(min - Vector2f(amount, amount), max + Vector2f(amount, amount));
+  }
 
   inline Vector2f GetCenter() const { return (min + max) * 0.5f; }
 
