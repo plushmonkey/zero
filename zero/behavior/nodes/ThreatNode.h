@@ -105,15 +105,16 @@ struct DodgeIncomingDamage : public behavior::BehaviorNode {
       if (weapon.data.type == WeaponType::Burst && !(weapon.flags & WEAPON_FLAG_BURST_ACTIVE)) continue;
       if (weapon.position.DistanceSq(self->position) > distance_sq) continue;
 
-      float dist = 0.0f;
+      bool is_mine = (weapon.data.type == WeaponType::Bomb || weapon.data.type == WeaponType::ProximityBomb) &&
+                     weapon.data.alternate;
 
       Vector2f relative_velocity = weapon.velocity - self->velocity;
       Vector2f direction = Normalize(relative_velocity);
       Rectangle check_bounds = self_bounds;
 
       if (weapon.data.type == WeaponType::Bomb) {
-        // Grow by bomb size (4 pixels)
-        check_bounds = check_bounds.Grow(2.0f);
+        // Grow by bomb size plus some extra pixels to be certain.
+        check_bounds = check_bounds.Grow(6.0f / 16.0f);
       } else if (weapon.data.type == WeaponType::ProximityBomb) {
         float prox_radius =
             ((float)ctx.bot->game->connection.settings.ProximityDistance + (float)weapon.data.level) + (2.0f / 16.0f);
@@ -126,7 +127,19 @@ struct DodgeIncomingDamage : public behavior::BehaviorNode {
 
       ctx.bot->game->line_renderer.PushRect(view_bounds, Vector3f(1, 0, 0));
 
+      // The amount of ticks that we are uncertain of with weapon alive time.
+      // This will cause it to attempt to dodge weapons that might be right outside of hitting range.
+      constexpr u32 kSlopTicks = 30;
+
+      float remaining_distance =
+          weapon.velocity.Length() * (TICK_DIFF(MAKE_TICK(weapon.end_tick + kSlopTicks), GetCurrentTick()) / 100.0f);
+
+      float dist = 0.0f;
+
       if (RayBoxIntersect(Ray(weapon.position, direction), check_bounds, &dist, nullptr)) {
+        // Ignore weapons that will time out before reaching us.
+        if (dist > remaining_distance && !is_mine) continue;
+
         // Reduce the amount of impact this weapon will have based on its distance away.
         float threat_percent = dist / (check_distance * 0.7f);
         if (threat_percent > 1.0f) threat_percent = 1.0f;

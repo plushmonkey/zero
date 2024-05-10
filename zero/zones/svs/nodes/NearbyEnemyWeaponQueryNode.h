@@ -17,6 +17,22 @@ struct WeaponTypeCombine {
   static constexpr size_t kExtendedIndexStart = 9;
   u16 set = 0;
 
+  WeaponTypeCombine() {}
+  WeaponTypeCombine(WeaponType type) {
+    if (type == WeaponType::None) return;
+    if (type > WeaponType::Thor) return;
+
+    u32 index = (u32)type;
+
+    this->set |= (1 << index);
+  }
+
+  WeaponTypeCombine(ExtendedWeaponType type) {
+    u32 index = (u32)type + kExtendedIndexStart;
+
+    this->set |= (1 << index);
+  }
+
   WeaponTypeCombine& operator|(WeaponType type) {
     if (type == WeaponType::None) return *this;
     if (type > WeaponType::Thor) return *this;

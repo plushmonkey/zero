@@ -64,7 +64,7 @@ struct NearestTargetNode : public behavior::BehaviorNode {
     Player* self = ctx.bot->game->player_manager.GetSelf();
     if (!self) return behavior::ExecuteResult::Failure;
 
-    Player* nearest = GetNearestTarget(*ctx.bot->game, *self, *ctx.bot->bot_controller->region_registry);
+    Player* nearest = GetNearestTarget(ctx, *self);
 
     if (!nearest) {
       ctx.blackboard.Erase(player_key);
@@ -77,7 +77,10 @@ struct NearestTargetNode : public behavior::BehaviorNode {
   }
 
  private:
-  Player* GetNearestTarget(Game& game, Player& self, RegionRegistry& region_registry) {
+  Player* GetNearestTarget(behavior::ExecuteContext& ctx, Player& self) {
+    Game& game = *ctx.bot->game;
+    RegionRegistry& region_registry = *ctx.bot->bot_controller->region_registry;
+
     Player* best_target = nullptr;
     float closest_dist_sq = std::numeric_limits<float>::max();
 

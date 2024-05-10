@@ -60,14 +60,9 @@ std::unique_ptr<behavior::BehaviorNode> CenterBehavior::CreateTree(behavior::Exe
                     .Child<InputActionNode>(InputAction::Multifire)
                     .End()
                 .Selector()
+                    // TOOD: Detect mines on our path or repeated deaths to mines. Ignore people who are camping behind mines.
                     .Sequence()
-                        .Child<PlayerEnergyQueryNode>("nearest_target", "target_energy")
-                        .Child<PlayerEnergyQueryNode>("self_energy")
-                        .Selector() // Only dodge when far away or enemy might have more energy than us.
-                            .Child<GreaterOrEqualThanNode<float>>("target_energy", "self_energy")
-                            .Child<DistanceThresholdNode>("nearest_target_position", "bullet_distance")
-                            .End()
-                        .Child<DodgeIncomingDamage>(0.3f, 25.0f)
+                        .Child<DodgeIncomingDamage>(0.3f, 35.0f)
                         .End()
                     .Sequence() // Path to target if they aren't immediately visible.
                         .InvertChild<VisibilityQueryNode>("nearest_target_position")
