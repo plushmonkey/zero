@@ -10,6 +10,7 @@ namespace zero {
 enum class LogLevel { Jabber, Debug, Info, Warning, Error, Count };
 
 extern LogLevel g_LogPrintLevel;
+extern const char* g_LogPath;
 
 void LogArgs(LogLevel level, const char* fmt, va_list args);
 

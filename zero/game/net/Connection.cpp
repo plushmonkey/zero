@@ -592,6 +592,8 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
       } break;
       case ProtocolS2C::TurfFlagUpdate: {
       } break;
+      case ProtocolS2C::FlagReward: {
+      } break;
       case ProtocolS2C::KeepAlive: {
       } break;
       case ProtocolS2C::SmallPosition: {

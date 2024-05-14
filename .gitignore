@@ -40,3 +40,4 @@ local.properties
 *.wa2
 graphics
 *.cfg
+*.log

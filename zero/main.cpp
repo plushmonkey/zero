@@ -38,6 +38,7 @@ BOOL WINAPI ConsoleCloserHandler(DWORD dwCtrlType) {
 namespace zero {
 
 const char* kSecurityServiceIp = "127.0.0.1";
+char kLogPath[1024];
 
 ServerInfo kServers[] = {
     {"local", "127.0.0.1", 5000, Zone::Local},
@@ -194,6 +195,11 @@ int main(int argc, char* argv[]) {
   }
 
   bot.config = std::move(cfg);
+
+  sprintf(zero::kLogPath, "%s-%s.log", login_name, server->name.data());
+  zero::g_LogPath = zero::kLogPath;
+
+  zero::Log(zero::LogLevel::Info, "==================================================");
 
   const char* encrypt_type =
       zero::g_Settings.encrypt_method == zero::EncryptMethod::Subspace ? "Subspace" : "Continuum";
