@@ -1,5 +1,4 @@
 #include <zero/BotController.h>
-#include <zero/Utility.h>
 #include <zero/ZeroBot.h>
 #include <zero/game/GameEvent.h>
 #include <zero/game/Logger.h>
@@ -44,7 +43,7 @@ struct WarpToCommand : public CommandExecutor {
 
   CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
   void SetAccess(CommandAccessFlags flags) override {}
-  std::vector<std::string> GetAliases() override { return { "warpto"}; }
+  std::vector<std::string> GetAliases() override { return {"warpto"}; }
   std::string GetDescription() override { return "Warps to a provided coord."; }
   int GetSecurityLevel() override { return 10; }
 };
@@ -65,21 +64,21 @@ static DevastationController controller;
 
 void DevastationController::CreateBehaviors(const char* arena_name) {
   // Create behaviors depending on arena name
-    Log(LogLevel::Info, "Registering Devastation behaviors.");
+  Log(LogLevel::Info, "Registering Devastation behaviors.");
 
-    base_manager = std::make_unique<BaseManager>(*this->bot);
+  base_manager = std::make_unique<BaseManager>(*this->bot);
 
-    auto& repo = bot->bot_controller->behaviors;
+  auto& repo = bot->bot_controller->behaviors;
 
-    repo.Add("center", std::make_unique<CenterBehavior>());
-    repo.Add("test", std::make_unique<TestBehavior>());
+  repo.Add("center", std::make_unique<CenterBehavior>());
+  repo.Add("test", std::make_unique<TestBehavior>());
 
-    SetBehavior("center");
+  SetBehavior("center");
 
-    bot->execute_ctx.blackboard.Set("base_manager", base_manager.get());
-    bot->bot_controller->energy_tracker.estimate_type = EnergyHeuristicType::Maximum;
+  bot->execute_ctx.blackboard.Set("base_manager", base_manager.get());
+  bot->bot_controller->energy_tracker.estimate_type = EnergyHeuristicType::Maximum;
 
-    bot->commands->RegisterCommand(std::make_shared<WarpToCommand>());
+  bot->commands->RegisterCommand(std::make_shared<WarpToCommand>());
 }
 
 }  // namespace deva

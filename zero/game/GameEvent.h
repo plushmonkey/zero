@@ -28,6 +28,11 @@ struct ArenaNameEvent : public Event {
   ArenaNameEvent(const char* name) : name(name) {}
 };
 
+struct LoginResponseEvent : public Event {
+  u8 response_id;
+  LoginResponseEvent(u8 response_id) : response_id(response_id) {}
+};
+
 struct ArenaSettingsEvent : public Event {
   ArenaSettings& settings;
 

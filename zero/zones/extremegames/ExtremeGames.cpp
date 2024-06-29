@@ -1,5 +1,4 @@
 #include <zero/BotController.h>
-#include <zero/Utility.h>
 #include <zero/ZeroBot.h>
 #include <zero/game/GameEvent.h>
 #include <zero/game/Logger.h>

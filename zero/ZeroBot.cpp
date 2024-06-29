@@ -101,6 +101,12 @@ bool ZeroBot::JoinZone(ServerInfo& server) {
     }
   }
 
+  const char* group_lookups[] = {to_string(server.zone), "General"};
+  auto default_arena = config->GetString(group_lookups, ZERO_ARRAY_SIZE(group_lookups), "Arena");
+  if (default_arena) {
+    bot_controller->default_arena = std::string(*default_arena);
+  }
+
   ConnectResult result = game->connection.Connect(server.ipaddr.data(), server.port);
 
   if (result != ConnectResult::Success) {

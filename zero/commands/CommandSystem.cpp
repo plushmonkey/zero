@@ -2,6 +2,7 @@
 
 #include <zero/BotController.h>
 #include <zero/ChatQueue.h>
+#include <zero/Utility.h>
 #include <zero/ZeroBot.h>
 #include <zero/behavior/Behavior.h>
 #include <zero/game/Game.h>
@@ -127,7 +128,7 @@ class SayCommand : public CommandExecutor {
       size_t pm_end = arg.find(':', 1);
       if (pm_end != std::string::npos) {
         std::string to = arg.substr(1, pm_end - 1);
-    
+
         Event::Dispatch(ChatQueueEvent::Private(to.data(), arg.data() + pm_end + 1));
         return;
       }
@@ -147,33 +148,9 @@ class GoCommand : public CommandExecutor {
  public:
   void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
     auto& connection = bot.game->connection;
+    auto login_args = ParseLoginArena(arg);
 
-    int ship = 8;
-
-    if (arg.empty()) {
-      connection.SendArenaLogin(ship, 0, 1920, 1080, 0xFFFF, "");
-      return;
-    }
-
-    bool is_number = true;
-    for (size_t i = 0; i < arg.size(); ++i) {
-      if (arg[i] < '0' || arg[i] > '9') {
-        is_number = false;
-        break;
-      }
-    }
-
-    if (is_number) {
-      int number = atoi(arg.data());
-
-      if (number > 0xFFFF) {
-        number = 0xFFFF;
-      }
-
-      connection.SendArenaLogin(ship, 0, 1920, 1080, number, "");
-    } else {
-      connection.SendArenaLogin(ship, 0, 1920, 1080, 0xFFFD, arg.data());
-    }
+    connection.SendArenaLogin(8, 0, 1920, 1080, login_args.first, login_args.second.data());
   }
 
   CommandAccessFlags GetAccess() override { return CommandAccess_Public | CommandAccess_Private; }

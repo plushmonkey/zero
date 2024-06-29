@@ -1,5 +1,6 @@
 #include "BotController.h"
 
+#include <zero/Utility.h>
 #include <zero/behavior/BehaviorBuilder.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/game/Logger.h>
@@ -53,6 +54,16 @@ void BotController::HandleEvent(const DoorToggleEvent& event) {
   if (current_path.dynamic) {
     Log(LogLevel::Debug, "Clearing current path from door update.");
     current_path.Clear();
+  }
+}
+
+void BotController::HandleEvent(const LoginResponseEvent& event) {
+  u8 response = event.response_id;
+
+  if (response == 0x00 || response == 0x0D) {
+    auto login_args = ParseLoginArena(default_arena);
+
+    game.connection.SendArenaLogin(8, 0, 1920, 1080, login_args.first, login_args.second.data());
   }
 }
 

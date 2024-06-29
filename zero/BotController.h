@@ -23,7 +23,8 @@ struct ExecuteContext;
 
 struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>,
                        EventHandler<JoinGameEvent>,
-                       EventHandler<DoorToggleEvent> {
+                       EventHandler<DoorToggleEvent>,
+                       EventHandler<LoginResponseEvent> {
   Game& game;
 
   std::unique_ptr<path::Pathfinder> pathfinder;
@@ -40,6 +41,8 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>,
   HeuristicEnergyTracker energy_tracker;
   InfluenceMap influence_map;
 
+  std::string default_arena;
+
   BotController(Game& game);
 
   void Update(RenderContext& rc, float dt, InputState& input, behavior::ExecuteContext& execute_ctx);
@@ -47,6 +50,7 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>,
   void HandleEvent(const JoinGameEvent& event) override;
   void HandleEvent(const PlayerFreqAndShipChangeEvent& event) override;
   void HandleEvent(const DoorToggleEvent& event) override;
+  void HandleEvent(const LoginResponseEvent& event) override;
 
   struct UpdateEvent : public Event {
     BotController& controller;

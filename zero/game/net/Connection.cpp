@@ -520,8 +520,9 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
 #endif
         }
 
+        Event::Dispatch(LoginResponseEvent(response));
+
         if (response == 0x00 || response == 0x0D) {
-          SendArenaLogin(8, 0, 1920, 1080, 0xFFFF, "");
           login_state = LoginState::ArenaLogin;
         } else if (response == 0x01) {
           // Send password packet again requesting the registration form

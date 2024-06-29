@@ -9,6 +9,10 @@ Server = Local
 Encryption = Subspace
 
 [General]
+# Sets the default arena. -1 means any public arena, any other number means a specific public arena.
+# Removing this will default to any public arena.
+# This can be overriden in a zone-specific section with the same key name.
+Arena = -1
 # Sets the name of the owner of the bot. This is shown in the !help command.
 Owner = *unset*
 # Sets the log level threshold so only log messages of that level or higher are displayed.
@@ -28,6 +32,7 @@ Behavior = center-jav
 [MetalGear]
 Behavior = jugg
 RequestShip = 6
+#Arena = duel
 
 # Only these servers are supported. The names must not be changed.
 [Servers]
