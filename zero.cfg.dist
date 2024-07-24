@@ -11,7 +11,7 @@ Encryption = Subspace
 [General]
 # Sets the default arena. -1 means any public arena, any other number means a specific public arena.
 # Removing this will default to any public arena.
-# This can be overriden in a zone-specific section with the same key name.
+# This can be overridden in a zone-specific section with the same key name.
 Arena = -1
 # Sets the name of the owner of the bot. This is shown in the !help command.
 Owner = *unset*
@@ -20,7 +20,7 @@ Owner = *unset*
 LogLevel = Info
 # Sets the default ship. This can overridden in a zone-specific section with the same key name.
 RequestShip = 1
-# Sets the default behavior. This can be overriden in a zone-specific section with the same key name.
+# Sets the default behavior. This can be overridden in a zone-specific section with the same key name.
 #Behavior = center
 
 [Subgame]

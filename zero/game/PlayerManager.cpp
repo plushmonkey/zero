@@ -132,6 +132,22 @@ static void OnSetCoordinatesPkt(void* user, u8* pkt, size_t size) {
 
   UnstuckSelf(*manager, *self);
   Event::Dispatch(TeleportEvent(*self));
+
+  if (manager->connection.map.GetTileId(self->position) == kTileSafeId) {
+    if (!(self->togglables & Status_Safety)) {
+      Event::Dispatch(SafeEnterEvent(self->position));
+    }
+
+    self->togglables |= Status_Safety;
+  } else {
+    if (self->togglables & Status_Safety) {
+      Event::Dispatch(SafeLeaveEvent(self->position));
+    }
+
+    self->togglables &= ~Status_Safety;
+  }
+
+  manager->SendPositionPacket();
 }
 
 inline bool IsPlayerVisible(Player& self, u32 self_freq, Player& player) {

@@ -4,6 +4,7 @@
 #include <zero/game/Logger.h>
 #include <zero/zones/ZoneController.h>
 #include <zero/zones/devastation/BaseManager.h>
+#include <zero/zones/devastation/FrogRaceBehavior.h>
 #include <zero/zones/devastation/base/TestBehavior.h>
 #include <zero/zones/devastation/center/CenterBehavior.h>
 
@@ -66,18 +67,28 @@ void DevastationController::CreateBehaviors(const char* arena_name) {
   // Create behaviors depending on arena name
   Log(LogLevel::Info, "Registering Devastation behaviors.");
 
-  base_manager = std::make_unique<BaseManager>(*this->bot);
+  if (strcmp(arena_name, "frograce") == 0) {
+    auto& repo = bot->bot_controller->behaviors;
 
-  auto& repo = bot->bot_controller->behaviors;
+    repo.Add("race", std::make_unique<FrogRaceBehavior>());
 
-  repo.Add("center", std::make_unique<CenterBehavior>());
-  repo.Add("test", std::make_unique<TestBehavior>());
+    SetBehavior("race");
 
-  SetBehavior("center");
+    bot->commands->RegisterCommand(std::make_shared<RaceCommand>());
+  } else {
+    base_manager = std::make_unique<BaseManager>(*this->bot);
 
-  bot->execute_ctx.blackboard.Set("base_manager", base_manager.get());
+    auto& repo = bot->bot_controller->behaviors;
+
+    repo.Add("center", std::make_unique<CenterBehavior>());
+    repo.Add("test", std::make_unique<TestBehavior>());
+
+    SetBehavior("center");
+
+    bot->execute_ctx.blackboard.Set("base_manager", base_manager.get());
+  }
+
   bot->bot_controller->energy_tracker.estimate_type = EnergyHeuristicType::Maximum;
-
   bot->commands->RegisterCommand(std::make_shared<WarpToCommand>());
 }
 
