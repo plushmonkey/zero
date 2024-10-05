@@ -264,7 +264,7 @@ static void CalculateEdges(const Map& map, NodeProcessor& processor, float ship_
 
       TileId tile_id = map.GetTileId(current_point.x, current_point.y);
 
-      if (tile_id == kTileSafeId) {
+      if (tile_id == kTileIdSafe) {
         node->flags |= NodeFlag_Safety;
       }
     }

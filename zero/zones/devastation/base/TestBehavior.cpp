@@ -68,7 +68,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateRusherTree(behavior::Execut
                 .Child<FaceNode>("aimshot")
                 .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Static)
                 .Sequence(CompositeDecorator::Success) // Determine if a shot should be fired by using weapon trajectory and bounding boxes.
-                    .InvertChild<TileQueryNode>(kTileSafeId)
+                    .InvertChild<TileQueryNode>(kTileIdSafe)
                     .Child<InputActionNode>(InputAction::Bullet)
                     .End()
                 .End() // End aim sequence

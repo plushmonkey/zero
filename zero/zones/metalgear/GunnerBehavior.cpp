@@ -80,7 +80,7 @@ std::unique_ptr<behavior::BehaviorNode> GunnerBehavior::CreateTree(behavior::Exe
                                     .End()
                                 .End()
                             .Sequence(CompositeDecorator::Success)
-                                .InvertChild<TileQueryNode>(kTileSafeId)
+                                .InvertChild<TileQueryNode>(kTileIdSafe)
                                 .Child<InputActionNode>(InputAction::Bullet)
                                 .End()
                             .End()

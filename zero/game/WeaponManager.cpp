@@ -42,7 +42,7 @@ void WeaponManager::Update(float dt) {
 
     Player* player = player_manager.GetPlayerById(weapon->player_id);
 
-    if (player && connection.map.GetTileId(player->position) == kTileSafeId) {
+    if (player && connection.map.GetTileId(player->position) == kTileIdSafe) {
       Event::Dispatch(WeaponDestroyEvent(*weapon));
       weapons[i--] = weapons[--weapon_count];
       continue;
@@ -354,7 +354,7 @@ WeaponSimulateResult WeaponManager::SimulateRepel(Weapon& weapon) {
     if (!player_manager.IsSynchronized(player)) continue;
 
     if (PointInsideBox(rect_min, rect_max, player.position)) {
-      if (connection.map.GetTileId(player.position) != kTileSafeId) {
+      if (connection.map.GetTileId(player.position) != kTileIdSafe) {
         player.last_repel_timestamp = GetCurrentTick();
 
         if (player.id == player_manager.player_id) {
@@ -425,6 +425,11 @@ WeaponSimulateResult WeaponManager::SimulatePosition(Weapon& weapon) {
       weapon.flags |= WEAPON_FLAG_BURST_ACTIVE;
       weapon.animation.sprite = &Graphics::anim_burst_active;
     }
+  }
+
+  TileId tile_id = this->connection.map.GetTileId(weapon.position);
+  if (tile_id == kTileIdWormhole) {
+    return WeaponSimulateResult::TimedOut;
   }
 
   return WeaponSimulateResult::Continue;

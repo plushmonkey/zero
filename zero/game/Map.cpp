@@ -611,7 +611,7 @@ bool Map::Load(MemoryArena& arena, const char* filename) {
   size_t tile_count = (size - pos) / sizeof(Tile);
   Tile* tiles = (Tile*)(data + pos);
 
-  this->door_count = GetTileCount(tiles, tile_count, kFirstDoorId, kLastDoorId);
+  this->door_count = GetTileCount(tiles, tile_count, kTileIdFirstDoor, kTileIdLastDoor);
   this->doors = memory_arena_push_type_count(&arena, Tile, this->door_count);
 
   for (size_t i = 0; i < kAnimatedTileCount; ++i) {
@@ -626,7 +626,7 @@ bool Map::Load(MemoryArena& arena, const char* filename) {
 
     this->tiles[tile->y * 1024 + tile->x] = tile->id;
 
-    if (tile->id >= kFirstDoorId && tile->id <= kLastDoorId) {
+    if (tile->id >= kTileIdFirstDoor && tile->id <= kTileIdLastDoor) {
       Tile* door = this->doors + door_index++;
       *door = *tile;
     }
@@ -785,9 +785,9 @@ void Map::SeedDoors(u32 seed) {
   for (size_t i = 0; i < door_count; ++i) {
     Tile* door = doors + i;
 
-    u8 id = table[door->id - kFirstDoorId];
+    u8 id = table[door->id - kTileIdFirstDoor];
 
-    constexpr TileId kOpenDoorId = kLastDoorId + 1;
+    constexpr TileId kOpenDoorId = kTileIdLastDoor + 1;
 
     TileId previous_id = tiles[door->y * 1024 + door->x];
     tiles[door->y * 1024 + door->x] = id;
@@ -961,7 +961,7 @@ u32 Map::GetChecksum(u32 key) const {
         tile = 0;
       }
 
-      if ((tile >= kTileStart && tile <= kTileEnd) || tile == kTileSafeId) {
+      if ((tile >= kTileStart && tile <= kTileEnd) || tile == kTileIdSafe) {
         key += basekey ^ tile;
       }
     }

@@ -20,7 +20,7 @@ void BaseManager::HandleEvent(const RegionTileAddEvent& event) {
 
   auto& map = bot.bot_controller->game.GetMap();
 
-  if (map.GetTileId(event.coord.x, event.coord.y) == kTileSafeId) {
+  if (map.GetTileId(event.coord.x, event.coord.y) == kTileIdSafe) {
     MapCoord surrounding[] = {
         MapCoord(event.coord.x - 1, event.coord.y),
         MapCoord(event.coord.x + 1, event.coord.y),
@@ -30,7 +30,7 @@ void BaseManager::HandleEvent(const RegionTileAddEvent& event) {
 
     // Check if there are safe tiles around this coord and mark it as this region's base spawn point.
     for (MapCoord check : surrounding) {
-      if (map.GetTileId(check.x, check.y) != kTileSafeId) {
+      if (map.GetTileId(check.x, check.y) != kTileIdSafe) {
         return;
       }
     }

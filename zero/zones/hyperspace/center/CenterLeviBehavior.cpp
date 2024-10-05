@@ -47,7 +47,7 @@ std::unique_ptr<behavior::BehaviorNode> CenterLeviBehavior::CreateTree(behavior:
             .Child<WarpNode>()
             .End()
         .Sequence() // If in the center safe, move towards the warp tiles.
-            .Child<TileQueryNode>(kTileSafeId)
+            .Child<TileQueryNode>(kTileIdSafe)
             .Child<ClosestTileQueryNode>("center_warpers", "closest_warper")
             .InvertChild<DistanceThresholdNode>("closest_warper", 25.0f)
             .Child<SeekNode>("closest_warper")
@@ -101,7 +101,7 @@ std::unique_ptr<behavior::BehaviorNode> CenterLeviBehavior::CreateTree(behavior:
                                 .Child<ShotVelocityQueryNode>(WeaponType::Bomb, "bomb_fire_velocity")
                                 .Child<RayNode>("self_position", "bomb_fire_velocity", "bomb_fire_ray")
                                 .Child<RayRectangleInterceptNode>("bomb_fire_ray", "target_bounds")
-                                .InvertChild<TileQueryNode>(kTileSafeId)
+                                .InvertChild<TileQueryNode>(kTileIdSafe)
                                 .Child<InputActionNode>(InputAction::Bomb)
                                 .End()
                             .End()

@@ -167,7 +167,7 @@ std::unique_ptr<behavior::BehaviorNode> WarbirdBehavior::CreateTree(behavior::Ex
                                     .Child<PlayerEnergyPercentThresholdNode>(0.3f)
                                     .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bullet)
                                     .InvertChild<InputQueryNode>(InputAction::Bomb) // Don't try to shoot a bullet when shooting a bomb.
-                                    .InvertChild<TileQueryNode>(kTileSafeId)
+                                    .InvertChild<TileQueryNode>(kTileIdSafe)
                                     .Child<ShotVelocityQueryNode>(WeaponType::Bullet, "bullet_fire_velocity")
                                     .Child<RayNode>("self_position", "bullet_fire_velocity", "bullet_fire_ray")
                                     .Child<DynamicPlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 4.0f)

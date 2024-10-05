@@ -74,7 +74,7 @@ std::unique_ptr<behavior::BehaviorNode> CreateJavTree(behavior::ExecuteContext& 
                               .End()
                           .End()
                       .Sequence(CompositeDecorator::Success) // Determine if a shot should be fired by using weapon trajectory and bounding boxes.
-                          .InvertChild<TileQueryNode>(kTileSafeId)
+                          .InvertChild<TileQueryNode>(kTileIdSafe)
                           .Child<ShotVelocityQueryNode>(WeaponType::Bullet, "bullet_fire_velocity")
                           .Child<RayNode>("self_position", "bullet_fire_velocity", "bullet_fire_ray")
                           .Child<PlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 3.0f)

@@ -24,7 +24,11 @@ struct Steering {
     u32 int_speed = game.ship_controller.ship.speed;
 
     if (game.ship_controller.ship.gravity_effect) {
-      int_speed = (u32)game.connection.settings.ShipSettings[self->ship].GravityTopSpeed;
+      u32 gravity_speed = (u32)game.connection.settings.ShipSettings[self->ship].GravityTopSpeed;
+
+      if (gravity_speed > int_speed) {
+        int_speed = gravity_speed;
+      }
     }
 
     return int_speed / 16.0f / 10.0f;

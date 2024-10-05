@@ -93,7 +93,7 @@ std::unique_ptr<behavior::BehaviorNode> CenterBehavior::CreateTree(behavior::Exe
                                     .End()
                                 .End()
                             .Sequence(CompositeDecorator::Success) // Determine if a shot should be fired by using weapon trajectory and bounding boxes.
-                                .InvertChild<TileQueryNode>(kTileSafeId)
+                                .InvertChild<TileQueryNode>(kTileIdSafe)
                                 .Selector()
                                     .Child<BlackboardSetQueryNode>("aim_override")
                                     .Sequence()

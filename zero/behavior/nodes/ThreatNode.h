@@ -436,7 +436,7 @@ struct FindTerritoryPosition : public BehaviorNode {
       return ExecuteResult::Failure;
     }
 
-    if (ctx.bot->game->GetMap().GetTileId(end_position) != kTileSafeId) {
+    if (ctx.bot->game->GetMap().GetTileId(end_position) != kTileIdSafe) {
       ctx.blackboard.Set(output_key, end_position);
     }
 

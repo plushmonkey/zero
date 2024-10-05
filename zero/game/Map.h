@@ -25,10 +25,11 @@ struct ArenaSettings;
 struct BrickManager;
 
 using TileId = u8;
-constexpr u32 kTileSafeId = 171;
-constexpr u32 kGoalTileId = 172;
-constexpr int kFirstDoorId = 162;
-constexpr int kLastDoorId = 169;
+constexpr u32 kTileIdSafe = 171;
+constexpr u32 kTileIdGoal = 172;
+constexpr int kTileIdFirstDoor = 162;
+constexpr int kTileIdLastDoor = 169;
+constexpr u32 kTileIdWormhole = 220;
 
 constexpr size_t kAnimatedTileCount = 7;
 
@@ -77,6 +78,7 @@ inline bool IsSolid(TileId id) {
   if (id == 0) return false;
   if (id >= 162 && id <= 169) return true;
   if (id < 170) return true;
+  if (id == 220) return false;
   if (id >= 192 && id <= 240) return true;
   if (id >= 242 && id <= 252) return true;
 

@@ -78,7 +78,7 @@ std::unique_ptr<behavior::BehaviorNode> SniperBehavior::CreateTree(behavior::Exe
                                     .End()
                                 .End()
                             .Sequence(CompositeDecorator::Success)
-                                .InvertChild<TileQueryNode>(kTileSafeId)
+                                .InvertChild<TileQueryNode>(kTileIdSafe)
                                 .Sequence()
                                     .Child<ShotVelocityQueryNode>(WeaponType::Bomb, "bomb_fire_velocity")
                                     .Child<RayNode>("self_position", "bomb_fire_velocity", "bomb_fire_ray")

@@ -104,7 +104,7 @@ std::unique_ptr<behavior::BehaviorNode> CenterBehavior::CreateTree(behavior::Exe
                                 .Child<TimerSetNode>("defense_timer", 100)
                                 .End()
                             .Sequence(CompositeDecorator::Success) // Fire bomb
-                                .InvertChild<TileQueryNode>(kTileSafeId)
+                                .InvertChild<TileQueryNode>(kTileIdSafe)
                                 .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
                                 .Child<ShotVelocityQueryNode>(WeaponType::Bomb, "bomb_fire_velocity")
                                 .Child<RayNode>("self_position", "bomb_fire_velocity", "bomb_fire_ray")
@@ -114,7 +114,7 @@ std::unique_ptr<behavior::BehaviorNode> CenterBehavior::CreateTree(behavior::Exe
                                 .Child<InputActionNode>(InputAction::Bomb)
                                 .End()
                             .Sequence(CompositeDecorator::Success) // Fire bullet
-                                .InvertChild<TileQueryNode>(kTileSafeId)
+                                .InvertChild<TileQueryNode>(kTileIdSafe)
                                 .InvertChild<InputQueryNode>(InputAction::Bomb)
                                 .InvertChild<DistanceThresholdNode>("nearest_target_position", "bullet_distance") // Only fire bullets when close
                                 .Child<ShotVelocityQueryNode>(WeaponType::Bullet, "bullet_fire_velocity")

@@ -108,7 +108,7 @@ std::unique_ptr<behavior::BehaviorNode> CenterJavBehavior::CreateTree(behavior::
                                 .Child<TimerSetNode>("defense_timer", 100)
                                 .End()
                             .Sequence(CompositeDecorator::Success)
-                                .InvertChild<TileQueryNode>(kTileSafeId)
+                                .InvertChild<TileQueryNode>(kTileIdSafe)
                                 .Selector()
                                     .Sequence() // Fire bomb
                                         .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)

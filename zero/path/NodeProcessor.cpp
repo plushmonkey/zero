@@ -84,7 +84,7 @@ static inline bool IsDynamicTile(const Map& map, u16 world_x, u16 world_y) {
   TileId tile_id = map.GetTileId(world_x, world_y);
 
   // Include 1 additional tile in the last door id span to include any door that might currently be empty on creation.
-  return tile_id >= kFirstDoorId && tile_id <= (kLastDoorId + 1);
+  return tile_id >= kTileIdFirstDoor && tile_id <= (kTileIdLastDoor + 1);
 }
 
 EdgeSet NodeProcessor::CalculateEdges(Node* node, float radius) {

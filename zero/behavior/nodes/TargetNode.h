@@ -94,7 +94,7 @@ struct NearestTargetNode : public behavior::BehaviorNode {
       if (!game.player_manager.IsSynchronized(*player)) continue;
       if (!region_registry.IsConnected(self.position, player->position)) continue;
 
-      bool in_safe = game.connection.map.GetTileId(player->position) == kTileSafeId;
+      bool in_safe = game.connection.map.GetTileId(player->position) == kTileIdSafe;
       if (in_safe) continue;
 
       float dist_sq = player->position.DistanceSq(self.position);

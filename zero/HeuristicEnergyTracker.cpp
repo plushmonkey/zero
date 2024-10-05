@@ -216,7 +216,7 @@ static BombReport GetBombDamage(PlayerManager& player_manager, Weapon& weapon, P
     if ((weapon.flags & WEAPON_FLAG_EMP) && report.damage > 0 && player.id != shooter->id) {
       TileId tile_id = connection.map.GetTileId((u16)player.position.x, (u16)player.position.y);
 
-      if (tile_id != kTileSafeId) {
+      if (tile_id != kTileIdSafe) {
         u32 emp_time = (u32)((connection.settings.EBombShutdownTime * report.damage) / bomb_dmg);
 
         report.emp_ticks = emp_time;
