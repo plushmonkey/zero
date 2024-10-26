@@ -35,14 +35,16 @@ void LogArgs(LogLevel level, const char* fmt, va_list args) {
     console_file = stderr;
   }
 
-  fprintf(console_file, "%c [%02d:%02d:%02d] %s\n", level_c, tm->tm_hour, tm->tm_min, tm->tm_sec, buffer);
+  int year = tm->tm_year + 1900;
+
+  fprintf(console_file, "%c [%04d-%02d-%02d %02d:%02d:%02d] %s\n", level_c, year, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, buffer);
   fflush(console_file);
 
   if (g_LogPath) {
     FILE* f = fopen(g_LogPath, "a");
 
     if (f) {
-      fprintf(f, "%c [%02d:%02d:%02d] %s\n", level_c, tm->tm_hour, tm->tm_min, tm->tm_sec, buffer);
+      fprintf(f, "%c [%04d-%02d-%02d %02d:%02d:%02d] %s\n", level_c, year, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, buffer);
       fflush(f);
       fclose(f);
     }
