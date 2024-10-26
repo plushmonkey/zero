@@ -324,5 +324,38 @@ struct PlayerHeadingQueryNode : public behavior::BehaviorNode {
   const char* output_key;
 };
 
+struct PlayerVelocityQueryNode : public behavior::BehaviorNode {
+  PlayerVelocityQueryNode(const char* output_key, bool normalize = false) : player_key(nullptr), output_key(output_key), normalize(normalize) {}
+  PlayerVelocityQueryNode(const char* player_key, const char* output_key, bool normalize = false)
+    : player_key(player_key), output_key(output_key), normalize(normalize) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    Player* player = ctx.bot->game->player_manager.GetSelf();
+
+    if (player_key) {
+      auto player_opt = ctx.blackboard.Value<Player*>(player_key);
+      if (!player_opt.has_value()) return behavior::ExecuteResult::Failure;
+
+      player = player_opt.value();
+    }
+
+    if (!player) return behavior::ExecuteResult::Failure;
+
+    Vector2f result = player->velocity;
+
+    if (normalize) {
+      result = Normalize(result);
+    }
+
+    ctx.blackboard.Set(output_key, result);
+
+    return behavior::ExecuteResult::Success;
+  }
+
+  const char* player_key;
+  const char* output_key;
+  bool normalize = false;
+};
+
 }  // namespace behavior
 }  // namespace zero

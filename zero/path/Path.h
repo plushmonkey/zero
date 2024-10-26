@@ -15,6 +15,7 @@ struct Path {
   inline void Clear() {
     points.clear();
     index = 0;
+    dynamic = false;
   }
 
   inline Vector2f Advance() {

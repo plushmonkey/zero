@@ -17,6 +17,8 @@
 #include <zero/behavior/nodes/ThreatNode.h>
 #include <zero/behavior/nodes/TimerNode.h>
 #include <zero/behavior/nodes/WaypointNode.h>
+#include <zero/zones/svs/nodes/DynamicPlayerBoundingBoxQueryNode.h>
+#include <zero/zones/svs/nodes/IncomingDamageQueryNode.h>
 
 namespace zero {
 namespace mg {
@@ -52,12 +54,53 @@ struct IncomingBombQueryNode : public behavior::BehaviorNode {
   }
 };
 
+// Looks for nearby walls, find away vector, and seek to it.
+// Returns failure if no wall is nearby.
+struct SeekFromWallNode : public behavior::BehaviorNode {
+  SeekFromWallNode(float search_distance) : search_distance(search_distance) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto self = ctx.bot->game->player_manager.GetSelf();
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    Vector2f pos = self->position;
+
+    constexpr Vector2f kSearchDirections[] = {Vector2f(0, -1), Vector2f(1, 0), Vector2f(0, 1), Vector2f(-1, 0)};
+
+    auto& map = ctx.bot->game->connection.map;
+
+    Vector2f away_vector;
+
+    for (Vector2f direction : kSearchDirections) {
+      auto cast = map.CastTo(self->position, self->position + direction * search_distance, self->frequency);
+
+      if (cast.hit) {
+        // We hit a wall, so move away from it.
+        away_vector -= direction;
+      }
+    }
+
+    if (away_vector.LengthSq() > 0.0f) {
+      ctx.bot->bot_controller->steering.Seek(*ctx.bot->game, self->position + Normalize(away_vector) * 10.0f);
+      return behavior::ExecuteResult::Success;
+    }
+
+    return behavior::ExecuteResult::Failure;
+  }
+
+  float search_distance = 0.0f;
+};
+
 std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
   BehaviorBuilder builder;
 
   const Vector2f center(512, 512);
+
+  // How fast we need to be moving toward the target in tiles for us to decide to shoot a bomb.
+  // This stops us from shooting bombs slowly all the time.
+  constexpr float kForwardSpeedBombRequirement = 1.5f;
 
   // clang-format off
   builder
@@ -78,62 +121,55 @@ std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::Execu
                     .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
                     .End()
                 .Selector()
-                    .Sequence() // Use repels when in danger
-                        .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Repel)
-                        .Child<TimerExpiredNode>("defense_timer")
-                        .Child<IncomingBombQueryNode>()
-                        .Child<InputActionNode>(InputAction::Repel)
-                        .Child<TimerSetNode>("defense_timer", 100)
-                        .End()
                     .Sequence()
-                        .Child<DodgeIncomingDamage>(0.5f, 20.0f)
+                        .Child<DodgeIncomingDamage>(0.6f, 35.0f)
                         .End()
                     .Sequence() // Path to target if they aren't immediately visible.
                         .InvertChild<VisibilityQueryNode>("nearest_target_position")
                         .Child<GoToNode>("nearest_target_position")
                         .End()
+                    .Sequence()
+                        .InvertChild<TileQueryNode>(kTileIdSafe)
+                        .Child<SeekFromWallNode>(3.0f) // If we are near a wall, seek away so we don't get stuck and become an easy target.
+                        .End()
                     .Sequence() // Aim at target and shoot while seeking them.
                         .Child<AimNode>(WeaponType::Bomb, "nearest_target", "aimshot")
-                        .Parallel()
-                            .Selector() // Select between hovering around a territory position and seeking to enemy.
-                                .Sequence()
-                                    .Child<FindTerritoryPosition>("nearest_target", "leash_distance", "territory_position")
-                                    .Sequence(CompositeDecorator::Success)
-                                        .Child<PositionThreatQueryNode>("self_position", "self_threat", 15.0f, 2.25f)
-                                        .Child<PositionThreatQueryNode>("territory_position", "territory_threat", 15.0f, 2.25f)
-                                        .Child<RenderTextNode>("world_camera", "territory_position", [](ExecuteContext& ctx) {
-                                          std::string str = std::string("Threat: ") + std::to_string(ctx.blackboard.ValueOr<float>("territory_threat", 0.0f));
-
-                                          return RenderTextNode::Request(str, TextColor::White, Layer::TopMost, TextAlignment::Center);
-                                        })
-                                        .Child<ScalarThresholdNode<float>>("territory_threat", 0.2f)
-                                        .Child<FindTerritoryPosition>("nearest_target", "leash_distance", "territory_position", true)
+                        .Parallel() // Main update
+                            .Sequence(CompositeDecorator::Success) // Determine main movement vectors
+                                .Child<VectorNode>("aimshot", "face_position")
+                                .Selector()
+                                    .Sequence()
+                                        .Child<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
+                                        .Child<SeekNode>("nearest_target_position", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
                                         .End()
-                                    .Sequence(CompositeDecorator::Success)
-                                        .InvertChild<ScalarThresholdNode<float>>("self_threat", 0.1f)
-                                        .Child<VectorNode>("aimshot", "face_position")
-                                        .End()
-                                    .Child<ArriveNode>("territory_position", 15.0f)
-                                    .Child<RectangleNode>("territory_position", Vector2f(2.0f, 2.0f), "territory_rect")
-                                    .Child<RenderRectNode>("world_camera", "territory_rect", Vector3f(0.0f, 1.0f, 0.0f))
-                                    .End()                            
-                                .Sequence()
-                                    .Child<VectorNode>("aimshot", "face_position")
-                                    .Child<SeekNode>("aimshot", "leash_distance")
+                                    .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
                                     .End()
                                 .End()
-                            .Sequence(CompositeDecorator::Success)
+                            .Sequence(CompositeDecorator::Success) // Always check incoming damage so we can use it in repel and portal sequences.
+                                .Child<RepelDistanceQueryNode>("repel_distance")
+                                .Child<svs::IncomingDamageQueryNode>("repel_distance", "incoming_damage")
+                                .Child<PlayerCurrentEnergyQueryNode>("self_energy")
+                                .End()
+                            .Sequence(CompositeDecorator::Success) // Use repel when in danger.
+                                .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Repel)
+                                .Child<TimerExpiredNode>("defense_timer")
+                                .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
+                                .Child<InputActionNode>(InputAction::Repel)
+                                .Child<TimerSetNode>("defense_timer", 100)
+                                .End()
+                            .Sequence(CompositeDecorator::Success) // Fire bomb
                                 .InvertChild<TileQueryNode>(kTileIdSafe)
-                                .Sequence()
-                                    .Child<ShotVelocityQueryNode>(WeaponType::Bomb, "bomb_fire_velocity")
-                                    .Child<RayNode>("self_position", "bomb_fire_velocity", "bomb_fire_ray")
-                                    .Child<PlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 1.5f)
-                                    .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
-                                    .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
-                                    .Child<RenderRayNode>("world_camera", "bomb_fire_ray", 50.0f, Vector3f(1.0f, 1.0f, 0.0f))
-                                    .Child<RayRectangleInterceptNode>("bomb_fire_ray", "target_bounds")
-                                    .Child<InputActionNode>(InputAction::Bomb)
-                                    .End()
+                                .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
+                                .Child<VectorSubtractNode>("aimshot", "self_position", "target_direction", true)
+                                .Child<PlayerVelocityQueryNode>("self_velocity")
+                                .Child<VectorDotNode>("self_velocity", "target_direction", "forward_velocity")
+                                .Child<ScalarThresholdNode<float>>("forward_velocity", kForwardSpeedBombRequirement)
+                                .Child<ShotVelocityQueryNode>(WeaponType::Bomb, "bomb_fire_velocity")
+                                .Child<RayNode>("self_position", "bomb_fire_velocity", "bomb_fire_ray")
+                                .Child<svs::DynamicPlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 3.0f)
+                                .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
+                                .Child<RayRectangleInterceptNode>("bomb_fire_ray", "target_bounds")
+                                .Child<InputActionNode>(InputAction::Bomb)
                                 .End()
                             .Sequence(CompositeDecorator::Success) // Face away from target so it can dodge while waiting for bomb cooldown.
                                 .Child<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
@@ -143,9 +179,10 @@ std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::Execu
                                 .Child<VectorAddNode>("self_position", "away_dir", "away_pos")
                                 .Child<VectorNode>("away_pos", "face_position")
                                 .End()
-                            .End()
+                            .End() // End main update parallel
                         .Sequence()
                           .Child<BlackboardSetQueryNode>("face_position")
+                          .Child<RotationThresholdSetNode>(0.35f)
                           .Child<FaceNode>("face_position")
                           .Child<BlackboardEraseNode>("face_position")
                           .End()
