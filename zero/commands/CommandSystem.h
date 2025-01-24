@@ -27,6 +27,10 @@ enum {
   CommandAccess_Chat = (1 << 9),
   CommandAccess_Fuchsia = (1 << 10),
 
+  // The common communication channels that we should respond from.
+  CommandAccess_Standard = (CommandAccess_Public | CommandAccess_PublicMacro | CommandAccess_Team |
+                            CommandAccess_Private | CommandAccess_RemotePrivate),
+
   CommandAccess_All = (CommandAccess_PublicMacro | CommandAccess_Public | CommandAccess_Team | CommandAccess_OtherTeam |
                        CommandAccess_Private | CommandAccess_RemotePrivate | CommandAccess_Chat),
 };
@@ -44,7 +48,7 @@ class CommandExecutor {
  public:
   virtual void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) = 0;
   virtual CommandAccessFlags GetAccess() = 0;
-  virtual void SetAccess(CommandAccessFlags flags) = 0;
+  virtual void SetAccess(CommandAccessFlags flags){};
   virtual CommandFlags GetFlags() { return 0; }
   virtual std::vector<std::string> GetAliases() = 0;
   virtual std::string GetDescription() = 0;

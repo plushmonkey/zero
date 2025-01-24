@@ -90,6 +90,8 @@ void ChatQueue::Update() {
 
   recv_queue.clear();
 
+  u8 data[kMaxPacketSize];
+
   while (send_index != write_index) {
     Tick current_tick = GetCurrentTick();
 
@@ -117,7 +119,34 @@ void ChatQueue::Update() {
       auto player = chat_controller.player_manager.GetPlayerByName(entry->target_name);
 
       if (!player) {
-        Log(LogLevel::Warning, "ChatQueue: Failed to send to player %s. Could not find player.", entry->target_name);
+        // We need to send this remotely if they aren't in the arena.
+
+        NetworkBuffer buffer(data, kMaxPacketSize);
+        // Size of the chat header + reliable message header
+        constexpr size_t kHeaderSize = 5 + 6;
+        char combined_message[kMaxPacketSize - kHeaderSize];
+        size_t combined_size =
+            snprintf(combined_message, sizeof(combined_message), ":%s:%s", entry->target_name, entry->message) + 1;
+
+        buffer.WriteU8(0x06);
+        buffer.WriteU8((u8)ChatType::RemotePrivate);
+        buffer.WriteU8(0x00);  // Sound
+        buffer.WriteU16(0x00);
+        buffer.WriteString(combined_message, combined_size);
+
+        auto& connection = chat_controller.connection;
+        connection.packet_sequencer.SendReliableMessage(connection, buffer.data, buffer.GetSize());
+        ++sent_message_count;
+
+        // Add the sent message to the chat output box.
+        ChatEntry* controller_entry =
+            chat_controller.PushEntry(combined_message, combined_size, ChatType::RemotePrivate);
+
+        Player* self = chat_controller.player_manager.GetSelf();
+        if (self) {
+          memcpy(controller_entry->sender, self->name, 20);
+        }
+
         continue;
       }
 
@@ -141,7 +170,6 @@ void ChatQueue::Update() {
       }
     }
 
-    u8 data[kMaxPacketSize];
     NetworkBuffer buffer(data, kMaxPacketSize);
     size_t size = strlen(entry->message) + 1;
 

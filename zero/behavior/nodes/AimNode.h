@@ -162,8 +162,15 @@ struct AimNode : public BehaviorNode {
     if (calculated_shot.has_value()) {
       aimshot = *calculated_shot;
 
+      constexpr float kFarDistance = 50.0f;
+
       // Set the aimshot directly to the player position if it is too far away.
-      if (aimshot.DistanceSq(target->position) > 20.0f * 20.0f) {
+      if (aimshot.DistanceSq(target->position) > kFarDistance * kFarDistance) {
+        aimshot = target->position;
+      }
+
+      // If the aimshot is behind us but the target isn't, just shoot at the target.
+      if ((aimshot - self->position).Dot(target->position - self->position) < 0.0f) {
         aimshot = target->position;
       }
     }

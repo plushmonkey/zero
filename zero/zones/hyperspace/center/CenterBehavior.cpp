@@ -47,6 +47,15 @@ std::unique_ptr<behavior::BehaviorNode> CenterBehavior::CreateTree(behavior::Exe
             .InvertChild<ShipQueryNode>("request_ship")
             .Child<ShipRequestNode>("request_ship")
             .End()
+        .Sequence() // Switch to own frequency when possible.
+            .Child<PlayerFrequencyCountQueryNode>("self_freq_count")
+            .Child<ScalarThresholdNode<size_t>>("self_freq_count", 2)
+            .Child<PlayerEnergyPercentThresholdNode>(1.0f)
+            .Child<TimerExpiredNode>("next_freq_change_tick")
+            .Child<TimerSetNode>("next_freq_change_tick", 300)
+            .Child<RandomIntNode<u16>>(5, 89, "random_freq")
+            .Child<PlayerChangeFrequencyNode>("random_freq")
+            .End()
         .Sequence() // Warp back to center.
             .InvertChild<RegionContainQueryNode>(center)
             .Child<WarpNode>()

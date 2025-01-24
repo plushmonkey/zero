@@ -27,6 +27,13 @@ std::unique_ptr<behavior::BehaviorNode> CenterJavBehavior::CreateTree(behavior::
 
   BehaviorBuilder builder;
 
+  // How fast we need to be moving toward the target in tiles for us to decide to shoot a bomb.
+// This stops us from shooting bombs slowly all the time.
+  constexpr float kForwardSpeedBombRequirement = 1.5f;
+  // Bypass the forward speed requirement if we are within this many tiles of the target.
+  // This is to prevent us from not shooting when very near someone and circling around.
+  constexpr float kNearbyBombBypass = 8.0f;
+
   const Vector2f center(512, 512);
 
   // clang-format off
@@ -35,6 +42,15 @@ std::unique_ptr<behavior::BehaviorNode> CenterJavBehavior::CreateTree(behavior::
         .Sequence() // Enter the specified ship if not already in it.
             .InvertChild<ShipQueryNode>("request_ship")
             .Child<ShipRequestNode>("request_ship")
+            .End()
+        .Sequence() // Switch to own frequency when possible.
+            .Child<PlayerFrequencyCountQueryNode>("self_freq_count")
+            .Child<ScalarThresholdNode<size_t>>("self_freq_count", 2)
+            .Child<PlayerEnergyPercentThresholdNode>(1.0f)
+            .Child<TimerExpiredNode>("next_freq_change_tick")
+            .Child<TimerSetNode>("next_freq_change_tick", 300)
+            .Child<RandomIntNode<u16>>(5, 89, "random_freq")
+            .Child<PlayerChangeFrequencyNode>("random_freq")
             .End()
         .Sequence() // Warp back to center.
             .InvertChild<RegionContainQueryNode>(center)
@@ -48,7 +64,12 @@ std::unique_ptr<behavior::BehaviorNode> CenterJavBehavior::CreateTree(behavior::
                     .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
                     .Child<BulletDistanceNode>("bullet_distance")
                     .End()
+                .Sequence(CompositeDecorator::Success) // Set a delay on portal laying cooldown while in safe so we don't place the location there.
+                    .Child<TileQueryNode>(kTileIdSafe)
+                    .Child<TimerSetNode>("portal_safe_cooldown", 300)
+                    .End()
                 .Sequence(CompositeDecorator::Success) // If we have a portal but no location, lay one down.
+                    .Child<TimerExpiredNode>("portal_safe_cooldown")
                     .Child<ShipItemCountThresholdNode>(ShipItemType::Portal, 1)
                     .InvertChild<ShipPortalPositionQueryNode>()
                     .Child<InputActionNode>(InputAction::Portal)
@@ -84,7 +105,11 @@ std::unique_ptr<behavior::BehaviorNode> CenterJavBehavior::CreateTree(behavior::
                                         .Child<GreaterOrEqualThanNode<float>>("self_energy", "target_energy")
                                         .Child<SeekNode>("aimshot", 10.0f, SeekNode::DistanceResolveType::Dynamic)
                                         .End()
-                                    .Child<SeekNode>("aimshot", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
+                                    .Sequence()
+                                        .Child<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
+                                        .Child<SeekNode>("nearest_target_position", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
+                                        .End()
+                                    .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
                                     .End()
                                 .End()
                             .Sequence(CompositeDecorator::Success) // Always check incoming damage so we can use it in repel and portal sequences.
@@ -112,6 +137,15 @@ std::unique_ptr<behavior::BehaviorNode> CenterJavBehavior::CreateTree(behavior::
                                 .Selector()
                                     .Sequence() // Fire bomb
                                         .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
+                                        .Child<VectorSubtractNode>("aimshot", "self_position", "target_direction", true)
+                                        .Selector()
+                                            .InvertChild<DistanceThresholdNode>("nearest_target_position", kNearbyBombBypass)
+                                            .Sequence()
+                                                .Child<PlayerVelocityQueryNode>("self_velocity")
+                                                .Child<VectorDotNode>("self_velocity", "target_direction", "forward_velocity")
+                                                .Child<ScalarThresholdNode<float>>("forward_velocity", kForwardSpeedBombRequirement)
+                                                .End()
+                                            .End()
                                         .Child<ShotVelocityQueryNode>(WeaponType::Bomb, "bomb_fire_velocity")
                                         .Child<RayNode>("self_position", "bomb_fire_velocity", "bomb_fire_ray")
                                         .Child<svs::DynamicPlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 3.0f)

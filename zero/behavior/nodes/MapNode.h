@@ -8,6 +8,38 @@
 namespace zero {
 namespace behavior {
 
+// Determines whether or not the specified player can go directly to a position by using a CastShip query.
+struct ShipTraverseQueryNode : public BehaviorNode {
+  ShipTraverseQueryNode(const char* position_key) : position_key(position_key) {}
+  ShipTraverseQueryNode(const char* player_key, const char* position_key)
+    : player_key(player_key), position_key(position_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    Player* player = ctx.bot->game->player_manager.GetSelf();;
+    
+    if (player_key) {
+      auto opt_player = ctx.blackboard.Value<Player*>(player_key);
+      if (!opt_player) return ExecuteResult::Failure;
+
+      player = *opt_player;
+    }
+
+    if (!player || player->ship >= 8) return ExecuteResult::Failure;
+
+    auto opt_position = ctx.blackboard.Value<Vector2f>(position_key);
+    if (!opt_position) return ExecuteResult::Failure;
+
+    float radius = ctx.bot->game->connection.settings.ShipSettings[player->ship].GetRadius();
+    
+    bool hit = ctx.bot->game->GetMap().CastShip(player, radius, *opt_position).hit;
+
+    return hit ? ExecuteResult::Failure : ExecuteResult::Success;
+  }
+
+  const char* position_key = nullptr;
+  const char* player_key = nullptr;
+};
+
 struct VisibilityQueryNode : public BehaviorNode {
   VisibilityQueryNode(const char* position_key) : position_a_key(position_key), position_b_key(nullptr) {}
   VisibilityQueryNode(const char* position_a_key, const char* position_b_key)

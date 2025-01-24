@@ -101,6 +101,9 @@ std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::Execu
   // How fast we need to be moving toward the target in tiles for us to decide to shoot a bomb.
   // This stops us from shooting bombs slowly all the time.
   constexpr float kForwardSpeedBombRequirement = 1.5f;
+  // Bypass the forward speed requirement if we are within this many tiles of the target.
+  // This is to prevent us from not shooting when very near someone and circling around.
+  constexpr float kNearbyBombBypass = 8.0f;
 
   // clang-format off
   builder
@@ -125,7 +128,7 @@ std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::Execu
                         .Child<DodgeIncomingDamage>(0.6f, 35.0f)
                         .End()
                     .Sequence() // Path to target if they aren't immediately visible.
-                        .InvertChild<VisibilityQueryNode>("nearest_target_position")
+                        .InvertChild<ShipTraverseQueryNode>("nearest_target_position")
                         .Child<GoToNode>("nearest_target_position")
                         .End()
                     .Sequence()
@@ -161,9 +164,14 @@ std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::Execu
                                 .InvertChild<TileQueryNode>(kTileIdSafe)
                                 .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
                                 .Child<VectorSubtractNode>("aimshot", "self_position", "target_direction", true)
-                                .Child<PlayerVelocityQueryNode>("self_velocity")
-                                .Child<VectorDotNode>("self_velocity", "target_direction", "forward_velocity")
-                                .Child<ScalarThresholdNode<float>>("forward_velocity", kForwardSpeedBombRequirement)
+                                .Selector()
+                                    .InvertChild<DistanceThresholdNode>("nearest_target_position", kNearbyBombBypass)
+                                    .Sequence()
+                                        .Child<PlayerVelocityQueryNode>("self_velocity")
+                                        .Child<VectorDotNode>("self_velocity", "target_direction", "forward_velocity")
+                                        .Child<ScalarThresholdNode<float>>("forward_velocity", kForwardSpeedBombRequirement)
+                                        .End()
+                                    .End()
                                 .Child<ShotVelocityQueryNode>(WeaponType::Bomb, "bomb_fire_velocity")
                                 .Child<RayNode>("self_position", "bomb_fire_velocity", "bomb_fire_ray")
                                 .Child<svs::DynamicPlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 3.0f)
@@ -193,7 +201,7 @@ std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::Execu
                 .Child<WaypointNode>("waypoints", "waypoint_index", "waypoint_position", 15.0f)
                 .Selector()
                     .Sequence()
-                        .InvertChild<VisibilityQueryNode>("waypoint_position")
+                        .InvertChild<ShipTraverseQueryNode>("waypoint_position")
                         .Child<GoToNode>("waypoint_position")
                         .End()
                     .Parallel()

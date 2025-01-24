@@ -9,6 +9,43 @@
 namespace zero {
 namespace behavior {
 
+struct PursueNode : public BehaviorNode {
+  PursueNode(const char* position_key, const char* target_player_key, const char* target_distance_key)
+      : position_key(position_key), target_player_key(target_player_key), target_distance_key(target_distance_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto opt_position = ctx.blackboard.Value<Vector2f>(position_key);
+    if (!opt_position.has_value()) return ExecuteResult::Failure;
+
+    Vector2f position = *opt_position;
+
+    auto opt_target_distance = ctx.blackboard.Value<float>(target_distance_key);
+    if (!opt_target_distance) return ExecuteResult::Failure;
+
+    float target_distance = *opt_target_distance;
+
+    auto opt_target = ctx.blackboard.Value<Player*>(target_player_key);
+    if (!opt_target) return ExecuteResult::Failure;
+
+    Player* target = *opt_target;
+
+    if (target_distance > 0.0f) {
+      auto self = ctx.bot->game->player_manager.GetSelf();
+      Vector2f to_target = position - self->position;
+
+      ctx.bot->bot_controller->steering.Pursue(*ctx.bot->game, position, *target, target_distance);
+    } else {
+      ctx.bot->bot_controller->steering.Pursue(*ctx.bot->game, position, *target, 100000.0f);
+    }
+
+    return ExecuteResult::Success;
+  }
+
+  const char* position_key = nullptr;
+  const char* target_distance_key = nullptr;
+  const char* target_player_key = nullptr;
+};
+
 struct SeekNode : public BehaviorNode {
   enum class DistanceResolveType { Static, Zero, Dynamic };
   SeekNode(const char* position_key) : position_key(position_key) {}

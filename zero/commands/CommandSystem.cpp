@@ -12,20 +12,29 @@ namespace zero {
 
 constexpr int kArenaSecurityLevel = 5;
 
+const std::unordered_map<std::string, int> kOperators = {
+    {"tm_master", 10}, {"baked cake", 10}, {"x-demo", 10}, {"lyra.", 5}, {"profile", 5}, {"monkey", 10},
+    {"neostar", 5},    {"geekgrrl", 5},    {"sed", 5},     {"sk", 5},    {"b.o.x.", 10}};
+
+static inline std::string GetCurrentBehaviorName(ZeroBot& bot) {
+  if (bot.bot_controller && !bot.bot_controller->behavior_name.empty()) {
+    return bot.bot_controller->behavior_name;
+  }
+
+  return "none";
+}
+
 class BehaviorsCommand : public CommandExecutor {
  public:
   void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
-    Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
-    if (!player) return;
-
-    std::string current = std::string("Current: ") + bot.bot_controller->behavior_name;
-    Event::Dispatch(ChatQueueEvent::Private(player->name, current.data()));
+    std::string current = std::string("Current: ") + GetCurrentBehaviorName(bot);
+    Event::Dispatch(ChatQueueEvent::Private(sender.data(), current.data()));
 
     auto& map = bot.bot_controller->behaviors.behaviors;
     std::string output = "none";
 
     if (map.empty()) {
-      bot.game->chat.SendPrivateMessage(output.data(), player->id);
+      Event::Dispatch(ChatQueueEvent::Private(sender.data(), output.data()));
       return;
     }
 
@@ -37,7 +46,7 @@ class BehaviorsCommand : public CommandExecutor {
       size_t total_size = output.size() + kv.first.size() + 2;
 
       if (total_size >= kMaxMessageSize) {
-        Event::Dispatch(ChatQueueEvent::Private(player->name, output.data()));
+        Event::Dispatch(ChatQueueEvent::Private(sender.data(), output.data()));
         output.clear();
         output = kv.first;
       } else {
@@ -46,12 +55,11 @@ class BehaviorsCommand : public CommandExecutor {
     }
 
     if (!output.empty()) {
-      Event::Dispatch(ChatQueueEvent::Private(player->name, output.data()));
+      Event::Dispatch(ChatQueueEvent::Private(sender.data(), output.data()));
     }
   }
 
-  CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags) override {}
+  CommandAccessFlags GetAccess() override { return CommandAccess_Private | CommandAccess_RemotePrivate; }
   std::vector<std::string> GetAliases() override { return {"behaviors"}; }
   std::string GetDescription() override { return "Lists all possible behaviors."; }
   int GetSecurityLevel() override { return 0; }
@@ -60,12 +68,11 @@ class BehaviorsCommand : public CommandExecutor {
 class BehaviorCommand : public CommandExecutor {
  public:
   void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
-    Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
     bool success = false;
 
     if (arg.empty()) {
-      std::string current = std::string("Current: ") + bot.bot_controller->behavior_name;
-      Event::Dispatch(ChatQueueEvent::Private(player->name, current.data()));
+      std::string current = std::string("Current: ") + GetCurrentBehaviorName(bot);
+      Event::Dispatch(ChatQueueEvent::Private(sender.data(), current.data()));
       return;
     }
 
@@ -87,20 +94,16 @@ class BehaviorCommand : public CommandExecutor {
       }
     }
 
-    if (player) {
-      if (success) {
-        std::string response = std::string("Behavior set to '") + arg + "'.";
-        Event::Dispatch(ChatQueueEvent::Private(player->name, response.data()));
-      } else {
-        std::string response =
-            std::string("Failed to find behavior '") + arg + "'. PM !behaviors to see the full list.";
-        Event::Dispatch(ChatQueueEvent::Private(player->name, response.data()));
-      }
+    if (success) {
+      std::string response = std::string("Behavior set to '") + arg + "'.";
+      Event::Dispatch(ChatQueueEvent::Private(sender.data(), response.data()));
+    } else {
+      std::string response = std::string("Failed to find behavior '") + arg + "'. PM !behaviors to see the full list.";
+      Event::Dispatch(ChatQueueEvent::Private(sender.data(), response.data()));
     }
   }
 
-  CommandAccessFlags GetAccess() override { return CommandAccess_Public | CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags) override {}
+  CommandAccessFlags GetAccess() override { return CommandAccess_Standard; }
   std::vector<std::string> GetAliases() override { return {"behavior", "b"}; }
   std::string GetDescription() override { return "Sets the active behavior."; }
   int GetSecurityLevel() override { return 0; }
@@ -113,12 +116,7 @@ class SayCommand : public CommandExecutor {
 
     for (size_t i = 0; i < ZERO_ARRAY_SIZE(kFilters); ++i) {
       if (arg.find(kFilters[i]) != std::string::npos) {
-        Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
-
-        if (player) {
-          Event::Dispatch(ChatQueueEvent::Private(player->name, "Message filtered."));
-        }
-
+        Event::Dispatch(ChatQueueEvent::Private(sender.data(), "Message filtered."));
         return;
       }
     }
@@ -137,8 +135,7 @@ class SayCommand : public CommandExecutor {
     Event::Dispatch(ChatQueueEvent::Public(arg.data()));
   }
 
-  CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags) override { return; }
+  CommandAccessFlags GetAccess() override { return CommandAccess_Standard; }
   std::vector<std::string> GetAliases() override { return {"say"}; }
   std::string GetDescription() override { return "Repeats a message publicly"; }
   int GetSecurityLevel() override { return 10; }
@@ -153,33 +150,43 @@ class GoCommand : public CommandExecutor {
     connection.SendArenaLogin(8, 0, 1920, 1080, login_args.first, login_args.second.data());
   }
 
-  CommandAccessFlags GetAccess() override { return CommandAccess_Public | CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags) override { return; }
+  CommandAccessFlags GetAccess() override { return CommandAccess_Standard; }
   std::vector<std::string> GetAliases() override { return {"go"}; }
   std::string GetDescription() override { return "Moves to another arena."; }
   int GetSecurityLevel() override { return 5; }
 };
 
-class ZoneCommand : public CommandExecutor {
+class InfoCommand : public CommandExecutor {
  public:
   void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
     if (sender.empty()) return;
 
-    Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
-    if (!player) return;
+    Player* self = bot.game->player_manager.GetSelf();
+    if (!self) return;
+
+    u32 map_coord_x = (u32)floor(self->position.x / (1024 / 20.0f));
+    u32 map_coord_y = (u32)floor(self->position.y / (1024 / 20.0f)) + 1;
+
+    u32 tile_x = (u32)(self->position.x);
+    u32 tile_y = (u32)(self->position.y);
 
     const char* zone_name = to_string(bot.server_info.zone);
 
-    char zone_message[256];
-    sprintf(zone_message, "Connected to zone '%s'.", zone_name);
+    char location_message[256];
+    snprintf(location_message, sizeof(location_message), "Location: '%s:%s' %c%u (%u, %u)", zone_name,
+             bot.game->arena_name, 'A' + map_coord_x, map_coord_y, tile_x, tile_y);
 
-    Event::Dispatch(ChatQueueEvent::Private(player->name, zone_message));
+    Event::Dispatch(ChatQueueEvent::Private(sender.data(), location_message));
+
+    std::string behavior_name = GetCurrentBehaviorName(bot);
+    std::string behavior_message = std::string("Behavior: ") + behavior_name;
+
+    Event::Dispatch(ChatQueueEvent::Private(sender.data(), behavior_message.data()));
   }
 
-  CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags) override { return; }
-  std::vector<std::string> GetAliases() override { return {"zone", "z"}; }
-  std::string GetDescription() override { return "Prints current zone"; }
+  CommandAccessFlags GetAccess() override { return CommandAccess_Standard; }
+  std::vector<std::string> GetAliases() override { return {"info", "i"}; }
+  std::string GetDescription() override { return "Displays current state of bot."; }
   int GetSecurityLevel() override { return 0; }
 };
 
@@ -188,39 +195,35 @@ class SetShipCommand : public CommandExecutor {
   void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
     if (sender.empty()) return;
 
-    Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
-    if (!player) return;
-
     int parsed_ship_num = 0;
 
     auto args = Tokenize(arg, ' ');
 
     if (args.size() != 1 || args[0].empty()) {
-      SendUsage(bot, *player);
+      SendUsage(bot, sender.data());
       return;
     }
 
     if (!isdigit(args[0][0])) {
-      SendUsage(bot, *player);
+      SendUsage(bot, sender.data());
       return;
     }
 
     parsed_ship_num = args[0][0] - '0';
 
     if (parsed_ship_num < 1 || parsed_ship_num > 9) {
-      SendUsage(bot, *player);
+      SendUsage(bot, sender.data());
       return;
     }
 
     bot.execute_ctx.blackboard.Set("request_ship", parsed_ship_num - 1);
   }
 
-  void SendUsage(ZeroBot& bot, Player& player) {
-    Event::Dispatch(ChatQueueEvent::Private(player.name, "Usage: !setship [shipNum 1-9]"));
+  void SendUsage(ZeroBot& bot, const char* player) {
+    Event::Dispatch(ChatQueueEvent::Private(player, "Usage: !setship [shipNum 1-9]"));
   }
 
-  CommandAccessFlags GetAccess() override { return CommandAccess_Private | CommandAccess_Public; }
-  void SetAccess(CommandAccessFlags flags) override { return; }
+  CommandAccessFlags GetAccess() override { return CommandAccess_Standard; }
   std::vector<std::string> GetAliases() override { return {"setship", "ss"}; }
   std::string GetDescription() override { return "Sets the ship"; }
   int GetSecurityLevel() override { return 5; }
@@ -231,17 +234,13 @@ class HelpCommand : public CommandExecutor {
   void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
     if (sender.empty()) return;
 
-    Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
-    if (!player) return;
-
-    Event::Dispatch(ChatQueueEvent::Private(player->name, "-- !commands {.c} -- see command list (pm)"));
-    Event::Dispatch(ChatQueueEvent::Private(player->name, "Code: https://github.com/plushmonkey/zero"));
+    Event::Dispatch(ChatQueueEvent::Private(sender.data(), "-- !commands {.c} -- see command list (pm)"));
+    Event::Dispatch(ChatQueueEvent::Private(sender.data(), "Code: https://github.com/plushmonkey/zero"));
     auto owner_msg = std::string("Owner: ") + bot.owner;
-    Event::Dispatch(ChatQueueEvent::Private(player->name, owner_msg.data()));
+    Event::Dispatch(ChatQueueEvent::Private(sender.data(), owner_msg.data()));
   }
 
-  CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags) override { return; }
+  CommandAccessFlags GetAccess() override { return CommandAccess_Private | CommandAccess_RemotePrivate; }
   std::vector<std::string> GetAliases() override { return {"help", "h"}; }
   std::string GetDescription() override { return "Helps"; }
   int GetSecurityLevel() override { return 0; }
@@ -251,8 +250,6 @@ class CommandsCommand : public CommandExecutor {
  public:
   void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
     if (sender.empty()) return;
-    Player* player = bot.game->player_manager.GetPlayerByName(sender.c_str());
-    if (!player) return;
 
     int requester_level = cmd.GetSecurityLevel(sender);
     Commands& commands = cmd.GetCommands();
@@ -306,18 +303,17 @@ class CommandsCommand : public CommandExecutor {
 
       std::string output = trigger.triggers + " - " + desc + " [" + std::to_string(security) + "]";
 
-      Event::Dispatch(ChatQueueEvent::Private(player->name, output.data()));
+      Event::Dispatch(ChatQueueEvent::Private(sender.data(), output.data()));
     }
   }
 
   CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags) override { return; }
   std::vector<std::string> GetAliases() override { return {"commands", "c"}; }
   std::string GetDescription() override { return "Shows available commands"; }
   int GetSecurityLevel() override { return 0; }
 };
 
-std::string Lowercase(std::string_view str) {
+static inline std::string Lowercase(std::string_view str) {
   std::string result;
 
   std::string_view name = str;
@@ -334,10 +330,6 @@ std::string Lowercase(std::string_view str) {
   return result;
 }
 
-const std::unordered_map<std::string, int> kOperators = {
-    {"tm_master", 10}, {"baked cake", 10}, {"x-demo", 10}, {"lyra.", 5}, {"profile", 5}, {"monkey", 10},
-    {"neostar", 5},    {"geekgrrl", 5},    {"sed", 5},     {"sk", 5},    {"b.o.x.", 10}};
-
 static void RawOnChatPacket(void* user, u8* pkt, size_t size) {
   CommandSystem* cmd = (CommandSystem*)user;
 
@@ -350,7 +342,7 @@ CommandSystem::CommandSystem(ZeroBot& bot, PacketDispatcher& dispatcher) : bot(b
   default_commands_.emplace_back(std::make_shared<HelpCommand>());
   default_commands_.emplace_back(std::make_shared<CommandsCommand>());
   default_commands_.emplace_back(std::make_shared<SetShipCommand>());
-  default_commands_.emplace_back(std::make_shared<ZoneCommand>());
+  default_commands_.emplace_back(std::make_shared<InfoCommand>());
   default_commands_.emplace_back(std::make_shared<SayCommand>());
   default_commands_.emplace_back(std::make_shared<GoCommand>());
   default_commands_.emplace_back(std::make_shared<BehaviorCommand>());
@@ -384,18 +376,31 @@ void CommandSystem::OnChatPacket(const u8* pkt, size_t size) {
   size_t msg_size = size - 6;
 
   std::string_view msg(msg_raw, msg_size);
+  std::string_view sender_name;
+
+  // We need to parse the name and message from a remote private message.
+  if (type == ChatType::RemotePrivate) {
+    size_t name_end = msg.find(")>");
+    if (name_end == std::string_view::npos) return;
+
+    sender_name = msg.substr(1, name_end - 1);
+    msg = msg.substr(name_end + 2);
+  }
 
   if (msg.empty()) return;
   if (msg[0] != '!' && msg[0] != '.') return;
 
   msg = msg.substr(1);
 
-  Player* player = bot.game->player_manager.GetPlayerById(sender_id);
+  if (sender_id != 0xFFFF) {
+    Player* player = bot.game->player_manager.GetPlayerById(sender_id);
+    if (!player) return;
 
-  if (!player) return;
+    // Ignore self
+    if (player->id == bot.game->player_manager.player_id) return;
 
-  // Ignore self
-  if (player->id == bot.game->player_manager.player_id) return;
+    sender_name = player->name;
+  }
 
   std::vector<std::string_view> tokens = Tokenize(msg, ';');
 
@@ -426,7 +431,7 @@ void CommandSystem::OnChatPacket(const u8* pkt, size_t size) {
         if (type == ChatType::Arena) {
           security_level = kArenaSecurityLevel;
         } else {
-          auto op_iter = kOperators.find(Lowercase(player->name));
+          auto op_iter = kOperators.find(Lowercase(sender_name));
 
           if (op_iter != kOperators.end()) {
             security_level = op_iter->second;
@@ -439,7 +444,7 @@ void CommandSystem::OnChatPacket(const u8* pkt, size_t size) {
           // If the command is lockable, bot is locked, and requester isn't an operator then ignore it.
           if (!(command.GetFlags() & CommandFlag_Lockable) || !bb.ValueOr<bool>("CmdLock", false) ||
               security_level > 0) {
-            command.Execute(*this, bot, std::string(player->name), arg);
+            command.Execute(*this, bot, std::string(sender_name), arg);
           }
         }
       }
