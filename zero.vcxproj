@@ -102,6 +102,7 @@
     <ClCompile Include="zero\zones\metalgear\MetalGear.cpp" />
     <ClCompile Include="zero\zones\metalgear\SniperBehavior.cpp" />
     <ClCompile Include="zero\zones\svs\Svs.cpp" />
+    <ClCompile Include="zero\zones\svs\TerrierBehavior.cpp" />
     <ClCompile Include="zero\zones\svs\WarbirdBehavior.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -225,6 +226,7 @@
     <ClInclude Include="zero\zones\svs\nodes\MemoryTargetNode.h" />
     <ClInclude Include="zero\zones\svs\nodes\DynamicPlayerBoundingBoxQueryNode.h" />
     <ClInclude Include="zero\zones\svs\nodes\NearbyEnemyWeaponQueryNode.h" />
+    <ClInclude Include="zero\zones\svs\TerrierBehavior.h" />
     <ClInclude Include="zero\zones\svs\WarbirdBehavior.h" />
     <ClInclude Include="zero\zones\ZoneController.h" />
   </ItemGroup>
