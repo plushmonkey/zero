@@ -9,12 +9,10 @@ bool IsValidPosition(MapCoord coord) {
   return coord.x >= 0 && coord.x < 1024 && coord.y >= 0 && coord.y < 1024;
 }
 
-RegionFiller::RegionFiller(const Map& map, float radius, RegionIndex* coord_regions, SharedRegionOwnership* edges,
-                           int* region_tile_counts)
+RegionFiller::RegionFiller(const Map& map, float radius, RegionIndex* coord_regions, int* region_tile_counts)
     : map(map),
       radius(radius),
       coord_regions(coord_regions),
-      edges(edges),
       region_tile_counts(region_tile_counts),
       highest_coord(9999, 9999) {
   potential_edges.reserve(1024 * 1024);
@@ -122,14 +120,15 @@ void RegionFiller::TraverseSolid(const Vector2f& from, MapCoord to) {
     stack.push_back(to);
     potential_edges[to_index] = kUndefinedRegion;
 
+#if 0
     // Add an edge if this tile is not part of the empty space within the base
     if (coord_regions[to_index] != region_index) {
       Vector2f to_pos = Vector2f((float)to.x, (float)to.y);
-
       if (!IsEmptyBaseTile(to_pos)) {
         edges[to_index].AddOwner(region_index);
       }
     }
+#endif
   }
 }
 
@@ -153,7 +152,7 @@ bool RegionFiller::IsEmptyBaseTile(const Vector2f& position) const {
 void RegionRegistry::CreateAll(const Map& map, float radius) {
   Event::Dispatch(RegionBuildEvent());
 
-  RegionFiller filler(map, radius, coord_regions_, outside_edges_, region_tile_counts_);
+  RegionFiller filler(map, radius, coord_regions_, region_tile_counts_);
 
   for (uint16_t y = 0; y < 1024; ++y) {
     for (uint16_t x = 0; x < 1024; ++x) {
@@ -208,11 +207,6 @@ bool RegionRegistry::IsConnected(MapCoord a, MapCoord b) const {
   RegionIndex second = coord_regions_[b.y * 1024 + b.x];
 
   return first == second;
-}
-
-bool RegionRegistry::IsEdge(MapCoord coord) const {
-  if (!IsValidPosition(coord)) return true;
-  return outside_edges_[coord.y * 1024 + coord.x].count > 0;
 }
 
 }  // namespace zero

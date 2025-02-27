@@ -13,7 +13,7 @@
 
 namespace zero {
 
-using RegionIndex = size_t;
+using RegionIndex = u32;
 
 constexpr static RegionIndex kUndefinedRegion = -1;
 
@@ -47,7 +47,7 @@ struct SharedRegionOwnership {
   static constexpr size_t kMaxOwners = 4;
 
   RegionIndex owners[kMaxOwners];
-  size_t count;
+  u8 count;
 
   SharedRegionOwnership() : count(0) {}
 
@@ -73,8 +73,7 @@ struct SharedRegionOwnership {
 
 struct RegionFiller {
  public:
-  RegionFiller(const Map& map, float radius, RegionIndex* coord_regions, SharedRegionOwnership* edges,
-               int* region_tile_counts);
+  RegionFiller(const Map& map, float radius, RegionIndex* coord_regions, int* region_tile_counts);
 
   void Fill(RegionIndex index, const MapCoord& coord) {
     this->region_index = index;
@@ -99,7 +98,6 @@ struct RegionFiller {
   float radius;
 
   RegionIndex* coord_regions;
-  SharedRegionOwnership* edges;
   int* region_tile_counts;
 
   MapCoord highest_coord;
@@ -114,7 +112,6 @@ class RegionRegistry {
   RegionRegistry() : region_count_(0) { memset(coord_regions_, 0xFF, sizeof(coord_regions_)); }
 
   bool IsConnected(MapCoord a, MapCoord b) const;
-  bool IsEdge(MapCoord coord) const;
   int GetTileCount(MapCoord coord) const;
   void CreateAll(const Map& map, float radius);
 
@@ -129,7 +126,6 @@ class RegionRegistry {
   RegionIndex region_count_;
 
   RegionIndex coord_regions_[1024 * 1024];
-  SharedRegionOwnership outside_edges_[1024 * 1024];
   int region_tile_counts_[1024 * 1024];
 };
 }  // namespace zero

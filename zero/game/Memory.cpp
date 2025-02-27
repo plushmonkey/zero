@@ -30,6 +30,10 @@ u8* MemoryArena::Allocate(size_t size, size_t alignment) {
 #endif
 
   assert(this->current <= this->base + this->max_size);
+  if (this->current > this->base + this->max_size) {
+    Log(LogLevel::Error, "Memory arena ran out of space: %zu", size);
+    exit(1);
+  }
 
   return result;
 }

@@ -673,9 +673,10 @@ void Map::UpdateDoors(const ArenaSettings& settings) {
 
   s32 count = TICK_DIFF(current_tick, last_seed_tick);
 
-  if (settings.DoorDelay > 0) {
-    count /= settings.DoorDelay;
-  }
+  s32 delay = settings.DoorDelay;
+  if (delay <= 0) delay = 1;
+
+  count /= delay;
 
   if (count >= 100) {
     count = 100;
@@ -745,7 +746,7 @@ void Map::UpdateDoors(const ArenaSettings& settings) {
     }
 
     SeedDoors(seed);
-    last_seed_tick = current_tick;
+    last_seed_tick += delay;
   }
 }
 
