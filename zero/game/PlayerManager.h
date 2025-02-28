@@ -47,6 +47,8 @@ struct PlayerManager {
   Soccer* soccer = nullptr;
   Radar* radar = nullptr;
 
+  struct KDNode* kdtree = nullptr;
+
   u16 player_id = 0;
   bool requesting_attach = false;
 
@@ -85,7 +87,7 @@ struct PlayerManager {
   void Render(Camera& camera, SpriteRenderer& renderer);
 
   void RenderPlayerName(Camera& camera, SpriteRenderer& renderer, Player& self, Player& player,
-    const Vector2f& position, bool is_decoy);
+                        const Vector2f& position, bool is_decoy);
 
   void Spawn(bool reset = true);
 
@@ -123,8 +125,10 @@ struct PlayerManager {
 
   bool IsAntiwarped(Player& self, bool notify);
 
-  inline bool IsSynchronized(Player& player) {
-    u16 tick = (GetCurrentTick() + connection.time_diff) & 0x7FFF;
+  inline bool IsSynchronized(Player& player) const { return IsSynchronized(player, GetCurrentTick()); }
+
+  inline bool IsSynchronized(Player& player, u32 current_tick) const {
+    u16 tick = (current_tick + connection.time_diff) & 0x7FFF;
     return player.id == player_id || SMALL_TICK_DIFF(tick, player.timestamp) < kPlayerTimeout;
   }
 };

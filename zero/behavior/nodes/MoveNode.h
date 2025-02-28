@@ -234,7 +234,7 @@ struct GoToNode : public BehaviorNode {
       }
 
       // Reset the stuck counter when we successfully move to a new node.
-      ctx.blackboard.Set("bounce_count", 0);
+      ctx.blackboard.Set("bounce_count", 0U);
       movement_target = current_path.Advance();
     }
 
@@ -327,7 +327,7 @@ struct GoToNode : public BehaviorNode {
       Tick start_tick = ctx.blackboard.ValueOr("stuck_start_tick", 0U);
 
       if (TICK_DIFF(current_tick, start_tick) >= kStuckTickMaxDuration) {
-        ctx.blackboard.Set("bounce_count", 0);
+        ctx.blackboard.Set("bounce_count", 0U);
         Log(LogLevel::Debug, "Unstuck for more than %u ticks.", kStuckTickMaxDuration);
         return false;
       }

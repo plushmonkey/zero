@@ -6,6 +6,7 @@
 #include <zero/game/Camera.h>
 #include <zero/game/Clock.h>
 #include <zero/game/GameEvent.h>
+#include <zero/game/KDTree.h>
 #include <zero/game/Memory.h>
 #include <zero/game/PlayerManager.h>
 #include <zero/game/Radar.h>
@@ -53,7 +54,7 @@ void WeaponManager::Update(float dt) {
     for (s32 j = 0; j < tick_count; ++j) {
       WeaponSimulateResult result = WeaponSimulateResult::Continue;
 
-      result = Simulate(*weapon);
+      result = Simulate(*weapon, tick);
 
       if (result != WeaponSimulateResult::Continue && weapon->link_id != kInvalidLink) {
         AddLinkRemoval(weapon->link_id, result);
@@ -166,7 +167,7 @@ bool WeaponManager::SimulateWormholeGravity(Weapon& weapon) {
   return affected;
 }
 
-WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon) {
+WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon, u32 current_tick) {
   WeaponType type = weapon.data.type;
 
   if (weapon.last_tick++ >= weapon.end_tick) return WeaponSimulateResult::TimedOut;
@@ -236,31 +237,54 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon) {
 
   WeaponSimulateResult result = WeaponSimulateResult::Continue;
 
-  for (size_t i = 0; i < player_manager.player_count; ++i) {
-    Player* player = player_manager.players + i;
+  float max_distance = 0.0f;
+  // Find ship max radius
+  for (size_t i = 0; i < 8; ++i) {
+    float radius = connection.settings.ShipSettings[i].GetRadius();
+    if (radius > max_distance) {
+      max_distance = radius;
+    }
+  }
+
+  float weapon_radius = 18.0f;
+
+  if (is_prox) {
+    float prox = (float)(connection.settings.ProximityDistance + weapon.data.level);
+
+    if (weapon.data.type == WeaponType::Thor) {
+      prox += 3;
+    }
+
+    weapon_radius = prox * 18.0f;
+  }
+
+  weapon_radius = (weapon_radius - 14.0f) / 16.0f;
+
+  // Combine ship radius with weapon radius to find max collision lookup distance.
+  max_distance += weapon_radius;
+
+  if (player_manager.kdtree == nullptr) {
+    player_manager.kdtree = BuildPartition(temp_arena, player_manager);
+  }
+
+  KDNode* node = player_manager.kdtree->RangeSearch(weapon.position, max_distance);
+  KDCollection players = {};
+
+  if (node) {
+    players = node->Collect(temp_arena);
+  }
+
+  for (size_t i = 0; i < players.count; ++i) {
+    Player* player = players.players[i];
 
     if (player->ship == 8) continue;
     if (player->frequency == weapon.frequency) continue;
     if (player->enter_delay > 0) continue;
-    if (!player_manager.IsSynchronized(*player)) continue;
+    if (!player_manager.IsSynchronized(*player, current_tick)) continue;
 
     float radius = connection.settings.ShipSettings[player->ship].GetRadius();
     Vector2f player_r(radius, radius);
     Vector2f pos = player->position.PixelRounded();
-
-    float weapon_radius = 18.0f;
-
-    if (is_prox) {
-      float prox = (float)(connection.settings.ProximityDistance + weapon.data.level);
-
-      if (weapon.data.type == WeaponType::Thor) {
-        prox += 3;
-      }
-
-      weapon_radius = prox * 18.0f;
-    }
-
-    weapon_radius = (weapon_radius - 14.0f) / 16.0f;
 
     Vector2f min_w = weapon.position.PixelRounded() - Vector2f(weapon_radius, weapon_radius);
     Vector2f max_w = weapon.position.PixelRounded() + Vector2f(weapon_radius, weapon_radius);
@@ -908,7 +932,7 @@ WeaponSimulateResult WeaponManager::GenerateWeapon(u16 player_id, WeaponData wea
   WeaponSimulateResult result = WeaponSimulateResult::Continue;
 
   for (s32 i = 0; i < tick_diff; ++i) {
-    result = Simulate(*weapon);
+    result = Simulate(*weapon, GetCurrentTick());
 
     if (result != WeaponSimulateResult::Continue) {
       if (type == WeaponType::Repel) {

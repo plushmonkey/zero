@@ -179,6 +179,7 @@ void ZeroBot::Run() {
     auto end = std::chrono::high_resolution_clock::now();
     frame_time = std::chrono::duration_cast<ms_float>(end - start).count();
 
+    game->player_manager.kdtree = nullptr;
     trans_arena.Reset();
   }
 

@@ -8,6 +8,7 @@
 #include <zero/game/Clock.h>
 #include <zero/game/GameEvent.h>
 #include <zero/game/InputState.h>
+#include <zero/game/KDTree.h>
 #include <zero/game/Logger.h>
 #include <zero/game/Radar.h>
 #include <zero/game/ShipController.h>

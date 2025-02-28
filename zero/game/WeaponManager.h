@@ -114,7 +114,7 @@ struct WeaponManager {
   void OnWeaponPacket(u8* pkt, size_t size);
 
  private:
-  WeaponSimulateResult Simulate(Weapon& weapon);
+  WeaponSimulateResult Simulate(Weapon& weapon, u32 current_tick);
   WeaponSimulateResult SimulateRepel(Weapon& weapon);
   bool SimulateWormholeGravity(Weapon& weapon);
 

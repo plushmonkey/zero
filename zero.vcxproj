@@ -43,6 +43,7 @@
     <ClCompile Include="zero\commands\CommandSystem.cpp" />
     <ClCompile Include="zero\Config.cpp" />
     <ClCompile Include="zero\DebugRenderer.cpp" />
+    <ClCompile Include="zero\game\KDTree.cpp" />
     <ClCompile Include="zero\game\Logger.cpp" />
     <ClCompile Include="zero\game\render\AnimatedTileRenderer.cpp" />
     <ClCompile Include="zero\game\render\Animation.cpp" />
@@ -137,6 +138,7 @@
     <ClInclude Include="zero\DebugRenderer.h" />
     <ClInclude Include="zero\Event.h" />
     <ClInclude Include="zero\game\GameEvent.h" />
+    <ClInclude Include="zero\game\KDTree.h" />
     <ClInclude Include="zero\game\Logger.h" />
     <ClInclude Include="zero\game\render\LineRenderer.h" />
     <ClInclude Include="zero\HeuristicEnergyTracker.h" />
