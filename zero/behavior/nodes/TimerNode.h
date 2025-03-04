@@ -23,16 +23,27 @@ struct TimerExpiredNode : public BehaviorNode {
 };
 
 struct TimerSetNode : public BehaviorNode {
-  TimerSetNode(const char* key, u32 ticks) : key(key), ticks(ticks) {}
+  TimerSetNode(const char* timer_key, u32 ticks) : timer_key(timer_key), ticks(ticks) {}
+  TimerSetNode(const char* timer_key, const char* ticks_key) : timer_key(timer_key), ticks_key(ticks_key) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
-    ctx.blackboard.Set<u32>(key, GetCurrentTick() + ticks);
+    u32 set_ticks = ticks;
+
+    if (ticks_key) {
+      auto opt_ticks = ctx.blackboard.Value<u32>(ticks_key);
+      if (!opt_ticks) return ExecuteResult::Failure;
+      set_ticks = *opt_ticks;
+    }
+
+    ctx.blackboard.Set<u32>(timer_key, GetCurrentTick() + set_ticks);
 
     return ExecuteResult::Success;
   }
 
-  const char* key;
-  u32 ticks;
+  const char* timer_key = nullptr;
+  const char* ticks_key = nullptr;
+
+  u32 ticks = 0;
 };
 
 }  // namespace behavior

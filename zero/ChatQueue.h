@@ -87,6 +87,10 @@ struct ChatQueue : EventHandler<ChatQueueEvent>, EventHandler<ChatEvent> {
   u32 sent_message_count = 0;
   u32 last_check_tick = 0;
 
+  // The flood limit sets the cap on how large the send_message_count can be.
+  // The send_message_count is halved every second.
+  u32 flood_limit = 6;
+
   ChatQueue(ChatController& chat) : chat_controller(chat) {}
 
   void Update();
@@ -99,6 +103,8 @@ struct ChatQueue : EventHandler<ChatQueueEvent>, EventHandler<ChatEvent> {
 
   void HandleEvent(const ChatQueueEvent& event) override;
   void HandleEvent(const ChatEvent& event) override;
+
+  inline bool IsEmpty() const { return write_index == send_index; }
 
  private:
   QueueEntry* AcquireEntry();

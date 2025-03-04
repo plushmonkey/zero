@@ -86,8 +86,6 @@ void ChatQueue::HandleEvent(const ChatEvent& event) {
 }
 
 void ChatQueue::Update() {
-  constexpr u32 kFloodLimit = 6;
-
   recv_queue.clear();
 
   u8 data[kMaxPacketSize];
@@ -106,7 +104,7 @@ void ChatQueue::Update() {
     }
 
     // Only send more messages if we're below the flood limit.
-    if (sent_message_count >= kFloodLimit - 1) break;
+    if (sent_message_count >= flood_limit - 1) break;
 
     size_t next_send_index = (send_index + 1) % ZERO_ARRAY_SIZE(entries);
     QueueEntry* entry = entries + send_index;
@@ -182,6 +180,14 @@ void ChatQueue::Update() {
     auto& connection = chat_controller.connection;
     connection.packet_sequencer.SendReliableMessage(connection, buffer.data, buffer.GetSize());
     ++sent_message_count;
+
+    if (size > 2 && entry->message[0] == '?' && entry->message[1] != '?') {
+      // Treat commands as double cost.
+      ++sent_message_count;
+    } else if (entry->type == ChatType::Public) {
+      // Treat public messages as more expensive
+      sent_message_count += 2;
+    }
 
     // Add the sent message to the chat output box.
     ChatEntry* controller_entry = chat_controller.PushEntry(entry->message, size, entry->type);

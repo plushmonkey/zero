@@ -736,7 +736,8 @@ void WeaponManager::OnWeaponPacket(u8* pkt, size_t size) {
   // Player sends out position packet with their timestamp, it takes ping ticks to reach server, server re-timestamps it
   // and sends it to us.
   u32 server_timestamp = ((connection.GetServerTick() & 0x7FFF0000) | timestamp);
-  u32 local_timestamp = server_timestamp - connection.time_diff - ping;
+  s32 my_ping = (connection.ping + 9) / 10;
+  u32 local_timestamp = MAKE_TICK(server_timestamp - connection.time_diff - ping - my_ping);
 
   Player* player = player_manager.GetPlayerById(pid);
   if (!player) return;
@@ -909,7 +910,7 @@ WeaponSimulateResult WeaponManager::GenerateWeapon(u16 player_id, WeaponData wea
     } break;
   }
 
-  weapon->end_tick = local_timestamp + GetWeaponTotalAliveTime(weapon->data.type, weapon->data.alternate);
+  weapon->end_tick = MAKE_TICK(local_timestamp + GetWeaponTotalAliveTime(weapon->data.type, weapon->data.alternate));
 
   bool is_mine = (type == WeaponType::Bomb || type == WeaponType::ProximityBomb) && weapon->data.alternate;
 

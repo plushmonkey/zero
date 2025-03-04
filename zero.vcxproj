@@ -98,6 +98,7 @@
     <ClCompile Include="zero\zones\hyperspace\center\CenterBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\CommandBehavior.cpp" />
     <ClCompile Include="zero\zones\hyperspace\Hyperspace.cpp" />
+    <ClCompile Include="zero\zones\local\Local.cpp" />
     <ClCompile Include="zero\zones\metalgear\GunnerBehavior.cpp" />
     <ClCompile Include="zero\zones\metalgear\JuggBehavior.cpp" />
     <ClCompile Include="zero\zones\metalgear\MetalGear.cpp" />
@@ -219,6 +220,8 @@
     <ClInclude Include="zero\zones\hyperspace\nodes\CommandNode.h" />
     <ClInclude Include="zero\zones\hyperspace\nodes\SectorNode.h" />
     <ClInclude Include="zero\zones\hyperspace\nodes\GlobalGoToNode.h" />
+    <ClInclude Include="zero\zones\local\CommandSpamBehavior.h" />
+    <ClInclude Include="zero\zones\local\ShipChangeBehavior.h" />
     <ClInclude Include="zero\zones\metalgear\GunnerBehavior.h" />
     <ClInclude Include="zero\zones\metalgear\JuggBehavior.h" />
     <ClInclude Include="zero\zones\metalgear\SniperBehavior.h" />
