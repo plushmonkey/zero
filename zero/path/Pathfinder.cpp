@@ -234,13 +234,15 @@ static void CalculateEdges(const Map& map, NodeProcessor& processor, float ship_
                            s16 x_start, s16 y_start, s16 x_end, s16 y_end) {
   u32 frequency = 0xFFFF;
 
+  OccupiedRect* occupied_scratch = (OccupiedRect*)malloc(sizeof(OccupiedRect) * 2048);
+
   for (u16 y = y_start; y < y_end; ++y) {
     for (u16 x = x_start; x < x_end; ++x) {
       if (map.IsSolidEmptyDoors(x, y, frequency)) continue;
 
       Node* node = processor.GetNode(NodePoint(x, y));
       NodePoint current_point = processor.GetPoint(node);
-      EdgeSet edges = processor.CalculateEdges(node, ship_radius);
+      EdgeSet edges = processor.CalculateEdges(node, ship_radius, occupied_scratch);
 
       node->SetWeight(1.0f);
 
@@ -269,6 +271,8 @@ static void CalculateEdges(const Map& map, NodeProcessor& processor, float ship_
       }
     }
   }
+
+  free(occupied_scratch);
 }
 
 void Pathfinder::CreateMapWeights(MemoryArena& temp_arena, const Map& map, WeightConfig config) {

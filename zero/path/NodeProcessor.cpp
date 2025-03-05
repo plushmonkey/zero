@@ -87,7 +87,7 @@ static inline bool IsDynamicTile(const Map& map, u16 world_x, u16 world_y) {
   return tile_id >= kTileIdFirstDoor && tile_id <= (kTileIdLastDoor + 1);
 }
 
-EdgeSet NodeProcessor::CalculateEdges(Node* node, float radius) {
+EdgeSet NodeProcessor::CalculateEdges(Node* node, float radius, OccupiedRect* occupied_scratch) {
   EdgeSet edges = {};
 
   NodePoint base_point = GetPoint(node);
@@ -101,9 +101,8 @@ EdgeSet NodeProcessor::CalculateEdges(Node* node, float radius) {
                                            CoordOffset::East(),      CoordOffset::NorthWest(), CoordOffset::NorthEast(),
                                            CoordOffset::SouthWest(), CoordOffset::SouthEast()};
 
-  OccupiedRect occupied[64];
   size_t occupied_count =
-      map_.GetAllOccupiedRects(Vector2f((float)base_point.x, (float)base_point.y), radius, 0xFFFF, occupied);
+      map_.GetAllOccupiedRects(Vector2f((float)base_point.x, (float)base_point.y), radius, 0xFFFF, occupied_scratch);
 
   for (std::size_t i = 0; i < 4; i++) {
     bool* requirement = requirements[i];
@@ -123,7 +122,7 @@ EdgeSet NodeProcessor::CalculateEdges(Node* node, float radius) {
       // Check each occupied rect to see if contains the target position.
       // The expensive check can be skipped because this spot is definitely occupiable.
       for (size_t j = 0; j < occupied_count; ++j) {
-        OccupiedRect& rect = occupied[j];
+        OccupiedRect& rect = occupied_scratch[j];
 
         if (rect.Contains(Vector2f((float)world_x, (float)world_y))) {
           is_occupied = true;

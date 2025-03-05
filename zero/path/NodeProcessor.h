@@ -84,7 +84,7 @@ class NodeProcessor {
   Game& GetGame() { return game_; }
 
   EdgeSet FindEdges(Node* node, float radius);
-  EdgeSet CalculateEdges(Node* node, float radius);
+  EdgeSet CalculateEdges(Node* node, float radius, OccupiedRect* occupied_scratch);
   Node* GetNode(NodePoint point);
   bool IsSolid(u16 x, u16 y) { return map_.IsSolid(x, y, 0xFFFF); }
 
