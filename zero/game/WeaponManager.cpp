@@ -267,8 +267,12 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon, u32 current_tick) {
     player_manager.kdtree = BuildPartition(temp_arena, player_manager);
   }
 
-  KDNode* node = player_manager.kdtree->RangeSearch(weapon.position, max_distance);
   KDCollection players = {};
+  KDNode* node = nullptr;
+
+  if (player_manager.kdtree) {
+    node = player_manager.kdtree->RangeSearch(weapon.position, max_distance);
+  }
 
   if (node) {
     players = node->Collect(temp_arena);

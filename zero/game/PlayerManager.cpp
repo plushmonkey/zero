@@ -552,6 +552,7 @@ void PlayerManager::OnPlayerIdChange(u8* pkt, size_t size) {
 
   this->player_count = 0;
   this->received_initial_list = false;
+  this->kdtree = nullptr;
 
   memset(player_lookup, 0, sizeof(player_lookup));
 }

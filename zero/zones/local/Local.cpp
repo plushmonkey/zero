@@ -3,6 +3,7 @@
 #include <zero/game/GameEvent.h>
 #include <zero/game/Logger.h>
 #include <zero/zones/ZoneController.h>
+#include <zero/zones/local/ArenaSpamBehavior.h>
 #include <zero/zones/local/CommandSpamBehavior.h>
 #include <zero/zones/local/ShipChangeBehavior.h>
 
@@ -56,7 +57,8 @@ void LocalController::CreateBehaviors(const char* arena_name) {
 
   repo.Add("shipchange", std::make_unique<ShipChangeBehavior>());
   repo.Add("commandspam", std::make_unique<CommandSpamBehavior>());
-
+  repo.Add("arenaspam", std::make_unique<ArenaSpamBehavior>());
+  
   SetBehavior("shipchange");
 
   bot->commands->RegisterCommand(std::make_shared<SetCommandCommand>());
