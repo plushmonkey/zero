@@ -18,9 +18,11 @@
 #include <sys/stat.h>
 
 #ifndef __ANDROID__
+#ifdef GLFW_AVAILABLE
 #include <GLFW/glfw3.h>
 
 GLFWwindow* clipboard_window = nullptr;
+#endif
 #endif
 
 #endif
@@ -240,6 +242,7 @@ bool CreateFolder(const char* path) {
 }
 void PasteClipboard(char* dest, size_t available_size) {
 #ifndef __ANDROID__
+#ifdef GLFW_AVAILABLE
   const char* clipboard = glfwGetClipboardString(clipboard_window);
   if (clipboard) {
     for (size_t i = 0; i < available_size && *clipboard && *clipboard != 10; ++i) {
@@ -247,6 +250,7 @@ void PasteClipboard(char* dest, size_t available_size) {
     }
     *dest = 0;
   }
+#endif
 #endif
 }
 

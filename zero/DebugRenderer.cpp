@@ -1,9 +1,14 @@
 #include "DebugRenderer.h"
 
+#ifdef GLFW_AVAILABLE
 #include <GLFW/glfw3.h>
+#endif
+
 #include <zero/game/Logger.h>
 
 namespace zero {
+
+#ifdef GLFW_AVAILABLE
 
 GLFWwindow* CreateGameWindow(int& width, int& height);
 
@@ -106,5 +111,22 @@ GLFWwindow* CreateGameWindow(int& width, int& height) {
 
   return window;
 }
+
+#else  // GLFW_AVAILABLE not set
+
+bool DebugRenderer::Initialize(s32 surface_width, s32 surface_height) {
+  return false;
+}
+
+void DebugRenderer::Close() {}
+
+// Returns false if the window is closed and should be terminated.
+bool DebugRenderer::Begin() {
+  return false;
+}
+
+void DebugRenderer::Present() {}
+
+#endif
 
 }  // namespace zero
