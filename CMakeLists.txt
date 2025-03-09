@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.2)
 project(zero VERSION 0.0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
-  
+
 if(WIN32)
 add_definitions(-D_CRT_SECURE_NO_WARNINGS -D_GLFW_WIN32 -D_MBCS -DNDEBUG -DNOMINMAX -DWIN32_LEAN_AND_MEAN)
 set(GLFW_SOURCES
@@ -43,16 +43,18 @@ target_include_directories(zero PRIVATE
                            lib
                            lib/glad/include
                            lib/glfw/include)
-                           
+
 if(WIN32)
   target_link_libraries(zero ws2_32)
   target_compile_definitions(zero PUBLIC GLFW_AVAILABLE=1)
 else()
   find_package(glfw3 3.3)
-  if(GLFW3_FOUND)
+  if(glfw3_FOUND)
+    message(STATUS "Using GLFW3")
     target_link_libraries(zero glfw dl -pthread)
 	target_compile_definitions(zero PUBLIC GLFW_AVAILABLE=1)
   else()
+    message(STATUS "GLFW3 not found. Render window disabled.")
     target_link_libraries(zero dl -pthread)
   endif()
 endif()
@@ -64,10 +66,10 @@ set(CPACK_PACKAGE_INSTALL_DIRECTORY "zero")
 
 set(CMAKE_INSTALL_PREFIX ".")
 
-install(TARGETS zero 
+install(TARGETS zero
         CONFIGURATIONS Debug
         RUNTIME DESTINATION Debug)
-        
-install(TARGETS zero 
+
+install(TARGETS zero
         CONFIGURATIONS Release
         RUNTIME DESTINATION Release)
