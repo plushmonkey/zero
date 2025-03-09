@@ -1,5 +1,6 @@
 #include "LineRenderer.h"
 
+#include <stdio.h>
 #include <zero/game/Camera.h>
 
 namespace zero {

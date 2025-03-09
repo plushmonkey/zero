@@ -46,7 +46,7 @@ struct ShotSpreadNode : public behavior::BehaviorNode {
     }
 
     float t = GetTime();
-    aimshot += perp * std::sinf(t / period) * spread;
+    aimshot += perp * sinf(t / period) * spread;
 
     ctx.blackboard.Set(aimshot_key, aimshot);
 

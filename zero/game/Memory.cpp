@@ -1,6 +1,7 @@
 #include "Memory.h"
 
 #include <assert.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <zero/game/Logger.h>
 

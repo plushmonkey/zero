@@ -84,8 +84,11 @@ bool ZeroBot::JoinZone(ServerInfo& server) {
   commands = memory_arena_construct_type(&perm_arena, CommandSystem, *this, this->game->dispatcher);
 
   if (g_Settings.debug_window) {
-    debug_renderer.Initialize(SURFACE_WIDTH, SURFACE_HEIGHT);
-    game->render_enabled = true;
+    if (debug_renderer.Initialize(SURFACE_WIDTH, SURFACE_HEIGHT)) {
+      game->render_enabled = true;
+    } else {
+      g_Settings.debug_window = false;
+    }
   }
 
   GameInitializeResult init_result = game->Initialize(input);

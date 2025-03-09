@@ -29,7 +29,7 @@ Config file order:
 3. Build
 
 ### Linux
-1. Install GLFW3 development libraries (`sudo apt-get install libglfw3-dev` on Ubuntu)
+1. Optionally install GLFW3 development libraries (`sudo apt-get install libglfw3-dev` on Ubuntu). This is for the debug render window.
 2. Install cmake
 3. Open terminal in zero directory
 4. `cmake -DCMAKE_BUILD_TYPE=Release -B build -S .`
