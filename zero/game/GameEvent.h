@@ -294,6 +294,12 @@ struct FlagSpawnEvent : public Event {
   FlagSpawnEvent(GameFlag& flag) : flag(flag) {}
 };
 
+struct FlagVictoryEvent : public Event {
+  u16 team;
+
+  FlagVictoryEvent(u16 team) : team(team) {}
+};
+
 struct GreenPickupEvent : public Event {
   PrizeGreen& green;
 

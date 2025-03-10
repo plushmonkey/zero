@@ -88,6 +88,18 @@ static void OnPlayerIdPkt(void* user, u8* pkt, size_t size) {
   game->OnPlayerId(pkt, size);
 }
 
+static void OnFlagVictoryPkt(void* user, u8* pkt, size_t size) {
+  Game* game = (Game*)user;
+
+  game->OnFlagVictory(pkt, size);
+}
+
+static void OnFlagDropPkt(void* user, u8* pkt, size_t size) {
+  Game* game = (Game*)user;
+
+  game->OnFlagDrop(pkt, size);
+}
+
 static void OnJoinGamePkt(void* user, u8* pkt, size_t size) {
   Game* game = (Game*)user;
 
@@ -762,6 +774,30 @@ void Game::OnFlagPosition(u8* pkt, size_t size) {
   flags[id].hidden_end_tick = 0;
 
   Event::Dispatch(FlagSpawnEvent(flags[id]));
+}
+
+void Game::OnFlagVictory(u8* pkt, size_t size) {
+  auto self = player_manager.GetSelf();
+  if (self) {
+    self->flags = 0;
+  }
+
+  if (size < 3) return;
+
+  u16 team = *(u16*)(pkt + 1);
+
+  Event::Dispatch(FlagVictoryEvent(team));
+}
+
+void Game::OnFlagDrop(u8* pkt, size_t size) {
+  if (size < 3) return;
+
+  u16 pid = *(u16*)(pkt + 1);
+
+  auto player = player_manager.GetPlayerById(pid);
+  if (!player) return;
+
+  player->flags = 0;
 }
 
 void Game::OnTurfFlagUpdate(u8* pkt, size_t size) {
