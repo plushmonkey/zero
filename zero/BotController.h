@@ -38,6 +38,9 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>,
   Actuator actuator;
   path::Path current_path;
 
+  bool enable_dynamic_path;
+  path::DoorSolidMethod door_solid_method;
+
   HeuristicEnergyTracker energy_tracker;
   InfluenceMap influence_map;
 

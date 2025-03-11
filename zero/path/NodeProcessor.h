@@ -77,6 +77,16 @@ struct CoordOffset {
   static inline size_t SouthEastIndex() { return 7; }
 };
 
+// This determines how doors should be treated in the node processor.
+enum class DoorSolidMethod {
+  // This will treat all doors as solid even if they are currently open.
+  AlwaysSolid,
+  // This will treat all doors as open even if they are currently closed.
+  AlwaysOpen,
+  // This will generate the path depending on current door state.
+  Dynamic
+};
+
 // Determines the node edges when using A*.
 class NodeProcessor {
  public:
@@ -111,11 +121,14 @@ class NodeProcessor {
 
   inline u32 GetNodeIndex(Node* node) const { return (u32)(node - nodes_); }
 
+  inline void SetDoorSolidMethod(DoorSolidMethod door_method) { door_method_ = door_method; }
+
  private:
   EdgeSet edges_[kMaxNodes];
   Node nodes_[kMaxNodes];
   const Map& map_;
   Game& game_;
+  DoorSolidMethod door_method_ = DoorSolidMethod::Dynamic;
 };
 
 }  // namespace path

@@ -1,10 +1,12 @@
+#include <string.h>
 #include <zero/BotController.h>
 #include <zero/ZeroBot.h>
 #include <zero/game/GameEvent.h>
 #include <zero/game/Logger.h>
 #include <zero/zones/ZoneController.h>
-#include <zero/zones/svs/WarbirdBehavior.h>
 #include <zero/zones/svs/TerrierBehavior.h>
+#include <zero/zones/svs/WarbirdBehavior.h>
+#include <zero/zones/svs/WarzoneBehavior.h>
 
 namespace zero {
 namespace svs {
@@ -24,10 +26,16 @@ void SvsController::CreateBehaviors(const char* arena_name) {
 
   repo.Add("warbird", std::make_unique<WarbirdBehavior>());
   repo.Add("terrier", std::make_unique<TerrierBehavior>());
+  repo.Add("warzone", std::make_unique<WarzoneBehavior>());
 
   SetBehavior("warbird");
 
   bot->bot_controller->energy_tracker.estimate_type = EnergyHeuristicType::Average;
+
+  if (strcmp(arena_name, "warzone") == 0) {
+    bot->bot_controller->enable_dynamic_path = false;
+    bot->bot_controller->door_solid_method = path::DoorSolidMethod::AlwaysOpen;
+  }
 }
 
 }  // namespace svs

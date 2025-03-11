@@ -106,6 +106,7 @@
     <ClCompile Include="zero\zones\svs\Svs.cpp" />
     <ClCompile Include="zero\zones\svs\TerrierBehavior.cpp" />
     <ClCompile Include="zero\zones\svs\WarbirdBehavior.cpp" />
+    <ClCompile Include="zero\zones\svs\WarzoneBehavior.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="zero\Actuator.h" />
@@ -234,6 +235,7 @@
     <ClInclude Include="zero\zones\svs\nodes\NearbyEnemyWeaponQueryNode.h" />
     <ClInclude Include="zero\zones\svs\TerrierBehavior.h" />
     <ClInclude Include="zero\zones\svs\WarbirdBehavior.h" />
+    <ClInclude Include="zero\zones\svs\WarzoneBehavior.h" />
     <ClInclude Include="zero\zones\ZoneController.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

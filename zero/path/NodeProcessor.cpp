@@ -14,10 +14,23 @@ EdgeSet NodeProcessor::FindEdges(Node* node, float radius) {
     // Only check if the tile is dynamic, like doors.
     if (!edges.DynamicIsSet(i)) continue;
 
-    // Perform a solid check here to make sure doors haven't blocked us.
-    CoordOffset offset = CoordOffset::FromIndex(i);
-    if (map_.IsSolid(point.x + offset.x, point.y + offset.y, 0xFFFF)) {
-      edges.Erase(i);
+    switch (door_method_) {
+      case DoorSolidMethod::AlwaysOpen: {
+        // Do nothing so the edge stays.
+      } break;
+      case DoorSolidMethod::AlwaysSolid: {
+        // Remove the edge because it's always treated as solid.
+        edges.Erase(i);
+      } break;
+      case DoorSolidMethod::Dynamic: {
+        // Perform a solid check here to make sure doors haven't blocked us.
+        CoordOffset offset = CoordOffset::FromIndex(i);
+        if (map_.IsSolid(point.x + offset.x, point.y + offset.y, 0xFFFF)) {
+          edges.Erase(i);
+        }
+      } break;
+      default: {
+      } break;
     }
   }
 

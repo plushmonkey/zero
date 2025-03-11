@@ -60,6 +60,7 @@ struct Pathfinder {
   Path FindPath(const Map& map, const Vector2f& from, const Vector2f& to, float radius);
 
   void CreateMapWeights(MemoryArena& temp_arena, const Map& map, WeightConfig config);
+  void SetDoorSolidMethod(DoorSolidMethod method) { processor_->SetDoorSolidMethod(method); }
 
  private:
   struct NodeCompare {

@@ -68,6 +68,19 @@ struct Path {
 
     return (u16)current.x == (u16)tile.x && (u16)current.y == (u16)tile.y;
   }
+
+  inline float GetRemainingDistance() {
+    if (points.empty()) return 0.0f;
+    if (index >= points.size() - 1) return 0.0f;
+
+    float dist = 0.0f;
+
+    for (size_t i = index; i < points.size() - 1; ++i) {
+      dist += points[i].Distance(points[i + 1]);
+    }
+
+    return dist;
+  }
 };
 
 }  // namespace path

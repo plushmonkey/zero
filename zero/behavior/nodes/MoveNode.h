@@ -208,7 +208,13 @@ struct GoToNode : public BehaviorNode {
     }
 
     if (build) {
-      current_path = pathfinder->FindPath(game.connection.map, self->position, target, radius);
+      // Try to find a new path, but continue to use the old one if we can't find a new one.
+      auto new_path = pathfinder->FindPath(game.connection.map, self->position, target, radius);
+
+      if (!new_path.Empty()) {
+        current_path = new_path;
+      }
+
       if (current_path.points.size() > 10) {
         Log(LogLevel::Jabber, "Rebuilding path");
       }
@@ -250,33 +256,54 @@ struct GoToNode : public BehaviorNode {
     bool is_stuck = IsStuck(*self, ctx);
 
     if (is_stuck) {
-      // Calculate the corners of the ship.
-      Vector2f corners[] = {
-          self->position + Vector2f(-radius, -radius),
-          self->position + Vector2f(radius, -radius),
-          self->position + Vector2f(-radius, radius),
-          self->position + Vector2f(radius, radius),
-      };
-      float best_dist_sq = 1024 * 1024;
-      size_t best_corner = 0;
+      bool find_nearest_corner = true;
+      Vector2f best_corner;
 
-      // Find the closest corner to the movement target.
-      for (size_t i = 0; i < ZERO_ARRAY_SIZE(corners); ++i) {
-        float dist_sq = movement_target.DistanceSq(corners[i]);
-        if (dist_sq < best_dist_sq) {
-          best_dist_sq = dist_sq;
-          best_corner = i;
+      auto opt_start_tick = ctx.blackboard.Value<Tick>("stuck_start_tick");
+      if (opt_start_tick) {
+        Tick start_tick = *opt_start_tick;
+
+        if (abs(TICK_DIFF(GetCurrentTick(), start_tick)) < 400) {
+          auto opt_stuck_corner = ctx.blackboard.Value<Vector2f>("stuck_corner");
+
+          if (opt_stuck_corner) {
+            best_corner = *opt_stuck_corner;
+            find_nearest_corner = false;
+          }
         }
       }
 
+      if (find_nearest_corner) {
+        // Calculate the corners of the ship.
+        Vector2f corners[] = {
+            self->position + Vector2f(-radius, -radius),
+            self->position + Vector2f(radius, -radius),
+            self->position + Vector2f(-radius, radius),
+            self->position + Vector2f(radius, radius),
+        };
+        float best_dist_sq = 1024 * 1024;
+        size_t best_corner_index = 0;
+
+        // Find the closest corner to the movement target.
+        for (size_t i = 0; i < ZERO_ARRAY_SIZE(corners); ++i) {
+          float dist_sq = movement_target.DistanceSq(corners[i]);
+          if (dist_sq < best_dist_sq) {
+            best_dist_sq = dist_sq;
+            best_corner_index = i;
+          }
+        }
+
+        best_corner = corners[best_corner_index];
+        ctx.blackboard.Set<Vector2f>("stuck_corner", best_corner);
+      }
+
       // Use the closest corner as our new target movement, so we rotate toward our closest corner.
-      Vector2f new_target = corners[best_corner];
 
       Log(LogLevel::Debug, "Unstucking");
 
-      steering.Face(game, new_target);
+      steering.Face(game, best_corner);
       // Avoid using seek because it wants to correct for velocity.
-      steering.force += new_target - self->position;
+      steering.force += best_corner - self->position;
     } else {
       float speed_sq = self->velocity.LengthSq();
 
@@ -322,12 +349,15 @@ struct GoToNode : public BehaviorNode {
       // Set the start tick so we can remove stuck status if it lasts too long.
       if (previous_bounce_count < kStuckTickThreshold) {
         ctx.blackboard.Set("stuck_start_tick", current_tick);
+        ctx.blackboard.Erase("stuck_corner");
       }
 
       Tick start_tick = ctx.blackboard.ValueOr("stuck_start_tick", 0U);
 
       if (TICK_DIFF(current_tick, start_tick) >= kStuckTickMaxDuration) {
         ctx.blackboard.Set("bounce_count", 0U);
+        ctx.blackboard.Erase("stuck_start_tick");
+        ctx.blackboard.Erase("stuck_corner");
         Log(LogLevel::Debug, "Unstuck for more than %u ticks.", kStuckTickMaxDuration);
         return false;
       }

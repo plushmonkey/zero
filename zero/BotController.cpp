@@ -9,6 +9,9 @@ namespace zero {
 
 BotController::BotController(Game& game) : game(game), chat_queue(game.chat), energy_tracker(game.player_manager) {
   this->input = nullptr;
+
+  this->enable_dynamic_path = true;
+  this->door_solid_method = path::DoorSolidMethod::Dynamic;
 }
 
 void BotController::HandleEvent(const JoinGameEvent& event) {
@@ -19,6 +22,9 @@ void BotController::HandleEvent(const JoinGameEvent& event) {
 
   // Clear the pathfinder so it will rebuild on ship change.
   pathfinder = nullptr;
+
+  this->enable_dynamic_path = true;
+  this->door_solid_method = path::DoorSolidMethod::Dynamic;
 }
 
 void BotController::HandleEvent(const PlayerFreqAndShipChangeEvent& event) {
@@ -29,7 +35,10 @@ void BotController::HandleEvent(const PlayerFreqAndShipChangeEvent& event) {
 
   current_path.Clear();
 
-  if (pathfinder && pathfinder->config.ship_radius == radius) return;
+  if (pathfinder && pathfinder->config.ship_radius == radius) {
+    pathfinder->SetDoorSolidMethod(door_solid_method);
+    return;
+  }
 
   Log(LogLevel::Info, "Creating new registry and pathfinder.");
 
@@ -48,10 +57,11 @@ void BotController::HandleEvent(const PlayerFreqAndShipChangeEvent& event) {
   cfg.weight_type = path::Pathfinder::WeightType::Exponential;
 
   pathfinder->CreateMapWeights(game.temp_arena, game.GetMap(), cfg);
+  pathfinder->SetDoorSolidMethod(door_solid_method);
 }
 
 void BotController::HandleEvent(const DoorToggleEvent& event) {
-  if (current_path.dynamic) {
+  if (enable_dynamic_path && current_path.dynamic) {
     Log(LogLevel::Debug, "Clearing current path from door update.");
     current_path.Clear();
   }

@@ -352,6 +352,9 @@ void ChatController::OnChatPacket(u8* packet, size_t size) {
   u8 sound = *(packet + 2);
   u16 sender_id = *(u16*)(packet + 3);
 
+  // Don't output empty sound messages.
+  if (type == ChatType::Arena && sound != 0 && size <= 6) return;
+
   ChatEntry* entry = PushEntry((char*)packet + 5, size - 5, type);
 
   Player* player = player_manager.GetPlayerById(sender_id);
