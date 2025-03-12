@@ -203,7 +203,7 @@ static void OnPlayerPrizePkt(void* user, u8* pkt, size_t size) {
 
   u16 x = buffer.ReadU16();
   u16 y = buffer.ReadU16();
-  u16 prize_id = buffer.ReadU16();
+  s16 prize_id = (s16)buffer.ReadU16();
   u16 player_id = buffer.ReadU16();
 
   // Loop through greens to remove any on that tile. This exists so players outside of position broadcast range will
@@ -219,6 +219,8 @@ static void OnPlayerPrizePkt(void* user, u8* pkt, size_t size) {
       break;
     }
   }
+
+  if (prize_id == (s16)Prize::Warp) return;
 
   // Perform prize sharing
   Player* player = game->player_manager.GetPlayerById(player_id);

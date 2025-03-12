@@ -1,6 +1,7 @@
 #include "ShipController.h"
 
 #include <assert.h>
+#include <stdlib.h>
 #include <string.h>
 #include <zero/game/ArenaSettings.h>
 #include <zero/game/Camera.h>
@@ -1128,9 +1129,6 @@ void ShipController::ApplyPrize(Player* self, s32 prize_id, bool notify, bool da
 
   if (negative) {
     prize = (Prize)(-prize_id);
-    if (self->bounty > 0) {
-      --self->bounty;
-    }
   } else {
     ++self->bounty;
   }
@@ -1206,24 +1204,29 @@ void ShipController::ApplyPrize(Player* self, s32 prize_id, bool notify, bool da
 
   switch (prize) {
     case Prize::None: {
-      if (!negative) {
-        for (u16 attempts = 0; attempts < 9999; ++attempts) {
-          s32 random_prize = GeneratePrize(false);
+      u32 pristine_seed = player_manager.connection.security.prize_seed;
 
-          if (random_prize == 0 || random_prize == (s32)Prize::EngineShutdown || random_prize == (s32)Prize::Shields ||
-              random_prize == (s32)Prize::Super || random_prize == (s32)Prize::Multiprize ||
-              random_prize == (s32)Prize::Warp) {
-            continue;
-          }
+      // We need a random seed here so we don't generate the same prize when being given a batch of prizes.
+      player_manager.connection.security.prize_seed = rand();
 
-          u16 bounty = self->bounty;
-          ApplyPrize(self, random_prize, false, false);
-          self->bounty = bounty;
-          break;
+      for (u16 attempts = 0; attempts < 9999; ++attempts) {
+        s32 random_prize = GeneratePrize(false);
+
+        if (random_prize == 0 || random_prize == (s32)Prize::EngineShutdown || random_prize == (s32)Prize::Shields ||
+            random_prize == (s32)Prize::Super || random_prize == (s32)Prize::Multiprize ||
+            random_prize == (s32)Prize::Warp) {
+          continue;
         }
 
-        display_notification = false;
+        u16 bounty = self->bounty;
+        ApplyPrize(self, random_prize, false, false);
+        self->bounty = bounty;
+        break;
       }
+
+      player_manager.connection.security.prize_seed = pristine_seed;
+
+      display_notification = false;
     } break;
     case Prize::Recharge: {
       display_notification = true;
@@ -1284,60 +1287,95 @@ void ShipController::ApplyPrize(Player* self, s32 prize_id, bool notify, bool da
       }
     } break;
     case Prize::Stealth: {
+      display_notification = true;
+      max_notification = true;
+
       if (negative) {
         if (ship.capability & ShipCapability_Stealth) {
-          display_notification = true;
+          max_notification = false;
+        } else if (!ship_settings.StealthStatus) {
+          max_notification = false;
+          negative = true;
+          prize = Prize::FullCharge;
         }
 
         ship.capability &= ~ShipCapability_Stealth;
       } else {
         if (ship_settings.StealthStatus > 0) {
           if (!(ship.capability & ShipCapability_Stealth)) {
-            display_notification = true;
+            max_notification = false;
           }
 
           ship.capability |= ShipCapability_Stealth;
+        } else {
+          max_notification = false;
+          prize = Prize::FullCharge;
         }
       }
     } break;
     case Prize::Cloak: {
+      display_notification = true;
+      max_notification = true;
+
       if (negative) {
         if (ship.capability & ShipCapability_Cloak) {
-          display_notification = true;
+          max_notification = false;
+        } else if (!ship_settings.CloakStatus) {
+          max_notification = false;
+          negative = true;
+          prize = Prize::FullCharge;
         }
 
         ship.capability &= ~ShipCapability_Cloak;
       } else {
         if (ship_settings.CloakStatus > 0) {
           if (!(ship.capability & ShipCapability_Cloak)) {
-            display_notification = true;
+            max_notification = false;
           }
 
           ship.capability |= ShipCapability_Cloak;
+        } else {
+          max_notification = false;
+          prize = Prize::FullCharge;
         }
       }
     } break;
     case Prize::XRadar: {
+      display_notification = true;
+      max_notification = true;
+
       if (negative) {
         if (ship.capability & ShipCapability_XRadar) {
-          display_notification = true;
+          max_notification = false;
+        } else if (!ship_settings.XRadarStatus) {
+          max_notification = false;
+          negative = true;
+          prize = Prize::FullCharge;
         }
 
         ship.capability &= ~ShipCapability_XRadar;
       } else {
         if (ship_settings.XRadarStatus > 0) {
           if (!(ship.capability & ShipCapability_XRadar)) {
-            display_notification = true;
+            max_notification = false;
           }
 
           ship.capability |= ShipCapability_XRadar;
+        } else {
+          max_notification = false;
+          prize = Prize::FullCharge;
         }
       }
     } break;
     case Prize::Warp: {
       display_notification = true;
-      player_manager.Spawn(false);
-      self->velocity = Vector2f(0, 0);
+
+      if (negative) {
+        prize = Prize::FullCharge;
+      } else {
+        player_manager.Spawn(false);
+        self->velocity = Vector2f(0, 0);
+      }
     } break;
     case Prize::Guns: {
       display_notification = true;
@@ -1377,17 +1415,18 @@ void ShipController::ApplyPrize(Player* self, s32 prize_id, bool notify, bool da
       }
     } break;
     case Prize::BouncingBullets: {
+      display_notification = true;
+      max_notification = true;
+
       if (negative) {
         if (ship.capability & ShipCapability_BouncingBullets) {
-          display_notification = true;
+          max_notification = false;
         }
 
         ship.capability &= ~ShipCapability_BouncingBullets;
       } else {
-        if (ship.capability & ShipCapability_BouncingBullets) {
-          --self->bounty;
-        } else {
-          display_notification = true;
+        if (!(ship.capability & ShipCapability_BouncingBullets)) {
+          max_notification = false;
         }
 
         ship.capability |= ShipCapability_BouncingBullets;
@@ -1429,15 +1468,6 @@ void ShipController::ApplyPrize(Player* self, s32 prize_id, bool notify, bool da
         }
       }
     } break;
-    case Prize::FullCharge: {
-      display_notification = true;
-
-      if (negative) {
-        self->energy = 1;
-      } else {
-        self->energy = (float)ship.energy;
-      }
-    } break;
     case Prize::EngineShutdown: {
       u32 ticks = player_manager.connection.settings.EngineShutdownTime;
 
@@ -1450,32 +1480,36 @@ void ShipController::ApplyPrize(Player* self, s32 prize_id, bool notify, bool da
       display_notification = true;
     } break;
     case Prize::Multifire: {
+      display_notification = true;
+      max_notification = true;
+
       if (negative) {
         if (ship.capability & ShipCapability_Multifire) {
-          display_notification = true;
+          max_notification = false;
         }
 
         ship.capability &= ~ShipCapability_Multifire;
       } else {
         if (!(ship.capability & ShipCapability_Multifire)) {
-          display_notification = true;
+          max_notification = false;
         }
 
         ship.capability |= ShipCapability_Multifire;
       }
     } break;
     case Prize::Proximity: {
+      display_notification = true;
+      max_notification = true;
+
       if (negative) {
         if (ship.capability & ShipCapability_Proximity) {
-          display_notification = true;
+          max_notification = false;
         }
 
         ship.capability &= ~ShipCapability_Proximity;
       } else {
-        if (ship.capability & ShipCapability_Proximity) {
-          --self->bounty;
-        } else {
-          display_notification = true;
+        if (!(ship.capability & ShipCapability_Proximity)) {
+          max_notification = false;
         }
 
         ship.capability |= ShipCapability_Proximity;
@@ -1521,19 +1555,29 @@ void ShipController::ApplyPrize(Player* self, s32 prize_id, bool notify, bool da
       }
     } break;
     case Prize::Antiwarp: {
+      display_notification = true;
+      max_notification = true;
+
       if (negative) {
         if (ship.capability & ShipCapability_Antiwarp) {
-          display_notification = true;
+          max_notification = false;
+        } else if (!ship_settings.AntiWarpStatus) {
+          max_notification = false;
+          negative = true;
+          prize = Prize::FullCharge;
         }
 
         ship.capability &= ~ShipCapability_Antiwarp;
       } else {
         if (ship_settings.AntiWarpStatus > 0) {
           if (!(ship.capability & ShipCapability_Antiwarp)) {
-            display_notification = true;
+            max_notification = false;
           }
 
           ship.capability |= ShipCapability_Antiwarp;
+        } else {
+          max_notification = false;
+          prize = Prize::FullCharge;
         }
       }
     } break;
@@ -1607,6 +1651,8 @@ void ShipController::ApplyPrize(Player* self, s32 prize_id, bool notify, bool da
       if (!negative) {
         u16 count = player_manager.connection.settings.MultiPrizeCount;
 
+        u32 pristine_seed = player_manager.connection.security.prize_seed;
+
         size_t attempts = 0;
         for (u16 i = 0; i < count && attempts < 9999; ++i, ++attempts) {
           s32 random_prize = GeneratePrize(false);
@@ -1622,6 +1668,8 @@ void ShipController::ApplyPrize(Player* self, s32 prize_id, bool notify, bool da
           ApplyPrize(self, random_prize, false, false);
           self->bounty = bounty;
         }
+
+        player_manager.connection.security.prize_seed = pristine_seed;
 
         display_notification = true;
       }
@@ -1676,6 +1724,16 @@ void ShipController::ApplyPrize(Player* self, s32 prize_id, bool notify, bool da
     } break;
     default: {
     } break;
+  }
+
+  if (prize == Prize::FullCharge) {
+    display_notification = true;
+
+    if (negative) {
+      self->energy = 1;
+    } else {
+      self->energy = (float)ship.energy;
+    }
   }
 
   Event::Dispatch(PrizeEvent(prize, negative));
