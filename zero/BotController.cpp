@@ -67,6 +67,34 @@ void BotController::HandleEvent(const DoorToggleEvent& event) {
   }
 }
 
+void BotController::HandleEvent(const BrickTileEvent& event) {
+  auto self = game.player_manager.GetSelf();
+  if (!self || self->ship >= 8) return;
+
+  if (pathfinder) {
+    pathfinder->SetBrickNode(event.brick.tile.x, event.brick.tile.y, true);
+  }
+
+  s32 x = event.brick.tile.x;
+  s32 y = event.brick.tile.y;
+
+  if (event.brick.team != self->frequency && current_path.Contains(x, y)) {
+    Log(LogLevel::Debug, "Clearing current path from brick drop.");
+    current_path.Clear();
+  }
+}
+
+void BotController::HandleEvent(const BrickTileClearEvent& event) {
+  if (pathfinder) {
+    pathfinder->SetBrickNode(event.brick.tile.x, event.brick.tile.y, false);
+  }
+
+  if (current_path.dynamic) {
+    Log(LogLevel::Debug, "Clearing current path from brick clear.");
+    current_path.Clear();
+  }
+}
+
 void BotController::HandleEvent(const LoginResponseEvent& event) {
   u8 response = event.response_id;
 

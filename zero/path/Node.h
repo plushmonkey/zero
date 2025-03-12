@@ -21,6 +21,9 @@ enum NodeFlag {
   NodeFlag_Initialized = (1 << 2),
   NodeFlag_Traversable = (1 << 3),
   NodeFlag_Safety = (1 << 4),
+  // Brick is handled here instead of checking map to improve performance.
+  // If it checked the map then it would be going all over the place with memory touches.
+  NodeFlag_Brick = (1 << 5),
 };
 typedef u32 NodeFlags;
 

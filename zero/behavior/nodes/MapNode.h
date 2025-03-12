@@ -12,11 +12,11 @@ namespace behavior {
 struct ShipTraverseQueryNode : public BehaviorNode {
   ShipTraverseQueryNode(const char* position_key) : position_key(position_key) {}
   ShipTraverseQueryNode(const char* player_key, const char* position_key)
-    : player_key(player_key), position_key(position_key) {}
+      : player_key(player_key), position_key(position_key) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
-    Player* player = ctx.bot->game->player_manager.GetSelf();;
-    
+    Player* player = ctx.bot->game->player_manager.GetSelf();
+
     if (player_key) {
       auto opt_player = ctx.blackboard.Value<Player*>(player_key);
       if (!opt_player) return ExecuteResult::Failure;
@@ -30,7 +30,7 @@ struct ShipTraverseQueryNode : public BehaviorNode {
     if (!opt_position) return ExecuteResult::Failure;
 
     float radius = ctx.bot->game->connection.settings.ShipSettings[player->ship].GetRadius();
-    
+
     bool hit = ctx.bot->game->GetMap().CastShip(player, radius, *opt_position).hit;
 
     return hit ? ExecuteResult::Failure : ExecuteResult::Success;
@@ -61,7 +61,7 @@ struct VisibilityQueryNode : public BehaviorNode {
 
       Vector2f& position_b = opt_position_b.value();
 
-      bool hit = ctx.bot->game->GetMap().CastTo(position_a, position_b, 0xFFFF).hit;
+      bool hit = ctx.bot->game->GetMap().CastTo(position_a, position_b, self->frequency).hit;
 
       return hit ? ExecuteResult::Failure : ExecuteResult::Success;
     }
@@ -95,7 +95,7 @@ struct DistanceThresholdNode : public BehaviorNode {
   DistanceThresholdNode(const char* position_key, float threshold)
       : position_a_key(position_key), position_b_key(nullptr), threshold_sq(threshold * threshold) {}
   DistanceThresholdNode(const char* position_key, const char* threshold_key)
-    : position_a_key(position_key), position_b_key(nullptr), threshold_key(threshold_key) {}
+      : position_a_key(position_key), position_b_key(nullptr), threshold_key(threshold_key) {}
   DistanceThresholdNode(const char* position_a_key, const char* position_b_key, float threshold)
       : position_a_key(position_a_key), position_b_key(position_b_key), threshold_sq(threshold * threshold) {}
   DistanceThresholdNode(const char* position_a_key, const char* position_b_key, const char* threshold_key)

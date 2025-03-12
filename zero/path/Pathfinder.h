@@ -57,10 +57,13 @@ struct Pathfinder {
   WeightConfig config;
 
   Pathfinder(std::unique_ptr<NodeProcessor> processor, RegionRegistry& regions);
-  Path FindPath(const Map& map, const Vector2f& from, const Vector2f& to, float radius);
+  Path FindPath(const Map& map, const Vector2f& from, const Vector2f& to, float radius, u16 frequency);
 
   void CreateMapWeights(MemoryArena& temp_arena, const Map& map, WeightConfig config);
   void SetDoorSolidMethod(DoorSolidMethod method) { processor_->SetDoorSolidMethod(method); }
+  inline void SetBrickNode(s32 x, s32 y, bool exists) {
+    if (processor_) processor_->SetBrickNode(x, y, exists);
+  }
 
  private:
   struct NodeCompare {

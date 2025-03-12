@@ -81,6 +81,22 @@ struct Path {
 
     return dist;
   }
+
+  inline bool Contains(s32 check_x, s32 check_y) const {
+    if (points.empty()) return false;
+    if (index >= points.size() - 1) return false;
+
+    for (size_t i = index; i < points.size() - 1; ++i) {
+      s32 x = (s32)points[i].x;
+      s32 y = (s32)points[i].y;
+
+      if (x == check_x && y == check_y) {
+        return true;
+      }
+    }
+
+    return false;
+  }
 };
 
 }  // namespace path

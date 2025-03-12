@@ -209,7 +209,7 @@ struct GoToNode : public BehaviorNode {
 
     if (build) {
       // Try to find a new path, but continue to use the old one if we can't find a new one.
-      auto new_path = pathfinder->FindPath(game.connection.map, self->position, target, radius);
+      auto new_path = pathfinder->FindPath(game.connection.map, self->position, target, radius, self->frequency);
 
       if (!new_path.Empty()) {
         current_path = new_path;

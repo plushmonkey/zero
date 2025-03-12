@@ -56,7 +56,7 @@ static inline float Euclidean(const NodePoint& __restrict from_p, const NodePoin
 Pathfinder::Pathfinder(std::unique_ptr<NodeProcessor> processor, RegionRegistry& regions)
     : processor_(std::move(processor)), regions_(regions) {}
 
-Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& to, float radius) {
+Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& to, float radius, u16 frequency) {
   Path path = {};
   Node* start = processor_->GetNode(ToNodePoint(from));
   Node* goal = processor_->GetNode(ToNodePoint(to));
@@ -109,6 +109,15 @@ Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& 
 
       NodePoint edge_point(node_point.x + offset.x, node_point.y + offset.y);
       Node* edge = processor_->GetNode(edge_point);
+
+      // This edge has a dynamic brick, so we need to check the state
+      if (edge->flags & NodeFlag_Brick) {
+        path.dynamic = true;
+
+        if (map.IsSolid(edge_point.x, edge_point.y, frequency)) {
+          continue;
+        }
+      }
 
       touched_.push_back(edge);
 

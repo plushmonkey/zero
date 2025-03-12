@@ -123,6 +123,17 @@ class NodeProcessor {
 
   inline void SetDoorSolidMethod(DoorSolidMethod door_method) { door_method_ = door_method; }
 
+  inline void SetBrickNode(s32 x, s32 y, bool exists) {
+    Node* node = GetNode(NodePoint(x, y));
+    if (!node) return;
+
+    if (exists) {
+      node->flags |= NodeFlag_Brick;
+    } else {
+      node->flags &= ~NodeFlag_Brick;
+    }
+  }
+
  private:
   EdgeSet edges_[kMaxNodes];
   Node nodes_[kMaxNodes];
