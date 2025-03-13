@@ -67,6 +67,9 @@ std::unique_ptr<behavior::BehaviorNode> TerrierBehavior::CreateTree(behavior::Ex
 
   const Vector2f center(512, 512);
   constexpr float kLowEnergyThreshold = 450.0f;
+  // This is how far away to check for enemies that are rushing at us with low energy.
+  // We will stop dodging and try to finish them off if they are within this distance and low energy.
+  constexpr float kNearbyEnemyThreshold = 20.0f;
   constexpr float kRepelDistance = 16.0f;
   // How much damage that is going towards an enemy before we start bombing. This is to limit the frequency of our
   // bombing so it overlaps bullets and is harder to dodge.
@@ -108,8 +111,32 @@ std::unique_ptr<behavior::BehaviorNode> TerrierBehavior::CreateTree(behavior::Ex
                         .End()
                     .End()
                 .Selector()
-                    .Sequence()
-                        .Child<DodgeIncomingDamage>(0.6f, 35.0f)
+                    .Sequence() // Attempt to dodge and use defensive items.
+                        .Sequence(CompositeDecorator::Success) // Always check incoming damage so we can use it in repel and portal sequences.
+                            .Child<IncomingDamageQueryNode>(kRepelDistance, "incoming_damage")
+                            .Child<PlayerCurrentEnergyQueryNode>("self_energy")
+                            .End()
+                        .Sequence(CompositeDecorator::Success) // If we are in danger but can't repel, use our portal.
+                            .InvertChild<ShipItemCountThresholdNode>(ShipItemType::Repel)
+                            .Child<ShipPortalPositionQueryNode>() // Check if we have a portal down.
+                            .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
+                            .Child<TimerExpiredNode>("defense_timer")
+                            .Child<InputActionNode>(InputAction::Warp)
+                            .Child<TimerSetNode>("defense_timer", 100)
+                            .End()
+                        .Sequence(CompositeDecorator::Success) // Use repel when in danger.
+                            .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Repel)
+                            .Child<TimerExpiredNode>("defense_timer")
+                            .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
+                            .Child<InputActionNode>(InputAction::Repel)
+                            .Child<TimerSetNode>("defense_timer", 100)
+                            .End()
+                        .Sequence(CompositeDecorator::Invert) // Check if enemy is very low energy and close to use. Don't bother dodging if they are rushing us with low energy.
+                            .Child<PlayerEnergyQueryNode>("nearest_target", "nearest_target_energy")
+                            .InvertChild<ScalarThresholdNode<float>>("nearest_target_energy", kLowEnergyThreshold)
+                            .InvertChild<DistanceThresholdNode>("nearest_target_position", "self_position", kNearbyEnemyThreshold)
+                            .End()
+                        .Child<DodgeIncomingDamage>(0.4f, 35.0f)
                         .End()
                     .Sequence() // Path to target if they aren't immediately visible.
                         .InvertChild<VisibilityQueryNode>("nearest_target_position")
@@ -137,25 +164,6 @@ std::unique_ptr<behavior::BehaviorNode> TerrierBehavior::CreateTree(behavior::Ex
                                     .Child<SeekNode>("aimshot", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
                                     .End()
                                 .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
-                                .End()
-                            .Sequence(CompositeDecorator::Success) // Always check incoming damage so we can use it in repel and portal sequences.
-                                .Child<IncomingDamageQueryNode>(kRepelDistance, "incoming_damage")
-                                .Child<PlayerCurrentEnergyQueryNode>("self_energy")
-                                .End()
-                            .Sequence(CompositeDecorator::Success) // If we are in danger but can't repel, use our portal.
-                                .InvertChild<ShipItemCountThresholdNode>(ShipItemType::Repel)
-                                .Child<ShipPortalPositionQueryNode>() // Check if we have a portal down.
-                                .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
-                                .Child<TimerExpiredNode>("defense_timer")
-                                .Child<InputActionNode>(InputAction::Warp)
-                                .Child<TimerSetNode>("defense_timer", 100)
-                                .End()
-                            .Sequence(CompositeDecorator::Success) // Use repel when in danger.
-                                .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Repel)
-                                .Child<TimerExpiredNode>("defense_timer")
-                                .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
-                                .Child<InputActionNode>(InputAction::Repel)
-                                .Child<TimerSetNode>("defense_timer", 100)
                                 .End()
                             .Sequence(CompositeDecorator::Success) // Use burst when near a wall.
                                 .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Burst)

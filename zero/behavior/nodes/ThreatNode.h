@@ -63,8 +63,12 @@ struct DodgeIncomingDamage : public behavior::BehaviorNode {
     Vector2f side = Normalize(self->position - closest_hit);
 
     if (est_damage > 0) {
-      ctx.bot->game->line_renderer.PushLine(self->position, Vector3f(1, 1, 0), self->position + side * 5.0f,
-                                            Vector3f(1, 1, 0));
+      Vector3f color = Vector3f(1, 1, 0);
+      if (damage_percent >= damage_percent_threshold || new_energy <= 0) {
+        color = Vector3f(0, 1, 0);
+      }
+
+      ctx.bot->game->line_renderer.PushLine(self->position, Vector3f(1, 1, 0), self->position + side * 5.0f, color);
       ctx.bot->game->line_renderer.Render(ctx.bot->game->camera);
     }
 
@@ -141,8 +145,9 @@ struct DodgeIncomingDamage : public behavior::BehaviorNode {
         if (dist > remaining_distance && !is_mine) continue;
 
         // Reduce the amount of impact this weapon will have based on its distance away.
-        float threat_percent = dist / (check_distance * 0.7f);
+        float threat_percent = (check_distance - dist) / (check_distance * 0.7f);
         if (threat_percent > 1.0f) threat_percent = 1.0f;
+        if (threat_percent < 0.0f) threat_percent = 0.0f;
 
         float damage = (float)GetEstimatedWeaponDamage(weapon, ctx.bot->game->connection) * threat_percent;
         Vector2f weighted_direction = direction * threat_percent;
