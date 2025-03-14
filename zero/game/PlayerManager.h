@@ -97,6 +97,8 @@ struct PlayerManager {
 
   inline u16 GetPlayerIndex(u16 id) { return player_lookup[id]; }
 
+  void RemovePlayer(Player* player);
+
   void SendPositionPacket();
   void SimulatePlayer(Player& player, float dt, bool extrapolating);
   bool SimulateAxis(Player& player, float dt, int axis, bool extrapolating);

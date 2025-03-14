@@ -562,6 +562,18 @@ void PlayerManager::OnPlayerEnter(u8* pkt, size_t size) {
 
   buffer.ReadU8();
 
+  u8 ship = buffer.ReadU8();
+  u8 audio = buffer.ReadU8();
+  char* name = buffer.ReadString(20);
+  char* squad = buffer.ReadString(20);
+
+  Player* existing_player = GetPlayerByName(name);
+  if (existing_player) {
+    // This can happen on servers that mistakenly send the enter packet after already including them in the initial
+    // list.
+    RemovePlayer(existing_player);
+  }
+
   size_t player_index = player_count++;
 
   assert(player_index < ZERO_ARRAY_SIZE(players));
@@ -570,10 +582,7 @@ void PlayerManager::OnPlayerEnter(u8* pkt, size_t size) {
 
   memset(player, 0, sizeof(Player));
 
-  player->ship = buffer.ReadU8();
-  u8 audio = buffer.ReadU8();
-  char* name = buffer.ReadString(20);
-  char* squad = buffer.ReadString(20);
+  player->ship = ship;
 
   memcpy(player->name, name, 20);
   memcpy(player->squad, squad, 20);
@@ -618,32 +627,36 @@ void PlayerManager::OnPlayerLeave(u8* pkt, size_t size) {
   buffer.ReadU8();
 
   u16 pid = buffer.ReadU16();
+  Player* player = GetPlayerById(pid);
 
-  size_t index;
-  Player* player = GetPlayerById(pid, &index);
+  RemovePlayer(player);
+}
 
-  if (player) {
-    weapon_manager->ClearWeapons(*player);
+void PlayerManager::RemovePlayer(Player* player) {
+  if (!player) return;
 
-    Log(LogLevel::Info, "%s left arena", player->name);
+  size_t index = (size_t)(player - players);
 
-    DetachPlayer(*player);
-    DetachAllChildren(*player);
+  weapon_manager->ClearWeapons(*player);
 
-    if (chat_controller) {
-      chat_controller->AddMessage(ChatType::Arena, "%s left arena", player->name);
-    }
+  Log(LogLevel::Info, "%s left arena", player->name);
 
-    Event::Dispatch(PlayerLeaveEvent(*player));
+  DetachPlayer(*player);
+  DetachAllChildren(*player);
 
-    // Swap the last player in the list's lookup to point to their new index
-    assert(index < 1024);
-
-    player_lookup[players[player_count - 1].id] = (u16)index;
-    player_lookup[player->id] = kInvalidPlayerId;
-
-    players[index] = players[--player_count];
+  if (chat_controller) {
+    chat_controller->AddMessage(ChatType::Arena, "%s left arena", player->name);
   }
+
+  Event::Dispatch(PlayerLeaveEvent(*player));
+
+  // Swap the last player in the list's lookup to point to their new index
+  assert(index < 1024);
+
+  player_lookup[players[player_count - 1].id] = (u16)index;
+  player_lookup[player->id] = kInvalidPlayerId;
+
+  players[index] = players[--player_count];
 }
 
 void PlayerManager::OnPlayerDeath(u8* pkt, size_t size) {
