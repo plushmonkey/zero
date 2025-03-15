@@ -70,6 +70,7 @@ struct Soccer {
   void OnPowerballPosition(u8* pkt, size_t size);
 
   bool IsTeamGoal(const Vector2f& position);
+  bool IsTeamGoal(u16 frequency, const Vector2f& position);
 
   inline bool IsCarryingBall() { return carry_id != kInvalidBallId; }
 

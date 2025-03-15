@@ -1,5 +1,6 @@
 #include "BallBehavior.h"
 
+#include <zero/behavior/nodes/BlackboardNode.h>
 #include <zero/behavior/nodes/InputActionNode.h>
 #include <zero/behavior/nodes/MapNode.h>
 #include <zero/behavior/nodes/MathNode.h>
@@ -38,7 +39,8 @@ std::unique_ptr<behavior::BehaviorNode> BallBehavior::CreateTree(behavior::Execu
             .Child<PowerballCarryQueryNode>()
             .Parallel()
                 .Sequence()
-                    .Child<PowerballGoalPathQuery>()
+                    .Child<PowerballGoalPathQuery>(nullptr, "goal_scored", false)
+                    .Child<BlackboardSetQueryNode>("goal_scored")
                     .Child<PowerballFireNode>()
                     .End()
                 .Selector() // If the ball is being carried, go toward the goal

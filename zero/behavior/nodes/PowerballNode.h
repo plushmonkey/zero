@@ -8,8 +8,12 @@
 namespace zero {
 namespace behavior {
 
-// Returns success if carrying the ball and pointing in a direction that will fire into a goal.
+// Calculates where the final position of a ball will be after simulating until it stops moving.
+// reverse will calculate the position shot from behind the ship.
 struct PowerballGoalPathQuery : public BehaviorNode {
+  PowerballGoalPathQuery(const char* output_position_key, const char* output_scored_key, bool reverse = false)
+      : output_position_key(output_position_key), output_scored_key(output_scored_key), reverse(reverse) {}
+
   ExecuteResult Execute(ExecuteContext& ctx) override {
     auto& soccer = ctx.bot->game->soccer;
 
@@ -26,6 +30,9 @@ struct PowerballGoalPathQuery : public BehaviorNode {
     float speed = ctx.bot->game->connection.settings.ShipSettings[player->ship].SoccerBallSpeed / 10.0f / 16.0f;
     Vector2f position = player->position.PixelRounded();
     Vector2f heading = OrientationToHeading((u8)(player->orientation * 40.0f));
+    if (reverse) {
+      heading = -heading;
+    }
     Vector2f velocity = (player->velocity + heading * speed).PixelRounded();
 
     projected_ball.x = (u32)(position.x * 16000.0f);
@@ -43,13 +50,15 @@ struct PowerballGoalPathQuery : public BehaviorNode {
     }
 
     auto& map = ctx.bot->game->GetMap();
+    bool scored_goal = false;
 
     for (size_t i = 0; i < max_iteration_count; ++i) {
       SimulateAxis(soccer, projected_ball, map, &projected_ball.x, &projected_ball.vel_x);
       bool hit_goal = SimulateAxis(soccer, projected_ball, map, &projected_ball.y, &projected_ball.vel_y);
 
       if (hit_goal) {
-        return ExecuteResult::Success;
+        scored_goal = true;
+        break;
       }
 
       s32 friction = projected_ball.friction / 1000;
@@ -63,7 +72,21 @@ struct PowerballGoalPathQuery : public BehaviorNode {
       }
     }
 
-    return ExecuteResult::Failure;
+    if (output_scored_key) {
+      if (scored_goal) {
+        ctx.blackboard.Set<bool>(output_scored_key, scored_goal);
+      } else {
+        ctx.blackboard.Erase(output_scored_key);
+      }
+    }
+
+    if (output_position_key) {
+      Vector2f position(projected_ball.x / 16000.0f, projected_ball.y / 16000.0f);
+
+      ctx.blackboard.Set<Vector2f>(output_position_key, position);
+    }
+
+    return ExecuteResult::Success;
   }
 
   inline bool SimulateAxis(Soccer& soccer, Powerball& ball, Map& map, u32* pos, s16* vel) {
@@ -95,7 +118,12 @@ struct PowerballGoalPathQuery : public BehaviorNode {
 
     return nullptr;
   }
+
+  const char* output_position_key = nullptr;
+  const char* output_scored_key = nullptr;
+  bool reverse = false;
 };
+
 struct PowerballFireNode : public BehaviorNode {
   ExecuteResult Execute(ExecuteContext& ctx) override {
     auto& soccer = ctx.bot->game->soccer;
@@ -173,7 +201,9 @@ struct PowerballClosestQueryNode : public BehaviorNode {
       return ExecuteResult::Failure;
     }
 
-    ctx.blackboard.Set(output_position_key, best_position);
+    if (output_position_key) {
+      ctx.blackboard.Set(output_position_key, best_position);
+    }
 
     return ExecuteResult::Success;
   }
