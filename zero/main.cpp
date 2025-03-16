@@ -33,6 +33,17 @@ BOOL WINAPI ConsoleCloserHandler(DWORD dwCtrlType) {
   return TRUE;
 }
 
+#else
+#include <signal.h>
+
+static void SignalHandler(int signum) {
+  if (g_Bot && g_Bot->game) {
+    g_Bot->game->connection.SendDisconnect();
+  }
+
+  exit(0);
+}
+
 #endif
 
 namespace zero {
@@ -71,6 +82,8 @@ static ServerInfo* GetServerByName(std::string_view name) {
 int main(int argc, char* argv[]) {
 #ifdef _WIN32
   SetConsoleCtrlHandler(ConsoleCloserHandler, TRUE);
+#else
+  signal(SIGINT, SignalHandler);
 #endif
 
   zero::ZeroBot bot;
