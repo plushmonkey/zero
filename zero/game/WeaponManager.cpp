@@ -172,6 +172,9 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon, u32 current_tick) {
 
   if (weapon.last_tick++ >= weapon.end_tick) return WeaponSimulateResult::TimedOut;
 
+  bool initial_sim = weapon.flags & WEAPON_FLAG_INITIAL_SIM;
+  weapon.flags &= ~WEAPON_FLAG_INITIAL_SIM;
+
   if (type == WeaponType::Repel) {
     return SimulateRepel(weapon);
   }
@@ -214,7 +217,7 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon, u32 current_tick) {
 
     float highest = dx > dy ? dx : dy;
 
-    if (highest > weapon.prox_highest_offset || GetCurrentTick() >= weapon.sensor_end_tick) {
+    if (highest > weapon.prox_highest_offset || TICK_GTE(weapon.last_tick, weapon.sensor_end_tick)) {
       if (ship_controller) {
         ship_controller->OnWeaponHit(weapon);
       }
@@ -298,7 +301,12 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon, u32 current_tick) {
 
       if (is_prox) {
         weapon.prox_hit_player_id = player->id;
-        weapon.sensor_end_tick = GetCurrentTick() + connection.settings.BombExplodeDelay;
+        weapon.sensor_end_tick = MAKE_TICK(weapon.last_tick + connection.settings.BombExplodeDelay);
+
+        if (initial_sim) {
+          // Activate the proximity explode delay immediately because the bomb was spawned on top of an enemy.
+          weapon.sensor_end_tick = weapon.last_tick;
+        }
 
         float dx = abs(weapon.position.x - player->position.x);
         float dy = abs(weapon.position.y - player->position.y);
@@ -874,7 +882,7 @@ WeaponSimulateResult WeaponManager::GenerateWeapon(u16 player_id, WeaponData wea
   weapon->player_id = player_id;
   weapon->position = Vector2f(pos_x / 16.0f, pos_y / 16.0f);
   weapon->bounces_remaining = 0;
-  weapon->flags = 0;
+  weapon->flags = WEAPON_FLAG_INITIAL_SIM;
   weapon->link_id = link_id;
   weapon->prox_hit_player_id = 0xFFFF;
   weapon->last_tick = local_timestamp;

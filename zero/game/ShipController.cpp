@@ -609,8 +609,6 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
           self.warp_anim_t = 0.0f;
           self.position = ship.portal_location;
 
-          player_manager.SendPositionPacket();
-
           ship.next_bomb_tick = tick + kRepelDelayTicks;
           ship.fake_antiwarp_end_tick = tick + connection.settings.AntiwarpSettleDelay;
           warped = true;

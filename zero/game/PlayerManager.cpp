@@ -815,8 +815,7 @@ void PlayerManager::Spawn(bool reset) {
 
   self->togglables |= Status_Flash;
   self->warp_anim_t = 0.0f;
-
-  SendPositionPacket();
+  self->velocity = Vector2f(0, 0);
 
   Event::Dispatch(SpawnEvent(*self));
 }
