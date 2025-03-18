@@ -63,8 +63,12 @@ u8* StandardLoadAsset(const char* filename, size_t* size) {
   fseek(f, 0, SEEK_SET);
 
   u8* buffer = (u8*)malloc(*size);
+  if (!buffer) return nullptr;
 
-  fread(buffer, 1, *size, f);
+  size_t read_amount = fread(buffer, 1, *size, f);
+  if (read_amount != *size) {
+    Log(LogLevel::Warning, "Failed to load entire asset.");
+  }
 
   fclose(f);
 

@@ -43,7 +43,6 @@ struct WarpToCommand : public CommandExecutor {
   }
 
   CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags) override {}
   std::vector<std::string> GetAliases() override { return {"warpto"}; }
   std::string GetDescription() override { return "Warps to a provided coord."; }
   int GetSecurityLevel() override { return 10; }

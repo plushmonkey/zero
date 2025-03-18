@@ -44,7 +44,6 @@ class SetCommandCommand : public CommandExecutor {
   }
 
   CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags) override {}
   std::vector<std::string> GetAliases() override { return {"setcommand", "setcmd"}; }
   std::string GetDescription() override { return "Sets the command to spam during 'commandspam' behavior."; }
   int GetSecurityLevel() override { return 0; }
@@ -58,7 +57,7 @@ void LocalController::CreateBehaviors(const char* arena_name) {
   repo.Add("shipchange", std::make_unique<ShipChangeBehavior>());
   repo.Add("commandspam", std::make_unique<CommandSpamBehavior>());
   repo.Add("arenaspam", std::make_unique<ArenaSpamBehavior>());
-  
+
   SetBehavior("shipchange");
 
   bot->commands->RegisterCommand(std::make_shared<SetCommandCommand>());

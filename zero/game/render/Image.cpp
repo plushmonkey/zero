@@ -1,6 +1,7 @@
 #include "Image.h"
 
 #include <zero/Types.h>
+#include <zero/game/Logger.h>
 #include <zero/game/Memory.h>
 #include <zero/game/Platform.h>
 
@@ -155,8 +156,12 @@ unsigned char* ImageLoad(const char* filename, int* width, int* height, bool ass
       fseek(f, 0, SEEK_SET);
 
       data = (u8*)malloc(size);
+      if (!data) return nullptr;
 
-      fread(data, 1, size, f);
+      size_t read_size = fread(data, 1, size, f);
+      if (read_size != size) {
+        Log(LogLevel::Warning, "ImageLoad failed to read entire file: %s", filename);
+      }
 
       fclose(f);
     }

@@ -1,5 +1,7 @@
 #include "Config.h"
 
+#include <zero/game/Logger.h>
+
 #include <string>
 #include <string_view>
 
@@ -17,7 +19,10 @@ static std::string LoadEntireFile(const char* filename) {
   fseek(f, 0, SEEK_SET);
 
   result.resize(file_size);
-  fread(&result[0], 1, file_size, f);
+  size_t read_amount = fread(&result[0], 1, file_size, f);
+  if (read_amount != file_size) {
+    Log(LogLevel::Warning, "Failed to read entire config file.");
+  }
   fclose(f);
 
   return result;

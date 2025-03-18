@@ -38,7 +38,6 @@ class FlagCommand : public CommandExecutor {
   }
 
   CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags) override {}
   std::vector<std::string> GetAliases() override { return {"flag"}; }
   std::string GetDescription() override { return "Enables flagging."; }
   int GetSecurityLevel() override { return 0; }
@@ -103,7 +102,6 @@ class BuyCommand : public ParseResponseCommand {
   }
 
   CommandAccessFlags GetAccess() override { return CommandAccess_Public | CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags) override {}
   std::vector<std::string> GetAliases() override { return {"buy"}; }
   std::string GetDescription() override { return "Buys items."; }
   int GetSecurityLevel() override { return 0; }
@@ -147,7 +145,6 @@ class SellCommand : public ParseResponseCommand {
   }
 
   CommandAccessFlags GetAccess() override { return CommandAccess_Public | CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags) override {}
   std::vector<std::string> GetAliases() override { return {"sell"}; }
   std::string GetDescription() override { return "Sells items."; }
   int GetSecurityLevel() override { return 0; }
@@ -189,7 +186,6 @@ class ShipItemsCommand : public ParseResponseCommand {
   }
 
   CommandAccessFlags GetAccess() override { return CommandAccess_Public | CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags) override {}
   std::vector<std::string> GetAliases() override { return {"shipitems"}; }
   std::string GetDescription() override { return "Prints a list of items the bot currently owns."; }
   int GetSecurityLevel() override { return 0; }

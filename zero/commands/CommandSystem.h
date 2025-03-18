@@ -48,7 +48,6 @@ class CommandExecutor {
  public:
   virtual void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) = 0;
   virtual CommandAccessFlags GetAccess() = 0;
-  virtual void SetAccess(CommandAccessFlags flags){};
   virtual CommandFlags GetFlags() { return 0; }
   virtual std::vector<std::string> GetAliases() = 0;
   virtual std::string GetDescription() = 0;
@@ -75,11 +74,17 @@ class CommandSystem {
   int GetSecurityLevel(const std::string& player);
 
   Commands& GetCommands() { return commands_; }
-  const Operators& GetOperators() const;
+  const Operators& GetOperators() const { return operators_; }
+
+  void LoadOperators();
 
  private:
   Commands commands_;
+  Operators operators_;
   ZeroBot& bot;
+
+  int default_security_level_ = 0;
+  int arena_security_level_ = 5;
 
   std::vector<std::shared_ptr<CommandExecutor>> default_commands_;
 };

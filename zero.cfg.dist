@@ -48,3 +48,13 @@ ExtremeGames = 208.118.63.35:7900
 RenderWindow = 0
 # Set this to 1 to render a text display of the execution path for the behavior tree.
 RenderBehaviorTree = 0
+
+# Each key in this group will be added as an operator for the bot. The value of the key is the integer level for their access.
+# Unlisted players will have *default* access level. Arena broadcasts will have *arena* access level.
+# Higher value means access to more commands. For example, the !say command requires level 10 access.
+# Negative values will revoke access to the default commands.
+[Operators]
+*default* = 0
+*arena* = 5
+monkey = 10
+taz = 10

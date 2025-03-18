@@ -6,15 +6,10 @@
 #include <zero/ZeroBot.h>
 #include <zero/behavior/Behavior.h>
 #include <zero/game/Game.h>
+#include <zero/game/Logger.h>
 #include <zero/game/net/PacketDispatcher.h>
 
 namespace zero {
-
-constexpr int kArenaSecurityLevel = 5;
-
-const std::unordered_map<std::string, int> kOperators = {
-    {"tm_master", 10}, {"baked cake", 10}, {"x-demo", 10}, {"lyra.", 5}, {"profile", 5}, {"monkey", 10},
-    {"neostar", 5},    {"geekgrrl", 5},    {"sed", 5},     {"sk", 5},    {"b.o.x.", 10}};
 
 static inline std::string GetCurrentBehaviorName(ZeroBot& bot) {
   if (bot.bot_controller && !bot.bot_controller->behavior_name.empty()) {
@@ -360,9 +355,9 @@ void CommandSystem::Reset() {
 }
 
 int CommandSystem::GetSecurityLevel(const std::string& player) {
-  auto iter = kOperators.find(player);
+  auto iter = operators_.find(Lowercase(player));
 
-  if (iter != kOperators.end()) {
+  if (iter != operators_.end()) {
     return iter->second;
   }
 
@@ -426,14 +421,14 @@ void CommandSystem::OnChatPacket(const u8* pkt, size_t size) {
        * 0001 & 0101 = 0001 which evaluates to true or non zero
        */
       if (access_request & command.GetAccess()) {
-        int security_level = 0;
+        int security_level = default_security_level_;
 
         if (type == ChatType::Arena) {
-          security_level = kArenaSecurityLevel;
+          security_level = arena_security_level_;
         } else {
-          auto op_iter = kOperators.find(Lowercase(sender_name));
+          auto op_iter = operators_.find(Lowercase(sender_name));
 
-          if (op_iter != kOperators.end()) {
+          if (op_iter != operators_.end()) {
             security_level = op_iter->second;
           }
         }
@@ -452,8 +447,26 @@ void CommandSystem::OnChatPacket(const u8* pkt, size_t size) {
   }
 }
 
-const Operators& CommandSystem::GetOperators() const {
-  return kOperators;
+void CommandSystem::LoadOperators() {
+  operators_.clear();
+
+  ConfigGroup operator_group = bot.config->GetOrCreateGroup("Operators");
+  for (auto& kv : operator_group.map) {
+    auto opt_level = bot.config->GetInt("Operators", kv.first.data());
+
+    if (!opt_level) continue;
+
+    if (std::string_view(kv.first) == std::string_view("*arena*")) {
+      arena_security_level_ = *opt_level;
+      Log(LogLevel::Info, "Setting arena security level to %d", *opt_level);
+    } else if (std::string_view(kv.first) == std::string_view("*default*")) {
+      default_security_level_ = *opt_level;
+      Log(LogLevel::Info, "Setting default security level to %d", *opt_level);
+    } else {
+      operators_[Lowercase(kv.first)] = *opt_level;
+      Log(LogLevel::Info, "Adding operator %s:%d", kv.first.data(), *opt_level);
+    }
+  }
 }
 
 // Very simple tokenizer. Doesn't treat quoted strings as one token.

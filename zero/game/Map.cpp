@@ -8,6 +8,7 @@
 #include <zero/game/BrickManager.h>
 #include <zero/game/Clock.h>
 #include <zero/game/GameEvent.h>
+#include <zero/game/Logger.h>
 #include <zero/game/PlayerManager.h>
 #include <zero/game/net/Connection.h>
 
@@ -594,7 +595,10 @@ bool Map::Load(MemoryArena& arena, const char* filename) {
   assert(data);
   assert(tiles);
 
-  fread(data, 1, size, file);
+  size_t read_size = fread(data, 1, size, file);
+  if (read_size != size) {
+    Log(LogLevel::Warning, "Map load failed to read entire file: %s", filename);
+  }
   fclose(file);
 
   size_t pos = 0;

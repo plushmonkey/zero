@@ -45,7 +45,10 @@ inline bool FileExists(MemoryArena& temp_arena, const char* filename, u32 checks
 
   u8* file_data = temp_arena.Allocate(file_size);
 
-  fread(file_data, 1, file_size, file);
+  size_t read_amount = fread(file_data, 1, file_size, file);
+  if (read_amount != file_size) {
+    Log(LogLevel::Warning, "FileRequester crc failed to read entire file: %s", filename);
+  }
 
   fclose(file);
 
@@ -160,7 +163,11 @@ void FileRequester::Request(const char* filename, u16 index, u32 size, u32 check
     ArenaSnapshot snapshot = temp_arena.GetSnapshot();
     u8* data = (u8*)temp_arena.Allocate(filesize);
 
-    fread(data, 1, filesize, f);
+    size_t read_amount = fread(data, 1, filesize, f);
+    if (read_amount != filesize) {
+      Log(LogLevel::Warning, "FileRequester failed to read entire file: %s", filename);
+    }
+
     fclose(f);
 
     callback(user, request, data);

@@ -38,7 +38,6 @@ struct RaceCommand : public CommandExecutor {
   }
 
   CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
-  void SetAccess(CommandAccessFlags flags) override {}
   std::vector<std::string> GetAliases() override { return {"race"}; }
   std::string GetDescription() override { return "Sets the race track."; }
   int GetSecurityLevel() override { return 0; }
