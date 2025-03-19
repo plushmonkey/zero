@@ -1072,7 +1072,10 @@ void PlayerManager::OnBatchedLargePositionPacket(u8* pkt, size_t size) {
   u32 server_tick = (GetCurrentTick() + connection.time_diff);
 
   while (buffer.write - buffer.read >= 11) {
-    u16 player_id = buffer.ReadU16() & 0x3FF;
+    u16 pid_togglables = buffer.ReadU16();
+
+    u16 player_id = pid_togglables & 0x3FF;
+    u8 togglables = (u8)(pid_togglables >> 10);
 
     u16 packed = buffer.ReadU16();
     u16 direction = (packed >> 10);
@@ -1109,6 +1112,8 @@ void PlayerManager::OnBatchedLargePositionPacket(u8* pkt, size_t size) {
 
       player->timestamp = timestamp;
       player->orientation = direction / 40.0f;
+      // Store the new togglables, but keep the top 2 bits since they aren't sent in this.
+      player->togglables = togglables | (player->togglables & 0xC0);
 
       OnPositionPacket(*player, position, velocity, timestamp_diff);
     }
