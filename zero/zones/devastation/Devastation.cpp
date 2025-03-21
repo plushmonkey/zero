@@ -45,7 +45,6 @@ struct WarpToCommand : public CommandExecutor {
   CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
   std::vector<std::string> GetAliases() override { return {"warpto"}; }
   std::string GetDescription() override { return "Warps to a provided coord."; }
-  int GetSecurityLevel() override { return 10; }
 };
 
 struct DevastationController : ZoneController {
@@ -89,6 +88,7 @@ void DevastationController::CreateBehaviors(const char* arena_name) {
 
   bot->bot_controller->energy_tracker.estimate_type = EnergyHeuristicType::Maximum;
   bot->commands->RegisterCommand(std::make_shared<WarpToCommand>());
+  bot->commands->SetCommandSecurityLevel("warpto", 10);
 }
 
 }  // namespace deva

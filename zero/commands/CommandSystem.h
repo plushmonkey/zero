@@ -49,9 +49,15 @@ class CommandExecutor {
   virtual void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) = 0;
   virtual CommandAccessFlags GetAccess() = 0;
   virtual CommandFlags GetFlags() { return 0; }
+  // All of the aliases provided here should be lowercase.
   virtual std::vector<std::string> GetAliases() = 0;
   virtual std::string GetDescription() = 0;
-  virtual int GetSecurityLevel() = 0;
+
+  inline int GetSecurityLevel() const { return security_level; }
+  void SetSecurityLevel(int level) { security_level = level; }
+
+ private:
+  int security_level = 0;
 };
 
 using Operators = std::unordered_map<std::string, int>;
@@ -76,7 +82,10 @@ class CommandSystem {
   Commands& GetCommands() { return commands_; }
   const Operators& GetOperators() const { return operators_; }
 
-  void LoadOperators();
+  void SetCommandSecurityLevel(const std::string& name, int level);
+
+  void LoadSecurityLevels();
+  void SetDefaultSecurityLevels();
 
  private:
   Commands commands_;

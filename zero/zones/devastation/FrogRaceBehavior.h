@@ -40,7 +40,6 @@ struct RaceCommand : public CommandExecutor {
   CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
   std::vector<std::string> GetAliases() override { return {"race"}; }
   std::string GetDescription() override { return "Sets the race track."; }
-  int GetSecurityLevel() override { return 0; }
 };
 
 struct FrogRaceBehavior : public behavior::Behavior {

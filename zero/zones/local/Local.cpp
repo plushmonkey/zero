@@ -46,7 +46,6 @@ class SetCommandCommand : public CommandExecutor {
   CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
   std::vector<std::string> GetAliases() override { return {"setcommand", "setcmd"}; }
   std::string GetDescription() override { return "Sets the command to spam during 'commandspam' behavior."; }
-  int GetSecurityLevel() override { return 0; }
 };
 
 void LocalController::CreateBehaviors(const char* arena_name) {

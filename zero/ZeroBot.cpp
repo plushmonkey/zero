@@ -82,7 +82,7 @@ bool ZeroBot::JoinZone(ServerInfo& server) {
   bot_controller = memory_arena_construct_type(&perm_arena, BotController, *game);
 
   commands = memory_arena_construct_type(&perm_arena, CommandSystem, *this, this->game->dispatcher);
-  commands->LoadOperators();
+  commands->LoadSecurityLevels();
 
   if (g_Settings.debug_window) {
     if (debug_renderer.Initialize(SURFACE_WIDTH, SURFACE_HEIGHT)) {

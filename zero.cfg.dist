@@ -58,3 +58,9 @@ RenderBehaviorTree = 0
 *arena* = 5
 monkey = 10
 taz = 10
+
+# Each key-value pair in this group will set the command's required access level.
+# Any commands not listed here will use their default access level.
+# command = integer level
+[CommandAccess]
+go = 3

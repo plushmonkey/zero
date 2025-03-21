@@ -57,7 +57,6 @@ class BehaviorsCommand : public CommandExecutor {
   CommandAccessFlags GetAccess() override { return CommandAccess_Private | CommandAccess_RemotePrivate; }
   std::vector<std::string> GetAliases() override { return {"behaviors"}; }
   std::string GetDescription() override { return "Lists all possible behaviors."; }
-  int GetSecurityLevel() override { return 0; }
 };
 
 class BehaviorCommand : public CommandExecutor {
@@ -101,7 +100,6 @@ class BehaviorCommand : public CommandExecutor {
   CommandAccessFlags GetAccess() override { return CommandAccess_Standard; }
   std::vector<std::string> GetAliases() override { return {"behavior", "b"}; }
   std::string GetDescription() override { return "Sets the active behavior."; }
-  int GetSecurityLevel() override { return 0; }
 };
 
 class SayCommand : public CommandExecutor {
@@ -133,7 +131,6 @@ class SayCommand : public CommandExecutor {
   CommandAccessFlags GetAccess() override { return CommandAccess_Standard; }
   std::vector<std::string> GetAliases() override { return {"say"}; }
   std::string GetDescription() override { return "Repeats a message publicly"; }
-  int GetSecurityLevel() override { return 10; }
 };
 
 class GoCommand : public CommandExecutor {
@@ -148,7 +145,6 @@ class GoCommand : public CommandExecutor {
   CommandAccessFlags GetAccess() override { return CommandAccess_Standard; }
   std::vector<std::string> GetAliases() override { return {"go"}; }
   std::string GetDescription() override { return "Moves to another arena."; }
-  int GetSecurityLevel() override { return 5; }
 };
 
 class InfoCommand : public CommandExecutor {
@@ -182,7 +178,6 @@ class InfoCommand : public CommandExecutor {
   CommandAccessFlags GetAccess() override { return CommandAccess_Standard; }
   std::vector<std::string> GetAliases() override { return {"info", "i"}; }
   std::string GetDescription() override { return "Displays current state of bot."; }
-  int GetSecurityLevel() override { return 0; }
 };
 
 class SetShipCommand : public CommandExecutor {
@@ -221,7 +216,6 @@ class SetShipCommand : public CommandExecutor {
   CommandAccessFlags GetAccess() override { return CommandAccess_Standard; }
   std::vector<std::string> GetAliases() override { return {"setship", "ss"}; }
   std::string GetDescription() override { return "Sets the ship"; }
-  int GetSecurityLevel() override { return 5; }
 };
 
 class HelpCommand : public CommandExecutor {
@@ -238,7 +232,6 @@ class HelpCommand : public CommandExecutor {
   CommandAccessFlags GetAccess() override { return CommandAccess_Private | CommandAccess_RemotePrivate; }
   std::vector<std::string> GetAliases() override { return {"help", "h"}; }
   std::string GetDescription() override { return "Helps"; }
-  int GetSecurityLevel() override { return 0; }
 };
 
 class CommandsCommand : public CommandExecutor {
@@ -305,7 +298,6 @@ class CommandsCommand : public CommandExecutor {
   CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
   std::vector<std::string> GetAliases() override { return {"commands", "c"}; }
   std::string GetDescription() override { return "Shows available commands"; }
-  int GetSecurityLevel() override { return 0; }
 };
 
 static inline std::string Lowercase(std::string_view str) {
@@ -447,7 +439,7 @@ void CommandSystem::OnChatPacket(const u8* pkt, size_t size) {
   }
 }
 
-void CommandSystem::LoadOperators() {
+void CommandSystem::LoadSecurityLevels() {
   operators_.clear();
 
   ConfigGroup operator_group = bot.config->GetOrCreateGroup("Operators");
@@ -466,6 +458,36 @@ void CommandSystem::LoadOperators() {
       operators_[Lowercase(kv.first)] = *opt_level;
       Log(LogLevel::Info, "Adding operator %s:%d", kv.first.data(), *opt_level);
     }
+  }
+
+  SetDefaultSecurityLevels();
+
+  ConfigGroup command_access_group = bot.config->GetOrCreateGroup("CommandAccess");
+  for (auto& kv : command_access_group.map) {
+    auto opt_level = bot.config->GetInt("CommandAccess", kv.first.data());
+
+    if (!opt_level) continue;
+
+    Log(LogLevel::Info, "Setting command '%s' security level to %d.", kv.first.data(), *opt_level);
+    SetCommandSecurityLevel(kv.first, *opt_level);
+  }
+}
+
+void CommandSystem::SetDefaultSecurityLevels() {
+  SetCommandSecurityLevel("behaviors", 0);
+  SetCommandSecurityLevel("behavior", 1);
+  SetCommandSecurityLevel("say", 10);
+  SetCommandSecurityLevel("go", 5);
+  SetCommandSecurityLevel("info", 0);
+  SetCommandSecurityLevel("setship", 1);
+  SetCommandSecurityLevel("help", 0);
+  SetCommandSecurityLevel("commands", 0);
+}
+
+void CommandSystem::SetCommandSecurityLevel(const std::string& name, int level) {
+  auto iter = commands_.find(Lowercase(name));
+  if (iter != commands_.end()) {
+    iter->second->SetSecurityLevel(level);
   }
 }
 
