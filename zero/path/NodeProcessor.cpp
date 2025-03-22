@@ -37,62 +37,6 @@ EdgeSet NodeProcessor::FindEdges(Node* node, float radius) {
   return edges;
 }
 
-static inline bool CanOccupy(const Map& map, OccupiedRect& rect, Vector2f offset) {
-  Vector2f min = Vector2f(rect.start_x, rect.start_y) + offset;
-  Vector2f max = Vector2f(rect.end_x, rect.end_y) + offset;
-
-  u32 frequency = 0xFFFF;
-
-  for (u16 y = (u16)min.y; y <= (u16)max.y; ++y) {
-    for (u16 x = (u16)min.x; x <= (u16)max.x; ++x) {
-      if (map.IsSolidEmptyDoors(x, y, frequency)) {
-        return false;
-      }
-    }
-  }
-
-  return true;
-}
-
-static inline bool CanOccupyAxis(const Map& map, OccupiedRect& rect, Vector2f offset) {
-  Vector2f min = Vector2f(rect.start_x, rect.start_y) + offset;
-  Vector2f max = Vector2f(rect.end_x, rect.end_y) + offset;
-
-  u32 frequency = 0xFFFF;
-
-  if (offset.x < 0) {
-    // Moving west, so check western section of rect
-    for (u16 y = (u16)min.y; y <= (u16)max.y; ++y) {
-      if (map.IsSolidEmptyDoors((u16)min.x, y, frequency)) {
-        return false;
-      }
-    }
-  } else if (offset.x > 0) {
-    // Moving east, so check eastern section of rect
-    for (u16 y = (u16)min.y; y <= (u16)max.y; ++y) {
-      if (map.IsSolidEmptyDoors((u16)max.x, y, frequency)) {
-        return false;
-      }
-    }
-  } else if (offset.y < 0) {
-    // Moving north, so check north section of rect
-    for (u16 x = (u16)min.x; x <= (u16)max.x; ++x) {
-      if (map.IsSolidEmptyDoors(x, (u16)min.y, frequency)) {
-        return false;
-      }
-    }
-  } else if (offset.y > 0) {
-    // Moving south, so check south section of rect
-    for (u16 x = (u16)min.x; x <= (u16)max.x; ++x) {
-      if (map.IsSolidEmptyDoors(x, (u16)max.y, frequency)) {
-        return false;
-      }
-    }
-  }
-
-  return true;
-}
-
 static inline bool IsDynamicTile(const Map& map, u16 world_x, u16 world_y) {
   TileId tile_id = map.GetTileId(world_x, world_y);
 

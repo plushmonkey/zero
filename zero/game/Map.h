@@ -57,10 +57,11 @@ struct OccupyRect {
 
 // Reduced version of OccupyRect to remove bool so it fits more in a cache line
 struct OccupiedRect {
-  u16 start_x;
-  u16 start_y;
-  u16 end_x;
-  u16 end_y;
+  u32 start_x : 10;
+  u32 start_y : 10;
+  u32 end_x : 10;
+  u32 end_y : 10;
+  u32 contains_door : 1;
 
   bool operator==(const OccupiedRect& other) const {
     return start_x == other.start_x && start_y == other.start_y && end_x == other.end_x && end_y == other.end_y;
@@ -113,7 +114,8 @@ struct Map {
   Vector2f GetOccupyCenter(const Vector2f& position, float radius, u32 frequency) const;
 
   // Rects must be initialized memory that can contain all possible occupy rects.
-  size_t GetAllOccupiedRects(Vector2f position, float radius, u32 frequency, OccupiedRect* rects) const;
+  size_t GetAllOccupiedRects(Vector2f position, float radius, u32 frequency, OccupiedRect* rects,
+                             bool dynamic_doors = false) const;
 
   bool CanTraverse(const Vector2f& start, const Vector2f& end, float radius, u32 frequency) const;
   bool CanOverlapTile(const Vector2f& position, float radius, u32 frequency) const;

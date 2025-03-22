@@ -110,11 +110,27 @@ Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& 
       NodePoint edge_point(node_point.x + offset.x, node_point.y + offset.y);
       Node* edge = processor_->GetNode(edge_point);
 
+      if (!(edge->flags & NodeFlag_Traversable)) continue;
+
       // This edge has a dynamic brick, so we need to check the state
       if (edge->flags & NodeFlag_Brick) {
         path.dynamic = true;
 
         if (map.IsSolid(edge_point.x, edge_point.y, frequency)) {
+          continue;
+        }
+      }
+
+      // This edge is dynamically empty and dirty. We should update its traversability.
+      if (edge->flags & NodeFlag_DynamicEmpty) {
+        size_t rect_count = map.GetAllOccupiedRects(Vector2f((float)edge_point.x, (float)edge_point.y), radius,
+                                                    frequency, nullptr, true);
+
+        edge->flags &= ~(NodeFlag_DynamicEmpty | NodeFlag_Traversable);
+
+        if (rect_count > 0) {
+          edge->flags |= NodeFlag_Traversable;
+        } else {
           continue;
         }
       }
@@ -210,15 +226,17 @@ inline static float GetWallDistance(const Map& map, u16 x, u16 y, u16 radius) {
   return sqrt(closest_sq);
 }
 
-static void CalculateTraversables(const Map& map, NodeProcessor& processor, float ship_radius, s16 x_start, s16 y_start,
-                                  s16 x_end, s16 y_end, OccupiedRect* scratch_rects) {
+static void CalculateTraversables(std::vector<NodePoint>& dynamic_points, const Map& map, NodeProcessor& processor,
+                                  float ship_radius, s16 x_start, s16 y_start, s16 x_end, s16 y_end,
+                                  OccupiedRect* scratch_rects) {
   u32 frequency = 0xFFFF;
 
   for (u16 y = y_start; y < y_end; ++y) {
     for (u16 x = x_start; x < x_end; ++x) {
       if (map.IsSolidEmptyDoors(x, y, 0xFFFF)) continue;
 
-      Node* node = processor.GetNode(NodePoint(x, y));
+      NodePoint node_point(x, y);
+      Node* node = processor.GetNode(node_point);
 
       if (map.CanOverlapTile(Vector2f(x, y), ship_radius, frequency)) {
         node->flags |= NodeFlag_Traversable;
@@ -233,6 +251,25 @@ static void CalculateTraversables(const Map& map, NodeProcessor& processor, floa
             // This is a diagonal-only tile, so skip it.
             node->flags &= ~NodeFlag_Traversable;
           }
+        }
+
+        TileId tile_id = map.GetTileId(x, y);
+        if (tile_id >= kTileIdFirstDoor && tile_id <= kTileIdLastDoor) continue;
+
+        // Loop over empty spaces that aren't doors, but might be surrounded by doors.
+        // We want to mark these as dynamic so they can be updated when doors change.
+        bool is_dynamic = true;
+
+        for (size_t i = 0; i < rect_count; ++i) {
+          if (!scratch_rects[i].contains_door) {
+            is_dynamic = false;
+            break;
+          }
+        }
+
+        if (is_dynamic) {
+          node->flags |= NodeFlag_DynamicEmpty;
+          dynamic_points.push_back(node_point);
         }
       }
     }
@@ -295,6 +332,7 @@ void Pathfinder::CreateMapWeights(MemoryArena& temp_arena, const Map& map, Weigh
 
   constexpr size_t kThreadCount = 12;
   std::thread threads[kThreadCount];
+  std::vector<NodePoint> dynamic_points[kThreadCount];
 
   // First loop over tiles and calculate all of the traversables.
   for (size_t i = 0; i < kThreadCount; ++i) {
@@ -310,13 +348,27 @@ void Pathfinder::CreateMapWeights(MemoryArena& temp_arena, const Map& map, Weigh
       x_end += remainder;
     }
 
-    threads[i] = std::thread(CalculateTraversables, map, std::ref(*processor_), ship_radius, x_start, y_start, x_end,
-                             y_end, scratch_rects + i * (256 / kThreadCount));
+    threads[i] = std::thread(CalculateTraversables, std::ref(dynamic_points[i]), map, std::ref(*processor_),
+                             ship_radius, x_start, y_start, x_end, y_end, scratch_rects + i * (256 / kThreadCount));
   }
 
   // We must wait for all of the traversables to be calculated before we start calculating edges.
   for (size_t i = 0; i < kThreadCount; ++i) {
     threads[i].join();
+  }
+
+  processor_->dynamic_points.clear();
+
+  size_t total_size = 0;
+  for (size_t i = 0; i < kThreadCount; ++i) {
+    total_size += dynamic_points[i].size();
+  }
+
+  processor_->dynamic_points.reserve(total_size);
+
+  for (size_t i = 0; i < kThreadCount; ++i) {
+    processor_->dynamic_points.insert(processor_->dynamic_points.end(), dynamic_points[i].begin(),
+                                      dynamic_points[i].end());
   }
 
   // Loop over tiles to calculate the node edges.

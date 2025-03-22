@@ -5,6 +5,8 @@
 #include <zero/game/Map.h>
 #include <zero/path/Node.h>
 
+#include <vector>
+
 namespace zero {
 
 struct Game;
@@ -133,6 +135,18 @@ class NodeProcessor {
       node->flags &= ~NodeFlag_Brick;
     }
   }
+
+  // Goes through each dynamic point and marks the node as dirty.
+  // This should happen on door updates.
+  inline void MarkDynamicNodes() {
+    for (NodePoint point : dynamic_points) {
+      Node* node = GetNode(point);
+      node->flags |= NodeFlag_DynamicEmpty | NodeFlag_Traversable;
+    }
+  }
+
+  // This is a list of empty spaces where nearby doors could block us.
+  std::vector<NodePoint> dynamic_points;
 
  private:
   EdgeSet edges_[kMaxNodes];

@@ -480,7 +480,8 @@ Vector2f Map::GetOccupyCenter(const Vector2f& position, float radius, u32 freque
 }
 
 // Rects must be initialized memory that can contain all possible occupy rects.
-size_t Map::GetAllOccupiedRects(Vector2f position, float radius, u32 frequency, OccupiedRect* rects) const {
+size_t Map::GetAllOccupiedRects(Vector2f position, float radius, u32 frequency, OccupiedRect* rects,
+                                bool dynamic_doors) const {
   size_t count = 0;
 
   u16 d = (u16)(radius * 2.0f);
@@ -498,12 +499,24 @@ size_t Map::GetAllOccupiedRects(Vector2f position, float radius, u32 frequency, 
   if (far_top > 1023) far_top = 0;
   if (far_bottom > 1023) far_bottom = 1023;
 
-  bool solid = IsSolidEmptyDoors(start_x, start_y, frequency);
+  bool solid = false;
+  if (dynamic_doors) {
+    solid = IsSolid(start_x, start_y, frequency);
+  } else {
+    solid = IsSolidEmptyDoors(start_x, start_y, frequency);
+  }
+
   if (d < 1 || solid) {
-    rects->start_x = (u16)position.x;
-    rects->start_y = (u16)position.y;
-    rects->end_x = (u16)position.x;
-    rects->end_y = (u16)position.y;
+    if (rects) {
+      rects->start_x = (u16)position.x;
+      rects->start_y = (u16)position.y;
+      rects->end_x = (u16)position.x;
+      rects->end_y = (u16)position.y;
+
+      TileId id = GetTileId(start_x, start_y);
+
+      rects->contains_door = id >= kTileIdFirstDoor && id <= kTileIdLastDoor;
+    }
 
     return !solid;
   }
@@ -522,12 +535,26 @@ size_t Map::GetAllOccupiedRects(Vector2f position, float radius, u32 frequency, 
       if (dir_x == 0) continue;
 
       bool can_fit = true;
+      bool contains_door = false;
 
       for (s16 y = check_y; std::abs(y - check_y) <= d && can_fit; y += dir_y) {
         for (s16 x = check_x; std::abs(x - check_x) <= d; x += dir_x) {
-          if (IsSolidEmptyDoors(x, y, frequency)) {
+          bool solid = false;
+
+          if (dynamic_doors) {
+            solid = IsSolid(x, y, frequency);
+          } else {
+            solid = IsSolidEmptyDoors(x, y, frequency);
+          }
+
+          if (solid) {
             can_fit = false;
             break;
+          }
+
+          TileId id = GetTileId(x, y);
+          if (id >= kTileIdFirstDoor && id <= kTileIdLastDoor) {
+            contains_door = true;
           }
         }
       }
@@ -555,12 +582,17 @@ size_t Map::GetAllOccupiedRects(Vector2f position, float radius, u32 frequency, 
           found_end_y = check_y + d;
         }
 
-        OccupiedRect* rect = rects + count++;
+        if (rects) {
+          OccupiedRect* rect = rects + count++;
 
-        rect->start_x = found_start_x;
-        rect->start_y = found_start_y;
-        rect->end_x = found_end_x;
-        rect->end_y = found_end_y;
+          rect->start_x = found_start_x;
+          rect->start_y = found_start_y;
+          rect->end_x = found_end_x;
+          rect->end_y = found_end_y;
+          rect->contains_door = contains_door;
+        } else {
+          ++count;
+        }
       }
     }
   }
@@ -745,7 +777,7 @@ void Map::UpdateDoors(const ArenaSettings& settings) {
       seed = (u8)settings.DoorMode;
     }
 
-    if (settings.DoorDelay > 0 && door_count > 0) {
+    if (settings.DoorMode < 0 && settings.DoorDelay > 0 && door_count > 0) {
       Event::Dispatch(DoorToggleEvent());
     }
 

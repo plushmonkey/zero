@@ -58,6 +58,7 @@ ServerInfo kServers[] = {
     {"SSCJ Devastation", "69.164.220.203", 7022, Zone::Devastation},
     {"SSCJ MetalGear CTF", "69.164.220.203", 14000, Zone::MetalGear},
     {"SSCU Extreme Games", "208.118.63.35", 7900, Zone::ExtremeGames},
+    {"SSCU Trench Wars", "127.0.0.1", 5000, Zone::TrenchWars},
 };
 
 const char* kLoginName = "ZeroBot";

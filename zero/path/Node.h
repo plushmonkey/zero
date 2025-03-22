@@ -24,6 +24,9 @@ enum NodeFlag {
   // Brick is handled here instead of checking map to improve performance.
   // If it checked the map then it would be going all over the place with memory touches.
   NodeFlag_Brick = (1 << 5),
+  // This marks the node as visitable, but it must first be checked if it can currently be occupied.
+  // This is used for empty spaces in the map that might be obstructed by surrounding doors.
+  NodeFlag_DynamicEmpty = (1 << 6),
 };
 typedef u32 NodeFlags;
 

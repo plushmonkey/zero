@@ -61,6 +61,10 @@ void BotController::HandleEvent(const PlayerFreqAndShipChangeEvent& event) {
 }
 
 void BotController::HandleEvent(const DoorToggleEvent& event) {
+  if (pathfinder) {
+    pathfinder->GetProcessor().MarkDynamicNodes();
+  }
+
   if (enable_dynamic_path && current_path.dynamic) {
     Log(LogLevel::Debug, "Clearing current path from door update.");
     current_path.Clear();

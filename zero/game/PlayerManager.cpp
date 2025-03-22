@@ -208,8 +208,12 @@ void PlayerManager::Update(float dt) {
       }
 
       if (player == self && player->enter_delay <= 0.0f) {
-        Spawn();
-        player->warp_anim_t = 0.0f;
+        if (connection.settings.EnterDelay > 0) {
+          Spawn();
+          player->warp_anim_t = 0.0f;
+        } else {
+          player->energy = 1;
+        }
       }
     }
   }

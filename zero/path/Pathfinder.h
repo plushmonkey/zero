@@ -65,6 +65,8 @@ struct Pathfinder {
     if (processor_) processor_->SetBrickNode(x, y, exists);
   }
 
+  inline NodeProcessor& GetProcessor() { return *processor_; }
+
  private:
   struct NodeCompare {
     bool operator()(const Node* lhs, const Node* rhs) const { return lhs->f > rhs->f; }

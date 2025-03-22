@@ -539,7 +539,13 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
         // Settings struct contains the packet type data
         ArenaSettings* settings = (ArenaSettings*)(pkt);
 
+        short old_door_mode = this->settings.DoorMode;
+
         this->settings = *settings;
+
+        if (old_door_mode != this->settings.DoorMode) {
+          Event::Dispatch(DoorToggleEvent());
+        }
 
         if (settings->DoorMode >= 0) {
           // Force update

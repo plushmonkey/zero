@@ -35,7 +35,7 @@ struct ZoneController : EventHandler<ZeroBot::JoinRequestEvent>,
     }
 
     // Set request ship after the behavior is initialized so it can override the blackboard variable.
-    if (request_ship) {
+    if (request_ship && *request_ship > 0 && *request_ship < 10) {
       bot->execute_ctx.blackboard.Set("request_ship", *request_ship - 1);
     }
   }
