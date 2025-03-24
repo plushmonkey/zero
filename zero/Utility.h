@@ -26,6 +26,18 @@ inline std::vector<std::string_view> SplitString(std::string_view string, std::s
   return result;
 }
 
+inline std::string_view Trim(std::string_view str) {
+  while (!str.empty() && (str[0] == ' ' || str[0] == '\r' || str[0] == '\t')) {
+    str = str.substr(1);
+  }
+
+  while (!str.empty() && (str.back() == ' ' || str.back() == '\r' || str.back() == '\t')) {
+    str = str.substr(0, str.size() - 1);
+  }
+
+  return str;
+}
+
 // Gets the frequency and request arena name from a user arena string. This is because the arena_number and arena_name
 // are handled in a specific way for the login request packet.
 inline std::pair<u16, std::string> ParseLoginArena(std::string_view arena) {

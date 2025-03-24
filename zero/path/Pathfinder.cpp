@@ -323,7 +323,6 @@ static void CalculateEdges(const Map& map, NodeProcessor& processor, float ship_
 
 void Pathfinder::CreateMapWeights(MemoryArena& temp_arena, const Map& map, WeightConfig config) {
   float ship_radius = config.ship_radius;
-  u32 frequency = config.frequency;
 
   MemoryRevert reverter = temp_arena.GetReverter();
   OccupiedRect* scratch_rects = memory_arena_push_type_count(&temp_arena, OccupiedRect, 256);

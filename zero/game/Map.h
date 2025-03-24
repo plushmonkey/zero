@@ -25,6 +25,8 @@ struct ArenaSettings;
 struct BrickManager;
 
 using TileId = u8;
+
+constexpr u32 kTileIdFlag = 170;
 constexpr u32 kTileIdSafe = 171;
 constexpr u32 kTileIdGoal = 172;
 constexpr int kTileIdFirstDoor = 162;

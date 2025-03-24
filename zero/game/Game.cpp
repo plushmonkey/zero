@@ -100,13 +100,6 @@ static void OnFlagDropPkt(void* user, u8* pkt, size_t size) {
   game->OnFlagDrop(pkt, size);
 }
 
-static void OnJoinGamePkt(void* user, u8* pkt, size_t size) {
-  Game* game = (Game*)user;
-
-  // Send a request for the arena list so we can know the name of the current arena.
-  game->chat.SendMessage(ChatType::Public, "?arena");
-}
-
 static void OnArenaListPkt(void* user, u8* pkt, size_t size) {
   NetworkBuffer buffer(pkt, kMaxPacketSize);
   Game* game = (Game*)user;
@@ -266,7 +259,6 @@ Game::Game(MemoryArena& perm_arena, MemoryArena& temp_arena, WorkQueue& work_que
   dispatcher.Register(ProtocolS2C::FlagPosition, OnFlagPositionPkt, this);
   dispatcher.Register(ProtocolS2C::FlagClaim, OnFlagClaimPkt, this);
   dispatcher.Register(ProtocolS2C::PlayerId, OnPlayerIdPkt, this);
-  dispatcher.Register(ProtocolS2C::JoinGame, OnJoinGamePkt, this);
   dispatcher.Register(ProtocolS2C::ArenaDirectoryListing, OnArenaListPkt, this);
   dispatcher.Register(ProtocolS2C::ArenaSettings, OnArenaSettingsPkt, this);
   dispatcher.Register(ProtocolS2C::TeamAndShipChange, OnPlayerFreqAndShipChangePkt, this);
@@ -564,10 +556,14 @@ void Game::RenderJoin(float dt) {
       }
     } break;
     case Connection::LoginState::MapDownload: {
-      int percent = (int)(connection.packet_sequencer.huge_chunks.size * 100 / (float)connection.map.compressed_size);
       char downloading[64];
 
-      sprintf(downloading, "Downloading level: %d%%", percent);
+      if (connection.map.compressed_size > 0) {
+        int percent = (int)(connection.packet_sequencer.huge_chunks.size * 100 / (float)connection.map.compressed_size);
+        sprintf(downloading, "Downloading level: %d%%", percent);
+      } else {
+        sprintf(downloading, "Downloading level: %d bytes", (int)(connection.packet_sequencer.huge_chunks.size));
+      }
 
       Vector2f download_pos(ui_camera.surface_dim.x * 0.5f, ui_camera.surface_dim.y * 0.8f);
 

@@ -27,6 +27,11 @@ void BotController::HandleEvent(const JoinGameEvent& event) {
   this->door_solid_method = path::DoorSolidMethod::Dynamic;
 }
 
+void BotController::HandleEvent(const MapLoadEvent& event) {
+  // Send a request for the arena list so we can know the name of the current arena.
+  game.chat.SendMessage(ChatType::Public, "?arena");
+}
+
 void BotController::HandleEvent(const PlayerFreqAndShipChangeEvent& event) {
   if (event.player.id != game.player_manager.player_id) return;
   if (event.new_ship >= 8 || event.old_ship == event.new_ship) return;
@@ -35,6 +40,10 @@ void BotController::HandleEvent(const PlayerFreqAndShipChangeEvent& event) {
 
   current_path.Clear();
 
+  UpdatePathfinder(radius);
+}
+
+void BotController::UpdatePathfinder(float radius) {
   if (pathfinder && pathfinder->config.ship_radius == radius) {
     pathfinder->SetDoorSolidMethod(door_solid_method);
     return;
@@ -52,7 +61,6 @@ void BotController::HandleEvent(const PlayerFreqAndShipChangeEvent& event) {
   path::Pathfinder::WeightConfig cfg = {};
 
   cfg.ship_radius = radius;
-  cfg.frequency = event.new_frequency;
   cfg.wall_distance = 5;
   cfg.weight_type = path::Pathfinder::WeightType::Exponential;
 

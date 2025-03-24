@@ -49,7 +49,6 @@ struct Pathfinder {
   enum class WeightType { Flat, Linear, Exponential };
   struct WeightConfig {
     float ship_radius = 0.0f;
-    u32 frequency = 0;
     WeightType weight_type = WeightType::Flat;
     s32 wall_distance = 1;
   };

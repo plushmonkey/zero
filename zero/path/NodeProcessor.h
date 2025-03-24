@@ -52,23 +52,6 @@ struct CoordOffset {
     return kNeighbors[index];
   }
 
-  inline size_t GetIndex() {
-    // clang-format off
-    static const size_t kLookup[] = {
-      NorthWestIndex(), NorthIndex(), NorthEastIndex(),
-      WestIndex(), 0, EastIndex(),
-      SouthWestIndex(), SouthIndex(), SouthEastIndex()
-    };
-    // clang-format on
-
-    // Adjust x and y into positive space then combine them together to create a lookup index.
-    s32 x_adj = x + 1;
-    s32 y_adj = y + 1;
-    u32 combined = (y_adj << 2) | x_adj;
-
-    return kLookup[combined];
-  }
-
   static inline size_t NorthIndex() { return 0; }
   static inline size_t SouthIndex() { return 1; }
   static inline size_t WestIndex() { return 2; }

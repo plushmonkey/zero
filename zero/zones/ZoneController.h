@@ -21,14 +21,23 @@ struct ZoneController : EventHandler<ZeroBot::JoinRequestEvent>,
   void HandleEvent(const ArenaNameEvent& event) override {
     if (!in_zone) return;
 
-    bot->commands->Reset();
-    CreateBehaviors(event.name);
-
     // Assign standard variables with priority of zone name section then General if that fails.
     const char* group_lookups[] = {to_string(bot->server_info.zone), "General"};
 
     auto default_behavior = bot->config->GetString(group_lookups, ZERO_ARRAY_SIZE(group_lookups), "Behavior");
     auto request_ship = bot->config->GetInt(group_lookups, ZERO_ARRAY_SIZE(group_lookups), "RequestShip");
+
+    float radius = bot->game->connection.settings.ShipSettings[0].GetRadius();
+
+    if (request_ship && *request_ship >= 1 && *request_ship <= 8) {
+      radius = bot->game->connection.settings.ShipSettings[*request_ship - 1].GetRadius();
+    }
+
+    // Update the pathfinder before we create our behaviors so we can use that data to make decisions.
+    bot->bot_controller->UpdatePathfinder(radius);
+
+    bot->commands->Reset();
+    CreateBehaviors(event.name);
 
     if (default_behavior) {
       SetBehavior(*default_behavior);
@@ -44,6 +53,8 @@ struct ZoneController : EventHandler<ZeroBot::JoinRequestEvent>,
 
   // Return true if this controller should become active.
   virtual bool IsZone(Zone zone) = 0;
+
+  // Map is already loaded at this point, so it's safe to read its data.
   virtual void CreateBehaviors(const char* arena_name) = 0;
 
   void SetBehavior(const char* name) {
