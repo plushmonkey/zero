@@ -8,6 +8,21 @@
 namespace zero {
 namespace behavior {
 
+struct PlayerSelfNode : public BehaviorNode {
+  PlayerSelfNode(const char* output_key) : output_key(output_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto self = ctx.bot->game->player_manager.GetSelf();
+    if (!self) return ExecuteResult::Failure;
+
+    ctx.blackboard.Set(output_key, self);
+
+    return ExecuteResult::Success;
+  }
+
+  const char* output_key = nullptr;
+};
+
 struct PlayerEnergyQueryNode : public BehaviorNode {
   PlayerEnergyQueryNode(const char* output_key) : output_key(output_key) {}
   PlayerEnergyQueryNode(const char* player_key, const char* output_key)
@@ -325,9 +340,10 @@ struct PlayerHeadingQueryNode : public behavior::BehaviorNode {
 };
 
 struct PlayerVelocityQueryNode : public behavior::BehaviorNode {
-  PlayerVelocityQueryNode(const char* output_key, bool normalize = false) : player_key(nullptr), output_key(output_key), normalize(normalize) {}
+  PlayerVelocityQueryNode(const char* output_key, bool normalize = false)
+      : player_key(nullptr), output_key(output_key), normalize(normalize) {}
   PlayerVelocityQueryNode(const char* player_key, const char* output_key, bool normalize = false)
-    : player_key(player_key), output_key(output_key), normalize(normalize) {}
+      : player_key(player_key), output_key(output_key), normalize(normalize) {}
 
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
     Player* player = ctx.bot->game->player_manager.GetSelf();

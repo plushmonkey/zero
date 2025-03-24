@@ -3,7 +3,9 @@
 #include <zero/behavior/BehaviorBuilder.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/behavior/nodes/AimNode.h>
+#include <zero/behavior/nodes/AttachNode.h>
 #include <zero/behavior/nodes/BlackboardNode.h>
+#include <zero/behavior/nodes/FlagNode.h>
 #include <zero/behavior/nodes/InputActionNode.h>
 #include <zero/behavior/nodes/MapNode.h>
 #include <zero/behavior/nodes/MathNode.h>
@@ -26,6 +28,95 @@
 
 namespace zero {
 namespace tw {
+
+// Determines if we are the best player to be claiming a flag.
+// It's not perfect since it is distance, not path distance, but it's fast.
+struct BestFlagClaimerNode : public behavior::BehaviorNode {
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto& pm = ctx.bot->game->player_manager;
+    auto self = pm.GetSelf();
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    Player* best_player = nullptr;
+    float best_dist_sq = 1024.0f * 1024.0f;
+
+    Vector2f flag_position = ctx.blackboard.ValueOr("tw_flag_position", Vector2f(512, 269));
+
+    // Loop over players to find a teammate that can be attached to that is closer to the flag room than us.
+    for (size_t i = 0; i < pm.player_count; ++i) {
+      Player* player = pm.players + i;
+
+      if (player->ship >= 8) continue;
+      if (player->frequency != self->frequency) continue;
+
+      float dist_sq = player->position.DistanceSq(flag_position);
+      if (dist_sq < best_dist_sq) {
+        best_dist_sq = dist_sq;
+        best_player = player;
+      }
+    }
+
+    if (best_player && best_player->id == self->id) {
+      return behavior::ExecuteResult::Success;
+    }
+
+    return behavior::ExecuteResult::Failure;
+  }
+};
+
+struct BestAttachQueryNode : public behavior::BehaviorNode {
+  BestAttachQueryNode(const char* output_key) : output_key(output_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto& pm = ctx.bot->game->player_manager;
+    auto self = pm.GetSelf();
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    Player* best_player = nullptr;
+    float best_dist_sq = 1024.0f * 1024.0f;
+
+    Vector2f flag_position = ctx.blackboard.ValueOr("tw_flag_position", Vector2f(512, 269));
+    float self_dist_sq = self->position.DistanceSq(flag_position);
+
+    // Loop over players to find a teammate that can be attached to that is closer to the flag room than us.
+    for (size_t i = 0; i < pm.player_count; ++i) {
+      Player* player = pm.players + i;
+
+      if (player->id == self->id) continue;
+      if (player->ship >= 8) continue;
+      if (player->frequency != self->frequency) continue;
+      if (player->position.DistanceSq(flag_position) > self_dist_sq) continue;
+
+      u8 turret_limit = ctx.bot->game->connection.settings.ShipSettings[player->ship].TurretLimit;
+
+      if (turret_limit == 0) continue;
+
+      u8 turret_count = 0;
+
+      AttachInfo* child = player->children;
+      while (child) {
+        ++turret_count;
+        child = child->next;
+      }
+
+      if (turret_count >= turret_limit) continue;
+
+      float dist_sq = flag_position.DistanceSq(player->position);
+      if (dist_sq < best_dist_sq) {
+        best_dist_sq = dist_sq;
+        best_player = player;
+      }
+    }
+
+    if (!best_player) return behavior::ExecuteResult::Failure;
+
+    ctx.blackboard.Set<Player*>(output_key, best_player);
+
+    return behavior::ExecuteResult::Success;
+  }
+
+  const char* output_key = nullptr;
+};
 
 // This looks for a good position to sit inside the flag room and aim.
 struct FlagroomAimPositionNode : public behavior::BehaviorNode {
@@ -218,6 +309,52 @@ static std::unique_ptr<behavior::BehaviorNode> CreateOffensiveTree(const char* n
   return builder.Build();
 }
 
+static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
+  using namespace behavior;
+
+  BehaviorBuilder builder;
+
+  constexpr float kNearFlagroomDistance = 45.0f;
+
+  // clang-format off
+  builder
+    .Sequence()
+        .Child<PlayerSelfNode>("self")
+        .Child<PlayerPositionQueryNode>("self_position")
+        .Selector()
+            .Sequence() // Attach to teammate if possible
+                .InvertChild<AttachedQueryNode>("self")
+                .Child<DistanceThresholdNode>("tw_flag_position", kNearFlagroomDistance)
+                .Child<TimerExpiredNode>("attach_cooldown")
+                .Child<BestAttachQueryNode>("best_attach_player")
+                .Child<AttachNode>("best_attach_player")
+                .Child<TimerSetNode>("attach_cooldown", 100)
+                .End()
+            .Sequence() // Detach when near flag room
+                .Child<AttachedQueryNode>("self")
+                .InvertChild<DistanceThresholdNode>("tw_flag_position", kNearFlagroomDistance)
+                .Child<TimerExpiredNode>("attach_cooldown")
+                .Child<DetachNode>()
+                .Child<TimerSetNode>("attach_cooldown", 100)
+                .End()
+            .Sequence() // Go directly to the flag room if we aren't there.
+                .InvertChild<InFlagroomNode>("self_position")
+                .Child<GoToNode>("tw_flag_position")
+                .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
+                .End()
+            .Sequence() // If we are the closest player to the unclaimed flag, touch it.
+                .Child<InFlagroomNode>("self_position")
+                .Child<NearestFlagNode>(NearestFlagNode::Type::Unclaimed, "nearest_flag_position")
+                .Child<BestFlagClaimerNode>()
+                .Child<GoToNode>("tw_flag_position")
+                .End()
+            .End()
+        .End();
+  // clang-format on
+    
+  return builder.Build();
+}
+
 std::unique_ptr<behavior::BehaviorNode> SpiderBehavior::CreateTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
@@ -234,32 +371,24 @@ std::unique_ptr<behavior::BehaviorNode> SpiderBehavior::CreateTree(behavior::Exe
             .InvertChild<ShipQueryNode>("request_ship")
             .Child<ShipRequestNode>("request_ship")
             .End()
+        .Composite(CreateFlagroomTravelBehavior())
         .Selector() // Choose to fight the player or follow waypoints.
             .Sequence() // Find nearest target and either path to them or seek them directly.
-                .Sequence()
+                .InvertChild<ShipQueryNode>(4) // Disable this on terrier. TODO: Remove once terrier behavior is made.
+                .Sequence() // Find an enemy
                     .Child<PlayerPositionQueryNode>("self_position")
                     .Child<svs::NearestMemoryTargetNode>("nearest_target")
                     .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
                     .End()
+                // TODO: Remove once terrier behavior is made
                 .Sequence(CompositeDecorator::Success) // If we have a portal but no location, lay one down.
+                    .Child<InFlagroomNode>("self_position")
                     .Child<ShipItemCountThresholdNode>(ShipItemType::Portal, 1)
                     .InvertChild<ShipPortalPositionQueryNode>()
                     .Child<InputActionNode>(InputAction::Portal)
                     .End()
                 .Selector()
                     .Composite(CreateDefensiveTree())
-#if 0
-                    .Sequence() // If the nearest enemy is very close to us, attack them.
-                        .Child<VisibilityQueryNode>("nearest_target_position")
-                        .InvertChild<DistanceThresholdNode>("self_position", "nearest_target_position", kNearbyEnemyThreshold)
-                        .Composite(CreateOffensiveTree("nearest_target", "nearest_target_position"))
-                        .End()
-#endif
-                    .Sequence() // Go directly to the flag room if we aren't there.
-                        .InvertChild<InFlagroomNode>("self_position")
-                        .Child<GoToNode>("tw_flag_position")
-                        .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
-                        .End()
                     .Sequence() // Go to enemy and attack if they are in the flag room.
                         .Child<InFlagroomNode>("nearest_target_position")
                         .Selector()
@@ -276,7 +405,7 @@ std::unique_ptr<behavior::BehaviorNode> SpiderBehavior::CreateTree(behavior::Exe
                 .Child<WaypointNode>("waypoints", "waypoint_index", "waypoint_position", 15.0f)
                 .Selector()
                     .Sequence()
-                        .InvertChild<VisibilityQueryNode>("waypoint_position")
+                        .InvertChild<ShipTraverseQueryNode>("waypoint_position")
                         .Child<GoToNode>("waypoint_position")
                         .Child<RenderPathNode>(Vector3f(0.0f, 0.5f, 1.0f))
                         .End()
