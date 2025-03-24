@@ -956,6 +956,29 @@ TileId Map::GetTileId(const Vector2f& position) const {
   return GetTileId((u16)position.x, (u16)position.y);
 }
 
+bool Map::IsDoor(u16 x, u16 y) const {
+  TileId id = GetTileId(x, y);
+
+  if (id >= kTileIdFirstDoor && id <= kTileIdLastDoor) return true;
+
+  // Empty doors are marked as flag, so we should look through our flag array to discern the type.
+  // The flag array is used for performance reasons of a typical map setup. If we checked the door array instead, it
+  // would have to check more. Most maps have few turf flags.
+  if (id == kTileIdFlag) {
+    const AnimatedTileSet& tileset = GetAnimatedTileSet(AnimatedTile::Flag);
+
+    for (size_t i = 0; i < tileset.count; ++i) {
+      if (tileset.tiles[i].x == x && tileset.tiles[i].y == y) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
 bool Map::IsSolid(u16 x, u16 y, u32 frequency) const {
   TileId id = GetTileId(x, y);
 

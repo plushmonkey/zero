@@ -60,8 +60,15 @@ void TwController::CreateFlagroomBitset() {
     return;
   }
 
-  s32 flag_x = flag_tiles.tiles[0].x;
-  s32 flag_y = flag_tiles.tiles[0].y;
+  Vector2f center_flag_avg;
+  for (size_t i = 0; i < flag_tiles.count; ++i) {
+    center_flag_avg += Vector2f((float)flag_tiles.tiles[i].x, (float)flag_tiles.tiles[i].y);
+  }
+
+  center_flag_avg *= (1.0f / flag_tiles.count);
+
+  s32 flag_x = (s32)center_flag_avg.x;
+  s32 flag_y = (s32)center_flag_avg.y;
 
   Log(LogLevel::Debug, "Building Trench Wars flag room region.");
 
@@ -70,56 +77,105 @@ void TwController::CreateFlagroomBitset() {
   tw->flag_position = Vector2f((float)flag_x, (float)flag_y);
   bot->execute_ctx.blackboard.Set("tw_flag_position", tw->flag_position);
 
-  auto visit = [tw](MapCoord coord) { tw->fr_bitset.Set(coord.x, coord.y); };
+  auto visit = [tw](MapCoord coord) {
+    tw->fr_bitset.Set(coord.x, coord.y);
+#if TW_RENDER_FR
+    tw->fr_positions.emplace_back((float)coord.x, (float)coord.y);
+#endif
+  };
   auto visited = [tw](MapCoord coord) { return tw->fr_bitset.Test(coord.x, coord.y); };
+
+  auto get_door_corridor_size = [map](MapCoord coord, s16 horizontal, s16 vertical) {
+    size_t first_area = 0;
+    for (size_t i = 0; i < 4; ++i) {
+      s16 x_offset = (s16)(i + 1) * horizontal;
+      s16 y_offset = (s16)(i + 1) * vertical;
+
+      if (!map.IsDoor(coord.x - x_offset, coord.y - y_offset)) break;
+
+      ++first_area;
+    }
+
+    size_t second_area = 0;
+    for (size_t i = 0; i < 4; ++i) {
+      s16 x_offset = (s16)(i + 1) * horizontal;
+      s16 y_offset = (s16)(i + 1) * vertical;
+
+      if (!map.IsDoor(coord.x + x_offset, coord.y + y_offset)) break;
+
+      ++second_area;
+    }
+
+    return first_area + second_area + 1;
+  };
+  auto get_empty_corridor_size = [map](MapCoord coord, s16 horizontal, s16 vertical) {
+    size_t first_area = 0;
+    for (size_t i = 0; i < 3; ++i) {
+      s16 x_offset = (s16)(i + 1) * horizontal;
+      s16 y_offset = (s16)(i + 1) * vertical;
+
+      if (map.IsSolidEmptyDoors(coord.x - x_offset, coord.y - y_offset, 0xFFFF)) break;
+      if (!map.IsDoor(coord.x - x_offset, coord.y - y_offset)) {
+        ++first_area;
+      }
+    }
+
+    size_t second_area = 0;
+    for (size_t i = 0; i < 3; ++i) {
+      s16 x_offset = (s16)(i + 1) * horizontal;
+      s16 y_offset = (s16)(i + 1) * vertical;
+
+      if (map.IsSolidEmptyDoors(coord.x + x_offset, coord.y + y_offset, 0xFFFF)) break;
+      if (!map.IsDoor(coord.x + x_offset, coord.y + y_offset)) {
+        ++second_area;
+      }
+    }
+
+    return 1 + first_area + second_area;
+  };
+  auto is_corridor = [map, get_empty_corridor_size, get_door_corridor_size](MapCoord coord, bool center) {
+    bool door_tile = map.IsDoor(coord.x, coord.y);
+
+    if (door_tile) {
+      size_t horizontal_size = get_door_corridor_size(coord, 1, 0);
+      size_t vertical_size = get_door_corridor_size(coord, 0, 1);
+
+      if (horizontal_size == 3 || vertical_size == 3 || horizontal_size == 5 || vertical_size == 5) {
+        return true;
+      }
+
+      return horizontal_size == 1 && vertical_size == 1;
+    }
+
+    s32 size_check = 2 + (s32)center;
+    size_t empty_hsize = get_empty_corridor_size(coord, 1, 0);
+    size_t empty_vsize = get_empty_corridor_size(coord, 0, 1);
+
+    return (empty_hsize <= size_check) || (empty_vsize <= size_check);
+  };
 
   struct VisitState {
     MapCoord coord;
     int depth;
+    int door_traverse_count;
 
-    VisitState(MapCoord coord, int depth) : coord(coord), depth(depth) {}
+    VisitState(MapCoord coord, int depth, int door_traverse_count)
+        : coord(coord), depth(depth), door_traverse_count(door_traverse_count) {}
   };
 
   std::deque<VisitState> stack;
 
-  s32 flood_x = bot->config->GetInt("TrenchWars", "FlagroomFloodX").value_or(512);
-  s32 flood_y = bot->config->GetInt("TrenchWars", "FlagroomFloodY").value_or(257);
-
-  const char* kDefaultEntranceTiles = "478,255;478,256;478,257;546,255;546,256;546,257;511,277;512,277;513,277";
-
-  const char* entrance_tile_string =
-      bot->config->GetString("TrenchWars", "FlagroomEntranceTiles").value_or(kDefaultEntranceTiles);
-
-  std::vector<std::string_view> entrance_tile_strings = SplitString(entrance_tile_string, ";");
-
-  for (std::string_view tile_str : entrance_tile_strings) {
-    tile_str = Trim(tile_str);
-    size_t split_index = tile_str.find(',');
-
-    if (split_index == std::string_view::npos) continue;
-    ++split_index;
-
-    size_t remaining_size = tile_str.size() - split_index;
-
-    // This should only have up to 4 characters for the tile 0-1023
-    if (remaining_size > 4) continue;
-
-    char temp[5] = {};
-    memcpy(temp, tile_str.data() + split_index, remaining_size);
-
-    // This is safe to do since we know it will stop parsing at the ','.
-    u16 x = (u16)strtol(tile_str.data(), nullptr, 10);
-    u16 y = (u16)strtol(temp, nullptr, 10);
-
-    visit(MapCoord(x, y));
-  }
-
-  stack.emplace_back(MapCoord(flood_x, flood_y), 0);
+  stack.emplace_back(MapCoord(flag_x, flag_y), 0, 0);
 
   visit(stack.front().coord);
 
   constexpr float kShipRadius = 0.85f;
   constexpr s32 kMaxFloodDistance = 100;
+  constexpr s32 kMaxFlagroomDoorTraverse = 2;
+
+  // Open the doors in the pathfinder so the dynamic edge sets don't consider the doors to be dynamic.
+  auto old_door_method = pathfinder.GetProcessor().GetDoorSolidMethod();
+  pathfinder.GetProcessor().SetDoorSolidMethod(path::DoorSolidMethod::AlwaysOpen);
 
   while (!stack.empty()) {
     VisitState current = stack.front();
@@ -128,7 +184,16 @@ void TwController::CreateFlagroomBitset() {
     stack.pop_front();
 
     if (current.depth >= kMaxFloodDistance) continue;
-    if (map.IsSolid(Vector2f(coord.x, coord.y), 0xFFFF)) continue;
+    if (map.IsSolidEmptyDoors(coord.x, coord.y, 0xFFFF)) continue;
+
+    s32 door_traverse_count = current.door_traverse_count;
+
+    if (map.IsDoor(coord.x, coord.y)) ++door_traverse_count;
+    if (door_traverse_count > 0 && flag_y - coord.y > 16) continue;
+    if (door_traverse_count > kMaxFlagroomDoorTraverse) continue;
+
+    bool center = coord.y - flag_y > 0 && (s32)fabsf(coord.x - (float)flag_x) < 3;
+    if (is_corridor(coord, center)) continue;
 
     MapCoord west(coord.x - 1, coord.y);
     MapCoord east(coord.x + 1, coord.y);
@@ -139,25 +204,31 @@ void TwController::CreateFlagroomBitset() {
         pathfinder.GetProcessor().GetNode(path::NodePoint(coord.x, coord.y)), kShipRadius);
 
     if (edgeset.IsSet(path::CoordOffset::WestIndex()) && !visited(west)) {
-      stack.emplace_back(west, current.depth + 1);
+      stack.emplace_back(west, current.depth + 1, door_traverse_count);
       visit(west);
     }
 
     if (edgeset.IsSet(path::CoordOffset::EastIndex()) && !visited(east)) {
-      stack.emplace_back(east, current.depth + 1);
+      stack.emplace_back(east, current.depth + 1, door_traverse_count);
       visit(east);
     }
 
     if (edgeset.IsSet(path::CoordOffset::NorthIndex()) && !visited(north)) {
-      stack.emplace_back(north, current.depth + 1);
+      stack.emplace_back(north, current.depth + 1, door_traverse_count);
       visit(north);
     }
 
     if (edgeset.IsSet(path::CoordOffset::SouthIndex()) && !visited(south)) {
-      stack.emplace_back(south, current.depth + 1);
+      stack.emplace_back(south, current.depth + 1, door_traverse_count);
       visit(south);
     }
   }
+
+  pathfinder.GetProcessor().SetDoorSolidMethod(old_door_method);
+
+#if TW_RENDER_FR
+  Log(LogLevel::Debug, "Flag room position count: %zu", tw->fr_positions.size());
+#endif
 
   Log(LogLevel::Debug, "Done building flag room.");
 }

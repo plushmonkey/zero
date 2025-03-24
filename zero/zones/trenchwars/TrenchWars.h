@@ -4,6 +4,9 @@
 
 #include <bitset>
 #include <memory>
+#include <vector>
+
+#define TW_RENDER_FR 0
 
 namespace zero {
 namespace tw {
@@ -31,6 +34,10 @@ struct RegionBitset {
 struct TrenchWars {
   RegionBitset fr_bitset;
   Vector2f flag_position;
+
+#if TW_RENDER_FR
+  std::vector<Vector2f> fr_positions;
+#endif
 };
 
 }  // namespace tw

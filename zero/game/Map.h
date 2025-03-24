@@ -104,6 +104,10 @@ struct Map {
   bool IsSolid(u16 x, u16 y, u32 frequency) const;
   bool IsSolidEmptyDoors(u16 x, u16 y, u32 frequency) const;
 
+  // This tells us if the tile is a door in the level map, but it might currently be open.
+  // Use GetTileId if current state is desired.
+  bool IsDoor(u16 x, u16 y) const;
+
   TileId GetTileId(u16 x, u16 y) const;
   TileId GetTileId(const Vector2f& position) const;
   void SetTileId(u16 x, u16 y, TileId id);
@@ -140,6 +144,7 @@ struct Map {
   CastResult CastShip(struct Player* player, float radius, const Vector2f& to) const;
 
   inline AnimatedTileSet& GetAnimatedTileSet(AnimatedTile type) { return animated_tiles[(size_t)type]; }
+  inline const AnimatedTileSet& GetAnimatedTileSet(AnimatedTile type) const { return animated_tiles[(size_t)type]; }
 
   char filename[1024];
   u32 checksum = 0;

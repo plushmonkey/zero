@@ -29,6 +29,36 @@
 namespace zero {
 namespace tw {
 
+#if TW_RENDER_FR
+
+struct RenderFlagroomNode : public behavior::BehaviorNode {
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto& world_camera = ctx.bot->game->camera;
+    auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+    if (!opt_tw) return behavior::ExecuteResult::Failure;
+
+    auto tw = *opt_tw;
+    bool render = false;
+
+    for (auto& pos : tw->fr_positions) {
+      Vector2f start(pos.x, pos.y);
+      Vector2f end(pos.x + 1.0f, pos.y + 1.0f);
+      Vector3f color(0.0f, 1.0f, 0.0f);
+
+      ctx.bot->game->line_renderer.PushRect(start, end, color);
+      render = true;
+    }
+
+    if (render) {
+      ctx.bot->game->line_renderer.Render(world_camera);
+    }
+
+    return behavior::ExecuteResult::Success;
+  }
+};
+
+#endif
+
 // Determines if we are the best player to be claiming a flag.
 // It's not perfect since it is distance, not path distance, but it's fast.
 struct BestFlagClaimerNode : public behavior::BehaviorNode {
@@ -343,6 +373,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
                 .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
                 .End()
             .Sequence() // If we are the closest player to the unclaimed flag, touch it.
+                .InvertChild<ShipQueryNode>(4) // Disable this on terrier. TODO: Remove once terrier behavior is made.
                 .Child<InFlagroomNode>("self_position")
                 .Child<NearestFlagNode>(NearestFlagNode::Type::Unclaimed, "nearest_flag_position")
                 .Child<BestFlagClaimerNode>()
@@ -351,7 +382,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
             .End()
         .End();
   // clang-format on
-    
+
   return builder.Build();
 }
 
@@ -364,6 +395,24 @@ std::unique_ptr<behavior::BehaviorNode> SpiderBehavior::CreateTree(behavior::Exe
   // We will stop dodging and try to finish them off if they are within this distance and low energy.
   constexpr float kNearbyEnemyThreshold = 10.0f;
 
+#if TW_RENDER_FR
+  // clang-format off
+  builder.
+    Sequence()
+        .Child<ExecuteNode>([](ExecuteContext& ctx) {
+          auto self = ctx.bot->game->player_manager.GetSelf();
+          if (self) {
+            self->position = Vector2f(512, 269);
+          }
+          return ExecuteResult::Success;
+        })
+        .Child<RenderFlagroomNode>()
+        .End();
+  // clang-format on
+
+  return builder.Build();
+#endif
+
   // clang-format off
   builder
     .Selector()
@@ -374,7 +423,6 @@ std::unique_ptr<behavior::BehaviorNode> SpiderBehavior::CreateTree(behavior::Exe
         .Composite(CreateFlagroomTravelBehavior())
         .Selector() // Choose to fight the player or follow waypoints.
             .Sequence() // Find nearest target and either path to them or seek them directly.
-                .InvertChild<ShipQueryNode>(4) // Disable this on terrier. TODO: Remove once terrier behavior is made.
                 .Sequence() // Find an enemy
                     .Child<PlayerPositionQueryNode>("self_position")
                     .Child<svs::NearestMemoryTargetNode>("nearest_target")
@@ -383,6 +431,7 @@ std::unique_ptr<behavior::BehaviorNode> SpiderBehavior::CreateTree(behavior::Exe
                 // TODO: Remove once terrier behavior is made
                 .Sequence(CompositeDecorator::Success) // If we have a portal but no location, lay one down.
                     .Child<InFlagroomNode>("self_position")
+                    .Child<InFlagroomNode>("nearest_target_position")
                     .Child<ShipItemCountThresholdNode>(ShipItemType::Portal, 1)
                     .InvertChild<ShipPortalPositionQueryNode>()
                     .Child<InputActionNode>(InputAction::Portal)
@@ -390,6 +439,7 @@ std::unique_ptr<behavior::BehaviorNode> SpiderBehavior::CreateTree(behavior::Exe
                 .Selector()
                     .Composite(CreateDefensiveTree())
                     .Sequence() // Go to enemy and attack if they are in the flag room.
+                        .InvertChild<ShipQueryNode>(4) // Disable this on terrier. TODO: Remove once terrier behavior is made.
                         .Child<InFlagroomNode>("nearest_target_position")
                         .Selector()
                             .Sequence()

@@ -107,6 +107,7 @@ class NodeProcessor {
   inline u32 GetNodeIndex(Node* node) const { return (u32)(node - nodes_); }
 
   inline void SetDoorSolidMethod(DoorSolidMethod door_method) { door_method_ = door_method; }
+  inline DoorSolidMethod GetDoorSolidMethod() const { return door_method_; }
 
   inline void SetBrickNode(s32 x, s32 y, bool exists) {
     Node* node = GetNode(NodePoint(x, y));

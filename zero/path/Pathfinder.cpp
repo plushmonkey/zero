@@ -123,16 +123,33 @@ Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& 
 
       // This edge is dynamically empty and dirty. We should update its traversability.
       if (edge->flags & NodeFlag_DynamicEmpty) {
-        size_t rect_count = map.GetAllOccupiedRects(Vector2f((float)edge_point.x, (float)edge_point.y), radius,
-                                                    frequency, nullptr, true);
+        auto& arena = this->processor_->GetGame().temp_arena;
+        MemoryRevert reverter = arena.GetReverter();
+
+        OccupiedRect* rects = memory_arena_push_type_count(&arena, OccupiedRect, 256);
+
+        size_t rect_count =
+            map.GetAllOccupiedRects(Vector2f((float)edge_point.x, (float)edge_point.y), radius, frequency, rects, true);
 
         edge->flags &= ~(NodeFlag_DynamicEmpty | NodeFlag_Traversable);
+        Vector2f node_position((float)node_point.x, (float)node_point.y);
 
-        if (rect_count > 0) {
-          edge->flags |= NodeFlag_Traversable;
-        } else {
+        // If there's only two and the two are offset from each other, then we must be on a diagonal tile and should not
+        // proceed.
+        if (rect_count == 2 && rects[0].start_x != rects[1].start_x && rects[0].start_y != rects[1].start_y) {
           continue;
         }
+
+        for (size_t i = 0; i < rect_count; ++i) {
+          OccupiedRect* rect = rects + i;
+
+          if (rect->Contains(node_position)) {
+            edge->flags |= NodeFlag_Traversable;
+            break;
+          }
+        }
+
+        if (!(edge->flags & NodeFlag_Traversable)) continue;
       }
 
       touched_.push_back(edge);
@@ -258,11 +275,11 @@ static void CalculateTraversables(std::vector<NodePoint>& dynamic_points, const 
 
         // Loop over empty spaces that aren't doors, but might be surrounded by doors.
         // We want to mark these as dynamic so they can be updated when doors change.
-        bool is_dynamic = true;
+        bool is_dynamic = false;
 
         for (size_t i = 0; i < rect_count; ++i) {
-          if (!scratch_rects[i].contains_door) {
-            is_dynamic = false;
+          if (scratch_rects[i].contains_door) {
+            is_dynamic = true;
             break;
           }
         }
