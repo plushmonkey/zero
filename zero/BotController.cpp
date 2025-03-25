@@ -152,6 +152,7 @@ void BotController::Update(RenderContext& rc, float dt, InputState& input, behav
 
   actuator.Update(game, input, steering.force, steering.rotation, steering.rotation_threshold);
   chat_queue.Update();
+  last_input = input;
 }
 
 }  // namespace zero

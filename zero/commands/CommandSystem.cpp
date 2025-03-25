@@ -19,6 +19,16 @@ static inline std::string GetCurrentBehaviorName(ZeroBot& bot) {
   return "none";
 }
 
+class QuitCommand : public CommandExecutor {
+  void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
+    bot.game->connection.SendDisconnect();
+  }
+
+  CommandAccessFlags GetAccess() override { return CommandAccess_Standard; }
+  std::vector<std::string> GetAliases() override { return {"quit"}; }
+  std::string GetDescription() override { return "Shuts the bot down completely."; }
+};
+
 class BehaviorsCommand : public CommandExecutor {
  public:
   void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
@@ -334,6 +344,7 @@ CommandSystem::CommandSystem(ZeroBot& bot, PacketDispatcher& dispatcher) : bot(b
   default_commands_.emplace_back(std::make_shared<GoCommand>());
   default_commands_.emplace_back(std::make_shared<BehaviorCommand>());
   default_commands_.emplace_back(std::make_shared<BehaviorsCommand>());
+  default_commands_.emplace_back(std::make_shared<QuitCommand>());
 
   Reset();
 }
@@ -482,6 +493,7 @@ void CommandSystem::SetDefaultSecurityLevels() {
   SetCommandSecurityLevel("setship", 1);
   SetCommandSecurityLevel("help", 0);
   SetCommandSecurityLevel("commands", 0);
+  SetCommandSecurityLevel("quit", 10);
 }
 
 void CommandSystem::SetCommandSecurityLevel(const std::string& name, int level) {

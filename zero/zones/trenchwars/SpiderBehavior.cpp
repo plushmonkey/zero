@@ -351,6 +351,27 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
     .Sequence()
         .Child<PlayerSelfNode>("self")
         .Child<PlayerPositionQueryNode>("self_position")
+        .Sequence(CompositeDecorator::Success) // Use afterburners to get to flagroom faster.
+            .InvertChild<InFlagroomNode>("self_position")
+            .Child<ExecuteNode>([](ExecuteContext& ctx) {
+              auto self = ctx.bot->game->player_manager.GetSelf();
+              if (!self || self->ship >= 8) return ExecuteResult::Failure;
+
+              float max_energy = (float)ctx.bot->game->ship_controller.ship.energy;
+
+              auto& input = *ctx.bot->bot_controller->input;
+              auto& last_input = ctx.bot->bot_controller->last_input;
+
+              // Keep using afterburners above 50%. Disable until full energy, then enable again.
+              if (last_input.IsDown(InputAction::Afterburner)) {
+                input.SetAction(InputAction::Afterburner, self->energy > max_energy * 0.5f);
+              } else if (self->energy >= max_energy) {
+                input.SetAction(InputAction::Afterburner, true);
+              }
+
+              return ExecuteResult::Success;
+            })
+            .End()
         .Selector()
             .Sequence() // Attach to teammate if possible
                 .InvertChild<AttachedQueryNode>("self")
@@ -377,7 +398,13 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
                 .Child<InFlagroomNode>("self_position")
                 .Child<NearestFlagNode>(NearestFlagNode::Type::Unclaimed, "nearest_flag_position")
                 .Child<BestFlagClaimerNode>()
-                .Child<GoToNode>("tw_flag_position")
+                .Selector()
+                    .Sequence()
+                        .InvertChild<ShipTraverseQueryNode>("tw_flag_position")
+                        .Child<GoToNode>("tw_flag_position")
+                        .End()
+                    .Child<ArriveNode>("tw_flag_position", 1.25f)
+                    .End()
                 .End()
             .End()
         .End();

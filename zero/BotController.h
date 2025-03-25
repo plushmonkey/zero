@@ -34,6 +34,7 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>,
   std::unique_ptr<RegionRegistry> region_registry;
   std::string behavior_name;
   InputState* input;
+  InputState last_input = {};
 
   ChatQueue chat_queue;
   behavior::BehaviorRepository behaviors;
