@@ -31,6 +31,10 @@ struct Steering {
       }
     }
 
+    if (game.ship_controller.ship.last_speed > int_speed) {
+      int_speed = game.ship_controller.ship.last_speed;
+    }
+
     return int_speed / 16.0f / 10.0f;
   }
 

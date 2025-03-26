@@ -9,6 +9,7 @@
 #include <zero/game/Logger.h>
 #include <zero/zones/ZoneController.h>
 #include <zero/zones/trenchwars/SpiderBehavior.h>
+#include <zero/zones/trenchwars/TerrierBehavior.h>
 
 #include <bitset>
 #include <deque>
@@ -46,6 +47,7 @@ void TwController::CreateBehaviors(const char* arena_name) {
   auto& repo = bot->bot_controller->behaviors;
 
   repo.Add("spider", std::make_unique<SpiderBehavior>());
+  repo.Add("terrier", std::make_unique<TerrierBehavior>());
 
   SetBehavior("spider");
 }
@@ -56,7 +58,7 @@ void TwController::CreateFlagroomBitset() {
 
   const AnimatedTileSet& flag_tiles = map.GetAnimatedTileSet(AnimatedTile::Flag);
   if (flag_tiles.count != 1 && flag_tiles.count != 3) {
-    Log(LogLevel::Warning, "Trench Wars controller being used without valid flag position.");
+    Log(LogLevel::Warning, "TrenchWars: ZoneController being used without valid flag position.");
     return;
   }
 
@@ -70,12 +72,15 @@ void TwController::CreateFlagroomBitset() {
   s32 flag_x = (s32)center_flag_avg.x;
   s32 flag_y = (s32)center_flag_avg.y;
 
-  Log(LogLevel::Debug, "Building Trench Wars flag room region.");
+  Log(LogLevel::Debug, "TrenchWars: Building flag room region.");
 
   auto tw = trench_wars.get();
 
   tw->flag_position = Vector2f((float)flag_x, (float)flag_y);
+  tw->entrance_position = tw->flag_position + Vector2f(0, 12);
+
   bot->execute_ctx.blackboard.Set("tw_flag_position", tw->flag_position);
+  bot->execute_ctx.blackboard.Set("tw_entrance_position", tw->entrance_position);
 
   auto visit = [tw](MapCoord coord) {
     tw->fr_bitset.Set(coord.x, coord.y);
@@ -87,7 +92,7 @@ void TwController::CreateFlagroomBitset() {
 
   auto get_door_corridor_size = [map](MapCoord coord, s16 horizontal, s16 vertical) {
     size_t first_area = 0;
-    for (size_t i = 0; i < 4; ++i) {
+    for (size_t i = 0; i < 5; ++i) {
       s16 x_offset = (s16)(i + 1) * horizontal;
       s16 y_offset = (s16)(i + 1) * vertical;
 
@@ -97,7 +102,7 @@ void TwController::CreateFlagroomBitset() {
     }
 
     size_t second_area = 0;
-    for (size_t i = 0; i < 4; ++i) {
+    for (size_t i = 0; i < 5; ++i) {
       s16 x_offset = (s16)(i + 1) * horizontal;
       s16 y_offset = (s16)(i + 1) * vertical;
 
@@ -133,25 +138,44 @@ void TwController::CreateFlagroomBitset() {
 
     return 1 + first_area + second_area;
   };
-  auto is_corridor = [map, get_empty_corridor_size, get_door_corridor_size](MapCoord coord, bool center) {
+
+  enum class CorridorType { None, Vertical, Horizontal };
+  auto get_corridor_type = [map, get_empty_corridor_size, get_door_corridor_size](MapCoord coord,
+                                                                                  bool center) -> CorridorType {
     bool door_tile = map.IsDoor(coord.x, coord.y);
 
     if (door_tile) {
       size_t horizontal_size = get_door_corridor_size(coord, 1, 0);
       size_t vertical_size = get_door_corridor_size(coord, 0, 1);
 
-      if (horizontal_size == 3 || vertical_size == 3 || horizontal_size == 5 || vertical_size == 5) {
-        return true;
+      if (horizontal_size == 3 || horizontal_size == 5) {
+        return CorridorType::Horizontal;
       }
 
-      return horizontal_size == 1 && vertical_size == 1;
+      if (vertical_size == 3 || vertical_size == 5) {
+        return CorridorType::Vertical;
+      }
+
+      if (horizontal_size == 1 && vertical_size == 1) {
+        return CorridorType::Horizontal;
+      }
+
+      return CorridorType::None;
     }
 
     s32 size_check = 2 + (s32)center;
     size_t empty_hsize = get_empty_corridor_size(coord, 1, 0);
     size_t empty_vsize = get_empty_corridor_size(coord, 0, 1);
 
-    return (empty_hsize <= size_check) || (empty_vsize <= size_check);
+    if (empty_hsize <= size_check) {
+      return CorridorType::Horizontal;
+    }
+
+    if (empty_vsize <= size_check) {
+      return CorridorType::Vertical;
+    }
+
+    return CorridorType::None;
   };
 
   struct VisitState {
@@ -172,6 +196,7 @@ void TwController::CreateFlagroomBitset() {
   constexpr float kShipRadius = 0.85f;
   constexpr s32 kMaxFloodDistance = 100;
   constexpr s32 kMaxFlagroomDoorTraverse = 2;
+  constexpr s32 kCorridorInclusion = 6;
 
   // Open the doors in the pathfinder so the dynamic edge sets don't consider the doors to be dynamic.
   auto old_door_method = pathfinder.GetProcessor().GetDoorSolidMethod();
@@ -193,7 +218,30 @@ void TwController::CreateFlagroomBitset() {
     if (door_traverse_count > kMaxFlagroomDoorTraverse) continue;
 
     bool center = coord.y - flag_y > 0 && (s32)fabsf(coord.x - (float)flag_x) < 3;
-    if (is_corridor(coord, center)) continue;
+    CorridorType corridor_type = get_corridor_type(coord, center);
+
+    if (corridor_type != CorridorType::None) {
+      if (!center && corridor_type == CorridorType::Vertical) {
+        Vector2f corridor((float)coord.x, (float)coord.y);
+
+        // Push this corridor 1 horizontally toward flag so it's within the flagroom.
+        corridor.x += (coord.x < flag_x) ? 1 : -1;
+
+        bool is_new_corridor = true;
+        for (size_t i = 0; i < tw->corridors.size(); ++i) {
+          if (tw->corridors[i].DistanceSq(corridor) < 5.0f * 5.0f) {
+            is_new_corridor = false;
+            break;
+          }
+        }
+
+        if (is_new_corridor) {
+          tw->corridors.push_back(corridor);
+        }
+      }
+
+      current.depth = kMaxFloodDistance - kCorridorInclusion;
+    }
 
     MapCoord west(coord.x - 1, coord.y);
     MapCoord east(coord.x + 1, coord.y);
@@ -227,10 +275,19 @@ void TwController::CreateFlagroomBitset() {
   pathfinder.GetProcessor().SetDoorSolidMethod(old_door_method);
 
 #if TW_RENDER_FR
-  Log(LogLevel::Debug, "Flag room position count: %zu", tw->fr_positions.size());
+  Log(LogLevel::Debug, "TrenchWars: Flag room position count: %zu", tw->fr_positions.size());
 #endif
 
-  Log(LogLevel::Debug, "Done building flag room.");
+  tw->left_entrance_path =
+      pathfinder.FindPath(map, tw->entrance_position, tw->flag_position + Vector2f(-1, 0), kShipRadius, 0xFFFF);
+  tw->right_entrance_path =
+      pathfinder.FindPath(map, tw->entrance_position, tw->flag_position + Vector2f(1, 0), kShipRadius, 0xFFFF);
+
+  if (tw->left_entrance_path.Empty() || tw->right_entrance_path.Empty()) {
+    Log(LogLevel::Warning, "TrenchWars: Failed to generate entrance paths.");
+  }
+
+  Log(LogLevel::Debug, "TrenchWars: Done building flag room.");
 }
 
 }  // namespace tw

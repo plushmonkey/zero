@@ -111,6 +111,7 @@ struct Ship {
 
   bool multifire;
   bool gravity_effect;
+  u32 last_speed;
 
   ShipCapabilityFlags capability;
 };

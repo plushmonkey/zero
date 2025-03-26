@@ -227,6 +227,8 @@ void ShipController::Update(const InputState& input, float dt) {
     self->repel_time -= dt;
   }
 
+  ship.last_speed = speed;
+
   self->velocity.Truncate(abs((s32)speed / 10.0f / 16.0f));
 
   // Energy update order must be: afterburners, recharge, all of the status costs.

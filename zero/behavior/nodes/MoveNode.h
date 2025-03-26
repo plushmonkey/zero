@@ -163,62 +163,17 @@ struct FaceNode : public BehaviorNode {
   const char* position_key;
 };
 
-struct GoToNode : public BehaviorNode {
-  GoToNode(const char* position_key) : position_key(position_key) {}
-  GoToNode(Vector2f position) : position(position), position_key(nullptr) {}
-
+// Follows the 'current_path' from the bot controller without rebuilding.
+struct FollowPathNode : public BehaviorNode {
   ExecuteResult Execute(ExecuteContext& ctx) override {
     Player* self = ctx.bot->game->player_manager.GetSelf();
-    if (!self) return ExecuteResult::Failure;
-
-    Vector2f target = position;
-
-    if (position_key) {
-      auto opt_pos = ctx.blackboard.Value<Vector2f>(position_key);
-      if (!opt_pos.has_value()) return ExecuteResult::Failure;
-
-      target = opt_pos.value();
-    }
+    if (!self || self->ship >= 8) return ExecuteResult::Failure;
 
     auto& map = ctx.bot->game->GetMap();
     auto& current_path = ctx.bot->bot_controller->current_path;
     auto& pathfinder = ctx.bot->bot_controller->pathfinder;
     auto& game = *ctx.bot->game;
-    bool build = true;
-
     float radius = game.connection.settings.ShipSettings[self->ship].GetRadius();
-
-    if (!current_path.Empty()) {
-      if (target.DistanceSq(current_path.GetGoal()) <= 3.0f * 3.0f) {
-        Vector2f next = current_path.GetCurrent();
-
-        CastResult cast = map.CastShip(self, radius, next);
-
-        // Try to walk the path backwards to re-use the nodes.
-        while (cast.hit && current_path.index > 0) {
-          --current_path.index;
-          next = current_path.GetCurrent();
-          cast = map.CastShip(self, radius, next);
-        }
-
-        if (!cast.hit) {
-          build = false;
-        }
-      }
-    }
-
-    if (build) {
-      // Try to find a new path, but continue to use the old one if we can't find a new one.
-      auto new_path = pathfinder->FindPath(game.connection.map, self->position, target, radius, self->frequency);
-
-      if (!new_path.Empty()) {
-        current_path = new_path;
-      }
-
-      if (current_path.points.size() > 10) {
-        Log(LogLevel::Jabber, "Rebuilding path");
-      }
-    }
 
     if (current_path.IsDone()) {
       return ExecuteResult::Success;
@@ -365,6 +320,72 @@ struct GoToNode : public BehaviorNode {
 
     return bounce_count >= kStuckTickThreshold;
   }
+};
+
+// Generic movement node that will rebuild the path when necessary.
+// The generated path will be stored in the bot controller's 'current_path' variable.
+struct GoToNode : public BehaviorNode {
+  GoToNode(const char* position_key) : position_key(position_key) {}
+  GoToNode(Vector2f position) : position(position), position_key(nullptr) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    Player* self = ctx.bot->game->player_manager.GetSelf();
+    if (!self || self->ship >= 8) return ExecuteResult::Failure;
+
+    Vector2f target = position;
+
+    if (position_key) {
+      auto opt_pos = ctx.blackboard.Value<Vector2f>(position_key);
+      if (!opt_pos.has_value()) return ExecuteResult::Failure;
+
+      target = opt_pos.value();
+    }
+
+    auto& map = ctx.bot->game->GetMap();
+    auto& current_path = ctx.bot->bot_controller->current_path;
+    auto& pathfinder = ctx.bot->bot_controller->pathfinder;
+    auto& game = *ctx.bot->game;
+    bool build = true;
+
+    float radius = game.connection.settings.ShipSettings[self->ship].GetRadius();
+
+    if (!current_path.Empty()) {
+      if (target.DistanceSq(current_path.GetGoal()) <= 3.0f * 3.0f) {
+        Vector2f next = current_path.GetCurrent();
+
+        CastResult cast = map.CastShip(self, radius, next);
+
+        // Try to walk the path backwards to re-use the nodes.
+        while (cast.hit && current_path.index > 0) {
+          --current_path.index;
+          next = current_path.GetCurrent();
+          cast = map.CastShip(self, radius, next);
+        }
+
+        if (!cast.hit) {
+          build = false;
+        }
+      }
+    }
+
+    if (build) {
+      // Try to find a new path, but continue to use the old one if we can't find a new one.
+      auto new_path = pathfinder->FindPath(game.connection.map, self->position, target, radius, self->frequency);
+
+      if (!new_path.Empty()) {
+        current_path = new_path;
+      }
+
+      if (current_path.points.size() > 10) {
+        Log(LogLevel::Jabber, "Rebuilding path");
+      }
+    }
+
+    return follow_node.Execute(ctx);
+  }
+
+ private:
+  FollowPathNode follow_node;
 
   Vector2f position;
   const char* position_key;

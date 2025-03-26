@@ -1,6 +1,7 @@
 #pragma once
 
 #include <zero/Math.h>
+#include <zero/path/Path.h>
 
 #include <bitset>
 #include <memory>
@@ -32,9 +33,18 @@ struct RegionBitset {
 };
 
 struct TrenchWars {
+  // Bitset representing every tile that is considered part of the flagroom.
   RegionBitset fr_bitset;
+  // The average position of the flags, which should be the middle flag.
   Vector2f flag_position;
+  // The middle corridor leading into the flagroom. This is used for some behavior checks, such as pathfinding from it
+  // to find safe paths through the flagroom.
+  Vector2f entrance_position;
 
+  path::Path left_entrance_path;
+  path::Path right_entrance_path;
+
+  std::vector<Vector2f> corridors;
 #if TW_RENDER_FR
   std::vector<Vector2f> fr_positions;
 #endif

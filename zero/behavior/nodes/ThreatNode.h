@@ -260,7 +260,62 @@ struct InfluenceMapGradientDodge : public BehaviorNode {
   }
 };
 
+struct InfluenceMapPopulateEnemies : public BehaviorNode {
+  InfluenceMapPopulateEnemies(float radius, float value, bool clear) : radius(radius), value(value), clear(clear) {}
+  InfluenceMapPopulateEnemies(const char* radius_key, float value, bool clear)
+      : radius_key(radius_key), value(value), clear(clear) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto& player_manager = ctx.bot->game->player_manager;
+    Player* self = player_manager.GetSelf();
+    if (!self || self->ship >= 8) return ExecuteResult::Failure;
+
+    float influence_radius = radius;
+
+    if (radius_key) {
+      auto opt_radius = ctx.blackboard.Value<float>(radius_key);
+      if (!opt_radius) return ExecuteResult::Failure;
+      influence_radius = *opt_radius;
+    }
+
+    auto& influence_map = ctx.bot->bot_controller->influence_map;
+
+    if (clear) {
+      influence_map.Clear();
+    }
+
+    u32 current_tick = GetCurrentTick();
+
+    for (size_t i = 0; i < player_manager.player_count; ++i) {
+      Player* p = player_manager.players + i;
+
+      if (p->ship >= 8) continue;
+      if (p->frequency == self->frequency) continue;
+      if (!player_manager.IsSynchronized(*p, current_tick)) continue;
+
+      for (float y = p->position.y - influence_radius; y < p->position.y + influence_radius; ++y) {
+        for (float x = p->position.x - influence_radius; x < p->position.x + influence_radius; ++x) {
+          if (x >= 0 && y >= 0 && x <= 1023 && y <= 1023) {
+            influence_map.AddValue((u16)x, (u16)y, value);
+          }
+        }
+      }
+    }
+
+    return ExecuteResult::Success;
+  }
+
+  bool clear = false;
+  float value = 1.0f;
+  float radius = 1.0f;
+
+  const char* radius_key = nullptr;
+};
+
 struct InfluenceMapPopulateWeapons : public BehaviorNode {
+  InfluenceMapPopulateWeapons() {}
+  InfluenceMapPopulateWeapons(bool clear) : clear(clear) {}
+
   ExecuteResult Execute(ExecuteContext& ctx) override {
     auto& weapon_manager = ctx.bot->game->weapon_manager;
     auto& player_manager = ctx.bot->game->player_manager;
@@ -268,7 +323,9 @@ struct InfluenceMapPopulateWeapons : public BehaviorNode {
 
     auto& influence_map = ctx.bot->bot_controller->influence_map;
 
-    influence_map.Clear();
+    if (clear) {
+      influence_map.Clear();
+    }
 
     if (!self) return ExecuteResult::Failure;
 
@@ -370,6 +427,8 @@ struct InfluenceMapPopulateWeapons : public BehaviorNode {
       }
     }
   }
+
+  bool clear = true;
 };
 
 // Tries to find a position near the enemy for camping around.
