@@ -4,6 +4,8 @@
 #include <GLFW/glfw3.h>
 #endif
 
+#include <zero/BotController.h>
+#include <zero/ZeroBot.h>
 #include <zero/game/Logger.h>
 
 namespace zero {
@@ -11,6 +13,38 @@ namespace zero {
 #ifdef GLFW_AVAILABLE
 
 GLFWwindow* CreateGameWindow(int& width, int& height);
+
+static void OnKeyboardChange(GLFWwindow* window, int key, int scancode, int key_action, int mods) {
+  ZeroBot* bot = (ZeroBot*)glfwGetWindowUserPointer(window);
+
+  if (!bot) return;
+
+  if (key == GLFW_KEY_F10 && key_action == GLFW_RELEASE) {
+    bot->bot_controller->actuator.enabled = !bot->bot_controller->actuator.enabled;
+  }
+
+  if (bot->bot_controller->actuator.enabled) return;
+
+  switch (key) {
+    case GLFW_KEY_LEFT: {
+      bot->input.SetAction(InputAction::Left, key_action != GLFW_RELEASE);
+    } break;
+    case GLFW_KEY_RIGHT: {
+      bot->input.SetAction(InputAction::Right, key_action != GLFW_RELEASE);
+    } break;
+    case GLFW_KEY_UP: {
+      bot->input.SetAction(InputAction::Forward, key_action != GLFW_RELEASE);
+    } break;
+    case GLFW_KEY_DOWN: {
+      bot->input.SetAction(InputAction::Backward, key_action != GLFW_RELEASE);
+    } break;
+    case GLFW_KEY_LEFT_SHIFT: {
+      bot->input.SetAction(InputAction::Afterburner, key_action != GLFW_RELEASE);
+    } break;
+    default: {
+    } break;
+  }
+}
 
 bool DebugRenderer::Initialize(s32 surface_width, s32 surface_height) {
   this->window = CreateGameWindow(surface_width, surface_height);
@@ -92,6 +126,7 @@ GLFWwindow* CreateGameWindow(int& width, int& height) {
   }
 
   glfwMakeContextCurrent(window);
+  glfwSetKeyCallback(window, OnKeyboardChange);
 
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
     Log(LogLevel::Error, "Failed to initialize opengl context");
@@ -112,6 +147,10 @@ GLFWwindow* CreateGameWindow(int& width, int& height) {
   return window;
 }
 
+void DebugRenderer::SetWindowUserPointer(void* user) {
+  glfwSetWindowUserPointer(window, user);
+}
+
 #else  // GLFW_AVAILABLE not set
 
 bool DebugRenderer::Initialize(s32 surface_width, s32 surface_height) {
@@ -126,6 +165,8 @@ bool DebugRenderer::Begin() {
 }
 
 void DebugRenderer::Present() {}
+
+void DebugRenderer::SetWindowUserPointer(void* user) {}
 
 #endif
 

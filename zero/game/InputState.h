@@ -62,6 +62,13 @@ struct InputState {
 
   void Clear() { actions = 0; }
 
+  void ClearWeapons() {
+    u32 movement_mask = (1 << (u32)InputAction::Left) | (1 << (u32)InputAction::Right) |
+                        (1 << (u32)InputAction::Forward) | (1 << (u32)InputAction::Backward) |
+                        (1 << (u32)InputAction::Afterburner);
+    actions &= movement_mask;
+  }
+
   void SetAction(InputAction action, bool value) {
     size_t action_bit = (size_t)action;
 

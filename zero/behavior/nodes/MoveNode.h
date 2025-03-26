@@ -231,17 +231,17 @@ struct FollowPathNode : public BehaviorNode {
       if (find_nearest_corner) {
         // Calculate the corners of the ship.
         Vector2f corners[] = {
-            self->position + Vector2f(-radius, -radius),
-            self->position + Vector2f(radius, -radius),
-            self->position + Vector2f(-radius, radius),
-            self->position + Vector2f(radius, radius),
+            Vector2f(-radius, -radius),
+            Vector2f(radius, -radius),
+            Vector2f(-radius, radius),
+            Vector2f(radius, radius),
         };
         float best_dist_sq = 1024 * 1024;
         size_t best_corner_index = 0;
 
         // Find the closest corner to the movement target.
         for (size_t i = 0; i < ZERO_ARRAY_SIZE(corners); ++i) {
-          float dist_sq = movement_target.DistanceSq(corners[i]);
+          float dist_sq = movement_target.DistanceSq(self->position + corners[i]);
           if (dist_sq < best_dist_sq) {
             best_dist_sq = dist_sq;
             best_corner_index = i;
@@ -254,11 +254,11 @@ struct FollowPathNode : public BehaviorNode {
 
       // Use the closest corner as our new target movement, so we rotate toward our closest corner.
 
-      Log(LogLevel::Debug, "Unstucking");
+      Log(LogLevel::Debug, "Unstucking: %f, %f", best_corner.x, best_corner.y);
 
-      steering.Face(game, best_corner);
+      steering.Face(game, self->position + best_corner);
       // Avoid using seek because it wants to correct for velocity.
-      steering.force += best_corner - self->position;
+      steering.force += best_corner * 1000.0f;
     } else {
       float speed_sq = self->velocity.LengthSq();
 
@@ -283,19 +283,26 @@ struct FollowPathNode : public BehaviorNode {
     constexpr u32 kStuckTickMaxDuration = 400;
 
     u32 last_stored_bounce_tick = ctx.blackboard.ValueOr<u32>("last_bounce_tick", 0);
+    u32 last_stored_bounce_tick_check = ctx.blackboard.ValueOr<u32>("last_bounce_tick_check", 0);
     u32 bounce_count = ctx.blackboard.ValueOr<u32>("bounce_count", 0);
     u32 previous_bounce_count = bounce_count;
 
-    if (last_stored_bounce_tick != self.last_bounce_tick) {
-      ++bounce_count;
+    u32 tick = GetCurrentTick();
 
-      ctx.blackboard.Set("bounce_count", bounce_count);
-      ctx.blackboard.Set("last_bounce_tick", self.last_bounce_tick);
-    } else {
-      if (bounce_count > 0) --bounce_count;
-      if (bounce_count > kStuckTickMax) bounce_count = kStuckTickMax;
+    if (tick != last_stored_bounce_tick_check) {
+      if (last_stored_bounce_tick != self.last_bounce_tick) {
+        ++bounce_count;
 
-      ctx.blackboard.Set("bounce_count", bounce_count);
+        ctx.blackboard.Set("bounce_count", bounce_count);
+        ctx.blackboard.Set("last_bounce_tick", self.last_bounce_tick);
+      } else {
+        if (bounce_count > 0) --bounce_count;
+        if (bounce_count > kStuckTickMax) bounce_count = kStuckTickMax;
+
+        ctx.blackboard.Set("bounce_count", bounce_count);
+      }
+
+      ctx.blackboard.Set<u32>("last_bounce_tick_check", tick);
     }
 
     if (bounce_count >= kStuckTickThreshold) {

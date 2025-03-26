@@ -87,6 +87,7 @@ bool ZeroBot::JoinZone(ServerInfo& server) {
   if (g_Settings.debug_window) {
     if (debug_renderer.Initialize(SURFACE_WIDTH, SURFACE_HEIGHT)) {
       game->render_enabled = true;
+      debug_renderer.SetWindowUserPointer(this);
     } else {
       g_Settings.debug_window = false;
     }
@@ -149,7 +150,11 @@ void ZeroBot::Run() {
       break;
     }
 
-    input.Clear();
+    if (bot_controller && bot_controller->actuator.enabled) {
+      input.Clear();
+    } else {
+      input.ClearWeapons();
+    }
 
     if (game->render_enabled && !debug_renderer.Begin()) {
       game->Cleanup();

@@ -366,7 +366,7 @@ void PlayerManager::RenderPlayerName(Camera& camera, SpriteRenderer& renderer, P
 
     offset = offset.PixelRounded();
 
-    char display[48];
+    char display[80];
 
     bool display_ball = player.ball_carrier && !is_decoy;
 

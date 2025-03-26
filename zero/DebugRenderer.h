@@ -16,6 +16,8 @@ struct DebugRenderer {
   // Returns false if the window is closed and should be terminated.
   bool Begin();
   void Present();
+
+  void SetWindowUserPointer(void* user);
 };
 
 }  // namespace zero
