@@ -27,8 +27,45 @@
 #include <zero/zones/trenchwars/TrenchWars.h>
 #include <zero/zones/trenchwars/nodes/FlagNode.h>
 
+// TODO: The loops over players should probably use the kdtree. Check performance.
+
 namespace zero {
 namespace tw {
+
+// This checks the top area and the vertical shaft for enemies.
+// TODO: Might need to check other pub maps to see if it's fine.
+// TODO: Could probably generate the rect sizes from the map data.
+// Returns Success if no enemies found.
+struct EmptyEntranceNode : public behavior::BehaviorNode {
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto& pm = ctx.bot->game->player_manager;
+
+    auto self = pm.GetSelf();
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+    if (!opt_tw) return behavior::ExecuteResult::Failure;
+    TrenchWars* tw = *opt_tw;
+
+    Vector2f top_center = tw->flag_position + Vector2f(0.5f, 4.5f);
+    Rectangle top_rect(top_center - Vector2f(8.5f, 2.5f), top_center + Vector2f(8.5f, 3.5f));
+    Rectangle vertical_rect(top_center - Vector2f(4, 3), top_center + Vector2f(4, 11));
+
+    for (size_t i = 0; i < pm.player_count; ++i) {
+      Player* player = pm.players + i;
+
+      if (player->ship >= 8) continue;
+      if (player->frequency == self->frequency) continue;
+      if (player->enter_delay > 0.0f) continue;
+
+      if (top_rect.Contains(player->position) || vertical_rect.Contains(player->position)) {
+        return behavior::ExecuteResult::Failure;
+      }
+    }
+
+    return behavior::ExecuteResult::Success;
+  }
+};
 
 // Returns success if we are within nearby_threshold tiles of the 'entrance' position.
 struct NearEntranceNode : public behavior::BehaviorNode {
@@ -56,7 +93,7 @@ struct NearEntranceNode : public behavior::BehaviorNode {
     return behavior::ExecuteResult::Failure;
   }
 
-  float nearby_threshold = 15.0f;
+  float nearby_threshold;
 };
 
 // Goes over the two paths into the base to find which one is less contested.
@@ -73,11 +110,28 @@ struct SelectBestEntranceSideNode : public behavior::BehaviorNode {
 
     TrenchWars* tw = *opt_tw;
 
+    if (tw->left_entrance_path.Empty() || tw->right_entrance_path.Empty()) return behavior::ExecuteResult::Failure;
+
     size_t left_index = 0;
     size_t right_index = 0;
 
     float left_threat = GetPathThreat(ctx, *self, tw->left_entrance_path, &left_index);
     float right_threat = GetPathThreat(ctx, *self, tw->right_entrance_path, &right_index);
+
+    // If we make it this far through a path, continue with it into the flagroom.
+    constexpr float kPathTravelPercentBruteForce = 0.25f;
+
+    if (left_index / (float)tw->left_entrance_path.points.size() >= kPathTravelPercentBruteForce) {
+      ctx.bot->bot_controller->current_path = tw->left_entrance_path;
+      ctx.bot->bot_controller->current_path.index = left_index;
+      return behavior::ExecuteResult::Success;
+    }
+
+    if (right_index / (float)tw->right_entrance_path.points.size() >= kPathTravelPercentBruteForce) {
+      ctx.bot->bot_controller->current_path = tw->right_entrance_path;
+      ctx.bot->bot_controller->current_path.index = right_index;
+      return behavior::ExecuteResult::Success;
+    }
 
     if (left_threat > self->energy && right_threat > self->energy) {
       return behavior::ExecuteResult::Failure;
@@ -119,6 +173,7 @@ struct SelectBestEntranceSideNode : public behavior::BehaviorNode {
       if (p->id == self->id) continue;
       if (p->ship >= 8) continue;
       if (p->frequency != self->frequency) continue;
+      if (p->enter_delay > 0.0f) continue;
 
       ++total_teammate_count;
       if (p->position.DistanceSq(path.points[forward_point]) < kNearbyDistanceSq) {
@@ -136,12 +191,17 @@ struct SelectBestEntranceSideNode : public behavior::BehaviorNode {
 
   float GetPathThreat(behavior::ExecuteContext& ctx, Player& self, const path::Path& path, size_t* index) {
     size_t start_index = FindNearestPathPoint(path, self.position);
+    size_t half_index = path.points.size() / 2;
+    size_t end_index = start_index + 15;
+
+    // Don't bother checking the threat inside of the flagroom, only the entranceway.
+    if (end_index > half_index) end_index = half_index;
 
     *index = start_index;
 
     float total_threat = 0.0f;
 
-    for (size_t i = start_index; i < start_index + 15 && i < path.points.size(); ++i) {
+    for (size_t i = start_index; i < end_index; ++i) {
       Vector2f point = path.points[i];
 
       float threat = ctx.bot->bot_controller->influence_map.GetValue(point);
@@ -270,6 +330,109 @@ static std::unique_ptr<behavior::BehaviorNode> CreateOffensiveTree(const char* n
   return builder.Build();
 }
 
+// This is a tree to handle progressing through the entrance area.
+// It will attempt to move forward when safe and fall back when in danger.
+static std::unique_ptr<behavior::BehaviorNode> CreateEntranceBehavior() {
+  using namespace behavior;
+
+  BehaviorBuilder builder;
+
+  constexpr float kNearEntranceDistance = 15.0f;
+
+  // clang-format off
+  builder
+    .Sequence()
+        .Child<NearEntranceNode>(kNearEntranceDistance)
+        .Child<InfluenceMapPopulateWeapons>()
+        .Child<InfluenceMapPopulateEnemies>(3.0f, 5000.0f, false)
+        .SuccessChild<DodgeIncomingDamage>(0.1f, 35.0f)
+        .Composite(CreateBurstSequence())
+        .Selector()
+            .Sequence()
+                .Child<SelectBestEntranceSideNode>()
+                .Child<FollowPathNode>()
+                .Child<RenderPathNode>(Vector3f(0.0f, 0.0f, 0.75f))
+                .End()
+            .Selector()
+                .Sequence()
+                    .InvertChild<EmptyEntranceNode>()
+                    .Child<ExecuteNode>([](ExecuteContext& ctx) { // Go to the area below the entrance
+                      Vector2f entrance_position = ctx.blackboard.ValueOr<Vector2f>("tw_entrance_position", Vector2f(512, 281));
+
+                      entrance_position.y += 8;
+
+                      GoToNode node(entrance_position);
+
+                      return node.Execute(ctx);
+                    })
+                    .Child<RenderPathNode>(Vector3f(1.0f, 0.0f, 0.0f))
+                    .End()
+                .Sequence()
+                    .InvertChild<ShipTraverseQueryNode>("tw_entrance_position")
+                    .Child<GoToNode>("tw_entrance_position")
+                    .Child<RenderPathNode>(Vector3f(1.0f, 0.0f, 0.0f))
+                    .End()
+                .Child<ArriveNode>("tw_entrance_position", 1.25f)
+                .End()
+            .End()
+        .End()
+        .End();
+  // clang-format on
+
+  return builder.Build();
+}
+
+// This is a tree to handle staying safe below the entrance until it is cleared and safe to move up.
+static std::unique_ptr<behavior::BehaviorNode> CreateBelowEntranceBehavior() {
+  using namespace behavior;
+
+  BehaviorBuilder builder;
+
+  constexpr float kEntranceNearbyDistance = 15.0f;
+  // How many teammates must be in the flagroom before we start moving up.
+  constexpr u32 kFlagroomPresenceRequirement = 1;
+
+  // clang-format off
+  builder
+    .Sequence()
+        .Sequence() // A sequence that contains the conditionals for testing that we are below the entrance.
+            .Child<PlayerPositionQueryNode>("self_position")
+            .InvertChild<InFlagroomNode>("self_position") // We must not be in the flagroom
+            .InvertChild<DistanceThresholdNode>("tw_entrance_position", kEntranceNearbyDistance) // We must be near the 'entrance' position.
+            .Child<ExecuteNode>([](ExecuteContext& ctx) { // We must be below the entrance position
+              auto self = ctx.bot->game->player_manager.GetSelf();
+              if (!self || self->ship >= 8) return ExecuteResult::Failure;
+
+              auto opt_entrance_pos = ctx.blackboard.Value<Vector2f>("tw_entrance_position");
+              if (!opt_entrance_pos) return ExecuteResult::Failure;
+              Vector2f entrance_pos = *opt_entrance_pos;
+
+              return (self->position.y > entrance_pos.y) ? ExecuteResult::Success : ExecuteResult::Failure;
+            })
+            .End()
+        .Selector()
+            .Sequence() // Check if the above area is clear to move up
+                .Selector() // Check if we have a team presence above us so we don't rush in alone.
+                    .Sequence() // If we are alone on a frequency, consider it enough to move forward.
+                        .Child<PlayerFrequencyCountQueryNode>("self_freq_size")
+                        .InvertChild<ScalarThresholdNode<size_t>>("self_freq_size", 2)
+                        .End()
+                    .Child<FlagroomPresenceNode>(kFlagroomPresenceRequirement)
+                    .End()
+                .Child<EmptyEntranceNode>()
+                .Child<GoToNode>("tw_entrance_position") // Move into entrance area so other tree takes over.
+                .End()
+            .Sequence(CompositeDecorator::Success) // Above area is not yet safe, sit still and dodge. TODO: Move into safe area.
+                .Child<SeekNode>("self_position", 0.0f, SeekNode::DistanceResolveType::Zero)
+                .Child<DodgeIncomingDamage>(0.1f, 15.0f)
+                .End()
+            .End()
+        .End();
+  // clang-format on
+
+  return builder.Build();
+}
+
 static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
   using namespace behavior;
 
@@ -324,7 +487,6 @@ std::unique_ptr<behavior::BehaviorNode> TerrierBehavior::CreateTree(behavior::Ex
   // This is how far away to check for enemies that are rushing at us with low energy.
   // We will stop dodging and try to finish them off if they are within this distance and low energy.
   constexpr float kNearbyEnemyThreshold = 10.0f;
-  constexpr float kNearEntranceDistance = 15.0f;
 
   // clang-format off
   builder
@@ -333,30 +495,10 @@ std::unique_ptr<behavior::BehaviorNode> TerrierBehavior::CreateTree(behavior::Ex
             .InvertChild<ShipQueryNode>("request_ship")
             .Child<ShipRequestNode>("request_ship")
             .End()
+        .Composite(CreateBelowEntranceBehavior())
         .Composite(CreateFlagroomTravelBehavior())
         .Selector() // Choose to fight the player or follow waypoints.
-            .Sequence() // Travel through the entrance by staying behind teammates
-                .Child<NearEntranceNode>(kNearEntranceDistance)
-                .Child<InfluenceMapPopulateWeapons>()
-                .Child<InfluenceMapPopulateEnemies>(5.0f, 5000.0f, false)
-                .SuccessChild<DodgeIncomingDamage>(0.1f, 35.0f)
-                .Composite(CreateBurstSequence())
-                .Selector()
-                    .Sequence()
-                        .Child<SelectBestEntranceSideNode>()
-                        .Child<FollowPathNode>()
-                        .Child<RenderPathNode>(Vector3f(0.0f, 0.0f, 0.75f))
-                        .End()
-                    .Selector()
-                        .Sequence()
-                            .InvertChild<ShipTraverseQueryNode>("tw_entrance_position")
-                            .Child<GoToNode>("tw_entrance_position")
-                            .Child<RenderPathNode>(Vector3f(1.0f, 0.0f, 0.0f))
-                            .End()
-                        .Child<ArriveNode>("tw_entrance_position", 1.25f)
-                        .End()
-                    .End()
-                .End()
+            .Composite(CreateEntranceBehavior())
             .Sequence()
                 .Sequence() // Find an enemy
                     .Child<PlayerPositionQueryNode>("self_position")

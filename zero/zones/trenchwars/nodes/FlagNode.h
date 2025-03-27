@@ -147,6 +147,7 @@ struct FlagroomPresenceNode : public behavior::BehaviorNode {
 
       if (check_player->ship >= 8) continue;
       if (check_player->frequency != player->frequency) continue;
+      if (check_player->enter_delay > 0.0f) continue;
       if (!bitset.Test(check_player->position)) continue;
 
       if (++count > count_threshold) {
