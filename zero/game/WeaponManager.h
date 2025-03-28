@@ -114,6 +114,9 @@ struct WeaponManager {
 
   void OnWeaponPacket(u8* pkt, size_t size);
 
+  void GetMineCounts(Player& player, const Vector2f& check, size_t* player_count, size_t* team_count,
+                     bool* has_check_mine);
+
  private:
   WeaponSimulateResult Simulate(Weapon& weapon, u32 current_tick);
   WeaponSimulateResult SimulateRepel(Weapon& weapon);
@@ -132,9 +135,6 @@ struct WeaponManager {
 
   WeaponSimulateResult GenerateWeapon(u16 player_id, WeaponData weapon_data, u32 local_timestamp, u32 pos_x, u32 pos_y,
                                       s32 vel_x, s32 vel_y, const Vector2f& heading, u32 link_id);
-
-  void GetMineCounts(Player& player, const Vector2f& check, size_t* player_count, size_t* team_count,
-                     bool* has_check_mine);
 
   Vector2f GetExtrapolatedPos(Weapon& weapon);
 };

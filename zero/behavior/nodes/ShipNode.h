@@ -262,6 +262,36 @@ struct ShipMultifireQueryNode : public BehaviorNode {
   }
 };
 
+// Returns Success if we can currently use a mine.
+// This checks self mine count, team mine count, if mine is directly in our position, and bomb cooldown.
+struct ShipMineCapableQueryNode : public BehaviorNode {
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    Player* self = ctx.bot->game->player_manager.GetSelf();
+    if (!self || self->ship >= 8) return ExecuteResult::Failure;
+
+    ShipWeaponCooldownQueryNode cooldown_query(WeaponType::Bomb);
+
+    if (cooldown_query.Execute(ctx) == ExecuteResult::Success) {
+      return ExecuteResult::Failure;
+    }
+
+    size_t self_max_mines = ctx.bot->game->connection.settings.ShipSettings[self->ship].MaxMines;
+    size_t team_max_mines = ctx.bot->game->connection.settings.TeamMaxMines;
+
+    size_t self_mine_count = 0;
+    size_t team_count = 0;
+    bool has_check_mine = false;
+
+    ctx.bot->game->weapon_manager.GetMineCounts(*self, self->position, &self_mine_count, &team_count, &has_check_mine);
+
+    if (has_check_mine || self_mine_count >= self_max_mines || team_count >= team_max_mines) {
+      return ExecuteResult::Failure;
+    }
+
+    return ExecuteResult::Success;
+  }
+};
+
 struct RepelDistanceQueryNode : public BehaviorNode {
   RepelDistanceQueryNode(const char* output_key) : output_key(output_key) {}
 

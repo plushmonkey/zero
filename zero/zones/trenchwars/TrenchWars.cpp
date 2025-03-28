@@ -8,6 +8,7 @@
 #include <zero/game/GameEvent.h>
 #include <zero/game/Logger.h>
 #include <zero/zones/ZoneController.h>
+#include <zero/zones/trenchwars/SharkBehavior.h>
 #include <zero/zones/trenchwars/SpiderBehavior.h>
 #include <zero/zones/trenchwars/TerrierBehavior.h>
 
@@ -48,6 +49,7 @@ void TwController::CreateBehaviors(const char* arena_name) {
 
   repo.Add("spider", std::make_unique<SpiderBehavior>());
   repo.Add("terrier", std::make_unique<TerrierBehavior>());
+  repo.Add("shark", std::make_unique<SharkBehavior>());
 
   SetBehavior("spider");
 }

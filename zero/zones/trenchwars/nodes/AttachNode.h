@@ -10,6 +10,8 @@ namespace tw {
 
 struct BestAttachQueryNode : public behavior::BehaviorNode {
   BestAttachQueryNode(const char* output_key) : output_key(output_key) {}
+  BestAttachQueryNode(bool require_closer_than_self, const char* output_key)
+      : require_closer_than_self(require_closer_than_self), output_key(output_key) {}
 
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
     auto& pm = ctx.bot->game->player_manager;
@@ -29,7 +31,7 @@ struct BestAttachQueryNode : public behavior::BehaviorNode {
       if (player->id == self->id) continue;
       if (player->ship >= 8) continue;
       if (player->frequency != self->frequency) continue;
-      if (player->position.DistanceSq(flag_position) > self_dist_sq) continue;
+      if (require_closer_than_self && player->position.DistanceSq(flag_position) > self_dist_sq) continue;
 
       u8 turret_limit = ctx.bot->game->connection.settings.ShipSettings[player->ship].TurretLimit;
 
@@ -59,6 +61,7 @@ struct BestAttachQueryNode : public behavior::BehaviorNode {
     return behavior::ExecuteResult::Success;
   }
 
+  bool require_closer_than_self = true;
   const char* output_key = nullptr;
 };
 
