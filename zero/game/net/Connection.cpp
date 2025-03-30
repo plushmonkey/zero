@@ -106,7 +106,7 @@ Connection::TickResult Connection::Tick() {
   addr.sin_addr.s_addr = remote_addr.addr;
 
   zero::Tick current_tick = GetCurrentTick();
-
+  
   constexpr u32 kConnectTimeout = 500;
   if (login_state == Connection::LoginState::EncryptionRequested &&
       TICK_DIFF(current_tick, connect_tick) >= kConnectTimeout) {

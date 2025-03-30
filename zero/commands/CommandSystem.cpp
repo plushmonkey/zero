@@ -1,5 +1,6 @@
 #include "CommandSystem.h"
 
+#include <stdlib.h>
 #include <zero/BotController.h>
 #include <zero/ChatQueue.h>
 #include <zero/Utility.h>
@@ -22,6 +23,7 @@ static inline std::string GetCurrentBehaviorName(ZeroBot& bot) {
 class QuitCommand : public CommandExecutor {
   void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
     bot.game->connection.SendDisconnect();
+    exit(0);
   }
 
   CommandAccessFlags GetAccess() override { return CommandAccess_Standard; }

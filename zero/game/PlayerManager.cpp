@@ -222,8 +222,13 @@ void PlayerManager::Update(float dt) {
 
   if (self && self->ship != 8) {
     position_delay = connection.settings.SendPositionDelay;
+
     if (position_delay < 5) {
       position_delay = 5;
+    }
+
+    if (self->enter_delay > 0.0f) {
+      position_delay = 50;
     }
   }
 
@@ -440,24 +445,29 @@ void PlayerManager::SendPositionPacket() {
 
   u16 x = (u16)(player->position.x * 16.0f);
   u16 y = (u16)(player->position.y * 16.0f);
-
   u16 vel_x = (u16)(player->velocity.x * 16.0f * 10.0f);
   u16 vel_y = (u16)(player->velocity.y * 16.0f * 10.0f);
+  u16 weapon = *(u16*)&player->weapon;
+  u16 energy = (u16)player->energy;
+  u8 direction = (u8)(player->orientation * 40.0f);
+  u16 bounty = player->bounty;
+  u8 togglables = player->togglables;
 
   if (player->ship != 8 && player->enter_delay > 0.0f) {
     x = 0xFFFF;
     y = 0xFFFF;
+    vel_x = 0;
+    vel_y = 0;
+    direction = 0;
+    togglables = 0x80;
+    energy = 0;
+    bounty = 0;
+    weapon = 0;
   }
-
-  u16 weapon = *(u16*)&player->weapon;
-  u16 energy = (u16)player->energy;
-  s32 time_diff = connection.time_diff;
-
-  u8 direction = (u8)(player->orientation * 40.0f);
 
   u32 local_timestamp = GetCurrentTick();
 
-  s32 server_timestamp = MAKE_TICK(local_timestamp + time_diff);
+  s32 server_timestamp = MAKE_TICK(local_timestamp + connection.time_diff);
 
   if (player->attach_parent != kInvalidPlayerId) {
     vel_x = 0;
@@ -490,18 +500,18 @@ void PlayerManager::SendPositionPacket() {
     server_timestamp = MAKE_TICK(last_position_tick + 1);
   }
 
-  buffer.WriteU8(0x03);                // Type
-  buffer.WriteU8(direction);           // Direction
-  buffer.WriteU32(server_timestamp);   // Timestamp
-  buffer.WriteU16(vel_x);              // X velocity
-  buffer.WriteU16(y);                  // Y
-  buffer.WriteU8(0);                   // Checksum
-  buffer.WriteU8(player->togglables);  // Togglables
-  buffer.WriteU16(x);                  // X
-  buffer.WriteU16(vel_y);              // Y velocity
-  buffer.WriteU16(player->bounty);     // Bounty
-  buffer.WriteU16(energy);             // Energy
-  buffer.WriteU16(weapon);             // Weapon info
+  buffer.WriteU8(0x03);               // Type
+  buffer.WriteU8(direction);          // Direction
+  buffer.WriteU32(server_timestamp);  // Timestamp
+  buffer.WriteU16(vel_x);             // X velocity
+  buffer.WriteU16(y);                 // Y
+  buffer.WriteU8(0);                  // Checksum
+  buffer.WriteU8(togglables);         // Togglables
+  buffer.WriteU16(x);                 // X
+  buffer.WriteU16(vel_y);             // Y velocity
+  buffer.WriteU16(bounty);            // Bounty
+  buffer.WriteU16(energy);            // Energy
+  buffer.WriteU16(weapon);            // Weapon info
 
   u8 checksum = WeaponChecksum(buffer.data, buffer.GetSize());
   buffer.data[10] = checksum;

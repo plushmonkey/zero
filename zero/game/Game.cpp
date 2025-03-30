@@ -733,7 +733,7 @@ void Game::OnFlagClaim(u8* pkt, size_t size) {
 
   u16 self_id = player_manager.GetSelf()->id;
 
-  if (!(flags[id].flags & GameFlag_Turf)) {
+  if (!(flags[id].flags & GameFlag_Turf) && connection.settings.CarryFlags > 0) {
     bool was_dropped = flags[id].flags & GameFlag_Dropped;
 
     flags[id].flags &= ~GameFlag_Dropped;
