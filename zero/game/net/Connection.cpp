@@ -885,6 +885,11 @@ void Connection::SendAttachDrop() {
 void Connection::SendTakeGreen(u16 x, u16 y, s16 prize_id) {
   u32 timestamp = GetCurrentTick();
 
+  if (x >= 0x400 || y >= 0x400 || prize_id >= 0x1d) {
+    Log(LogLevel::Error, "Trying to send bad green packet: %u %u %d", (u32)x, (u32)y, (s32)prize_id);
+    return;
+  }
+
 #pragma pack(push, 1)
   struct {
     u8 type;

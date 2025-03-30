@@ -163,7 +163,7 @@ static void OnPlayerDeathPkt(void* user, u8* pkt, size_t size) {
 
   buffer.ReadU8();
 
-  u8 green_id = buffer.ReadU8();
+  s8 green_id = buffer.ReadU8();
   u16 killer_id = buffer.ReadU16();
   u16 killed_id = buffer.ReadU16();
 
