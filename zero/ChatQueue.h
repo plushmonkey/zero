@@ -4,6 +4,7 @@
 #include <zero/game/ChatController.h>
 #include <zero/game/GameEvent.h>
 
+#include <string>
 #include <vector>
 
 namespace zero {
@@ -11,7 +12,7 @@ namespace zero {
 // This event can be dispatched from anywhere to have the ChatQueue pick it up and enqueue it.
 struct ChatQueueEvent {
   ChatType type = ChatType::Public;
-  const char* message = nullptr;
+  std::string message;
   const char* target_name = nullptr;
   u16 frequency = 0;
 

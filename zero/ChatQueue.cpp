@@ -60,16 +60,16 @@ void ChatQueue::SendFrequency(u16 frequency, const char* message) {
 void ChatQueue::HandleEvent(const ChatQueueEvent& event) {
   switch (event.type) {
     case ChatType::Public: {
-      SendPublic(event.message);
+      SendPublic(event.message.data());
     } break;
     case ChatType::Private: {
-      SendPrivate(event.target_name, event.message);
+      SendPrivate(event.target_name, event.message.data());
     } break;
     case ChatType::Team: {
-      SendTeam(event.message);
+      SendTeam(event.message.data());
     } break;
     case ChatType::OtherTeam: {
-      SendFrequency(event.frequency, event.message);
+      SendFrequency(event.frequency, event.message.data());
     } break;
     default: {
     } break;

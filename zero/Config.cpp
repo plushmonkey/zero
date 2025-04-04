@@ -156,6 +156,8 @@ std::unique_ptr<Config> Config::Load(const char* file_path) {
 
   std::unique_ptr<Config> result = std::make_unique<Config>();
 
+  result->filepath = file_path;
+
   std::string contents = LoadEntireFile(file_path);
 
   if (contents.empty()) return {};

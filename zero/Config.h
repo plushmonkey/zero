@@ -15,6 +15,7 @@ struct ConfigGroup {
 
 struct Config {
   std::unordered_map<std::string, ConfigGroup> groups;
+  std::string filepath;
 
   inline ConfigGroup& GetOrCreateGroup(const std::string& group) {
     auto group_iter = groups.find(group);

@@ -20,6 +20,31 @@ static inline std::string GetCurrentBehaviorName(ZeroBot& bot) {
   return "none";
 }
 
+class ReloadCommand : public CommandExecutor {
+  void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
+    if (!bot.config) {
+      Event::Dispatch(ChatQueueEvent::Private(sender.data(), "Failed to reload config: Unknown file path."));
+      return;
+    }
+
+    std::unique_ptr<Config> new_cfg = zero::Config::Load(bot.config->filepath.data());
+    if (!new_cfg) {
+      Event::Dispatch(ChatQueueEvent::Private(sender.data(), "Failed to reload config: Config parsing failed."));
+      return;
+    }
+
+    bot.config = std::move(new_cfg);
+
+    cmd.LoadSecurityLevels();
+
+    Event::Dispatch(ChatQueueEvent::Private(sender.data(), "Config reload successful."));
+  }
+
+  CommandAccessFlags GetAccess() override { return CommandAccess_Standard; }
+  std::vector<std::string> GetAliases() override { return {"reload"}; }
+  std::string GetDescription() override { return "Reloads the config file."; }
+};
+
 class QuitCommand : public CommandExecutor {
   void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
     bot.game->connection.SendDisconnect();
@@ -347,6 +372,7 @@ CommandSystem::CommandSystem(ZeroBot& bot, PacketDispatcher& dispatcher) : bot(b
   default_commands_.emplace_back(std::make_shared<BehaviorCommand>());
   default_commands_.emplace_back(std::make_shared<BehaviorsCommand>());
   default_commands_.emplace_back(std::make_shared<QuitCommand>());
+  default_commands_.emplace_back(std::make_shared<ReloadCommand>());
 
   Reset();
 }
@@ -496,6 +522,7 @@ void CommandSystem::SetDefaultSecurityLevels() {
   SetCommandSecurityLevel("help", 0);
   SetCommandSecurityLevel("commands", 0);
   SetCommandSecurityLevel("quit", 10);
+  SetCommandSecurityLevel("reload", 10);
 }
 
 void CommandSystem::SetCommandSecurityLevel(const std::string& name, int level) {
