@@ -1,3 +1,5 @@
+#include "NexusABehavior.h"
+
 #include <zero/behavior/BehaviorBuilder.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/behavior/nodes/AimNode.h>
@@ -21,10 +23,10 @@
 #include <zero/zones/svs/nodes/MemoryTargetNode.h>
 #include <zero/zones/svs/nodes/NearbyEnemyWeaponQueryNode.h>
 
-#include "NexusABehavior.h"
+using namespace zero::svs;
 
 namespace zero {
-namespace svs {
+namespace nexus {
 
 std::unique_ptr<behavior::BehaviorNode> NexusABehavior::CreateTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
@@ -214,5 +216,5 @@ std::unique_ptr<behavior::BehaviorNode> NexusABehavior::CreateTree(behavior::Exe
   return builder.Build();
 }
 
-}  // namespace svs
+}  // namespace nexus
 }  // namespace zero

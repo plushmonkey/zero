@@ -1,3 +1,5 @@
+#include "NexusBehavior.h"
+
 #include <zero/behavior/BehaviorBuilder.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/behavior/nodes/AimNode.h>
@@ -21,10 +23,10 @@
 #include <zero/zones/svs/nodes/MemoryTargetNode.h>
 #include <zero/zones/svs/nodes/NearbyEnemyWeaponQueryNode.h>
 
-#include "NexusBehavior.h"
+using namespace zero::svs;
 
 namespace zero {
-namespace svs {
+namespace nexus {
 
 struct ShotSpreadNode : public behavior::BehaviorNode {
   ShotSpreadNode(const char* aimshot_key, float spread, float period)
@@ -244,5 +246,5 @@ std::unique_ptr<behavior::BehaviorNode> NexusBehavior::CreateTree(behavior::Exec
   return builder.Build();
 }
 
-}  // namespace svs
+}  // namespace nexus
 }  // namespace zero

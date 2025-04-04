@@ -59,7 +59,10 @@ ServerInfo kServers[] = {
     {"SSCJ MetalGear CTF", "69.164.220.203", 14000, Zone::MetalGear},
     {"SSCU Extreme Games", "208.118.63.35", 7900, Zone::ExtremeGames},
     {"SSCU Trench Wars", "127.0.0.1", 5000, Zone::TrenchWars},
+    {"Nexus", "127.0.0.1", 5000, Zone::Nexus},
 };
+
+static_assert(ZERO_ARRAY_SIZE(kServers) == (size_t)Zone::Count - 1);
 
 const char* kLoginName = "ZeroBot";
 const char* kLoginPassword = "none";
