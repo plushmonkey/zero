@@ -5,6 +5,7 @@
 #include <zero/game/Logger.h>
 #include <zero/zones/ZoneController.h>
 #include <zero/zones/svs/PowerballBehavior.h>
+#include <zero/zones/svs/NexusBehavior.h>
 #include <zero/zones/svs/TerrierBehavior.h>
 #include <zero/zones/svs/WarbirdBehavior.h>
 #include <zero/zones/svs/WarzoneBehavior.h>
@@ -34,6 +35,7 @@ void SvsController::CreateBehaviors(const char* arena_name) {
     return;
   }
 
+  repo.Add("nexus", std::make_unique<NexusBehavior>());
   repo.Add("warbird", std::make_unique<WarbirdBehavior>());
   repo.Add("terrier", std::make_unique<TerrierBehavior>());
   repo.Add("warzone", std::make_unique<WarzoneBehavior>());

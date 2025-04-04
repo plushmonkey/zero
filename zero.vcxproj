@@ -103,6 +103,7 @@
     <ClCompile Include="zero\zones\metalgear\JuggBehavior.cpp" />
     <ClCompile Include="zero\zones\metalgear\MetalGear.cpp" />
     <ClCompile Include="zero\zones\metalgear\SniperBehavior.cpp" />
+    <ClCompile Include="zero\zones\svs\NexusBehavior.cpp" />
     <ClCompile Include="zero\zones\svs\PowerballBehavior.cpp" />
     <ClCompile Include="zero\zones\svs\Svs.cpp" />
     <ClCompile Include="zero\zones\svs\TerrierBehavior.cpp" />
@@ -232,6 +233,7 @@
     <ClInclude Include="zero\zones\metalgear\GunnerBehavior.h" />
     <ClInclude Include="zero\zones\metalgear\JuggBehavior.h" />
     <ClInclude Include="zero\zones\metalgear\SniperBehavior.h" />
+    <ClInclude Include="zero\zones\svs\NexusBehavior.h" />
     <ClInclude Include="zero\zones\svs\nodes\BurstAreaQueryNode.h" />
     <ClInclude Include="zero\zones\svs\nodes\FindNearestGreenNode.h" />
     <ClInclude Include="zero\zones\svs\nodes\IncomingDamageQueryNode.h" />
