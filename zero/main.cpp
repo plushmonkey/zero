@@ -10,6 +10,7 @@
 //
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include <memory>
 
@@ -89,6 +90,8 @@ int main(int argc, char* argv[]) {
 #else
   signal(SIGINT, SignalHandler);
 #endif
+
+  srand((unsigned int)time(NULL));
 
   zero::ZeroBot bot;
   g_Bot = &bot;

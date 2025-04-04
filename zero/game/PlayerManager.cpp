@@ -739,6 +739,24 @@ void PlayerManager::OnPlayerDeath(u8* pkt, size_t size) {
   }
 }
 
+static inline u32 HashName(Player& player) {
+  u32 hash = 0;
+
+  const char* c = player.name;
+
+  for (; *c; ++c) {
+    hash += *c;
+    hash += (hash << 10);
+    hash ^= (hash >> 6);
+  }
+
+  hash += (hash << 3);
+  hash ^= (hash >> 11);
+  hash += (hash << 15);
+
+  return hash;
+}
+
 void PlayerManager::Spawn(bool reset) {
   Player* self = GetSelf();
 
@@ -755,7 +773,11 @@ void PlayerManager::Spawn(bool reset) {
   }
 
   float ship_radius = connection.settings.ShipSettings[ship].GetRadius();
-  u32 rand_seed = rand();
+
+  // Create a hash based on our name so we can offset the random seed.
+  // This is to stop many bots ran at the same time from generating the same positions.
+  u32 hash = HashName(*self);
+  u32 rand_seed = rand() + hash;
 
   if (spawn_count == 0) {
     // Default position to center of map if no location could be found.
@@ -832,8 +854,8 @@ void PlayerManager::Spawn(bool reset) {
     if (radius > 0) {
       // Try 100 times to spawn in a random spot.
       for (int i = 0; i < 100; ++i) {
-        float x_offset = (float)((rand() % (radius * 2)) - radius);
-        float y_offset = (float)((rand() % (radius * 2)) - radius);
+        float x_offset = (float)(((rand() + hash) % (radius * 2)) - radius);
+        float y_offset = (float)(((rand() + hash) % (radius * 2)) - radius);
 
         Vector2f spawn(x_center + x_offset, y_center + y_offset);
 
