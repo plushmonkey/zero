@@ -23,6 +23,7 @@ struct ExecuteContext;
 
 struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>,
                        EventHandler<JoinGameEvent>,
+                       EventHandler<PlayerEnterEvent>,
                        EventHandler<MapLoadEvent>,
                        EventHandler<DoorToggleEvent>,
                        EventHandler<LoginResponseEvent>,
@@ -57,6 +58,7 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>,
   void UpdatePathfinder(float radius);
 
   void HandleEvent(const JoinGameEvent& event) override;
+  void HandleEvent(const PlayerEnterEvent& event) override;
   void HandleEvent(const MapLoadEvent& event) override;
   void HandleEvent(const PlayerFreqAndShipChangeEvent& event) override;
   void HandleEvent(const DoorToggleEvent& event) override;

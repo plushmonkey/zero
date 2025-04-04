@@ -27,6 +27,18 @@ void BotController::HandleEvent(const JoinGameEvent& event) {
   this->door_solid_method = path::DoorSolidMethod::Dynamic;
 }
 
+void BotController::HandleEvent(const PlayerEnterEvent& event) {
+  if (event.player.id != game.player_manager.player_id) return;
+  if (event.player.ship >= 8) return;
+
+  float radius = game.connection.settings.ShipSettings[event.player.ship].GetRadius();
+
+  current_path.Clear();
+
+  Log(LogLevel::Debug, "Creating pathfinder from enter event.");
+  UpdatePathfinder(radius);
+}
+
 void BotController::HandleEvent(const MapLoadEvent& event) {
   // Send a request for the arena list so we can know the name of the current arena.
   game.chat.SendMessage(ChatType::Public, "?arena");
@@ -130,7 +142,7 @@ void BotController::Update(RenderContext& rc, float dt, InputState& input, behav
 
   static behavior::TreePrinter tree_printer;
 
-  if (behavior_tree) {
+  if (behavior_tree && pathfinder) {
     bool should_print = g_Settings.debug_behavior_tree;
 
     if (should_print) {
