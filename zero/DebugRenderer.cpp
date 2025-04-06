@@ -41,6 +41,9 @@ static void OnKeyboardChange(GLFWwindow* window, int key, int scancode, int key_
     case GLFW_KEY_LEFT_SHIFT: {
       bot->input.SetAction(InputAction::Afterburner, key_action != GLFW_RELEASE);
     } break;
+    case GLFW_KEY_LEFT_CONTROL: {
+      bot->input.SetAction(InputAction::Bullet, key_action != GLFW_RELEASE);
+    } break;
     default: {
     } break;
   }

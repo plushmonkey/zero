@@ -187,7 +187,7 @@ void PlayerManager::Update(float dt) {
   for (size_t i = 0; i < this->player_count; ++i) {
     Player* player = this->players + i;
 
-    if (player->ship == 8) continue;
+    if (player->ship >= 8) continue;
 
     SimulatePlayer(*player, dt, false);
 
@@ -854,8 +854,11 @@ void PlayerManager::Spawn(bool reset) {
     if (radius > 0) {
       // Try 100 times to spawn in a random spot.
       for (int i = 0; i < 100; ++i) {
-        float x_offset = (float)(((rand() + hash) % (radius * 2)) - radius);
-        float y_offset = (float)(((rand() + hash) % (radius * 2)) - radius);
+        u32 xrand = ((u32)rand() + hash);
+        u32 yrand = ((u32)rand() + hash);
+
+        float x_offset = (float)((int)(xrand % (radius * 2)) - radius);
+        float y_offset = (float)((int)(yrand % (radius * 2)) - radius);
 
         Vector2f spawn(x_center + x_offset, y_center + y_offset);
 
