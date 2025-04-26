@@ -104,8 +104,9 @@
     <ClCompile Include="zero\zones\metalgear\MetalGear.cpp" />
     <ClCompile Include="zero\zones\metalgear\SniperBehavior.cpp" />
     <ClCompile Include="zero\zones\nexus\Nexus.cpp" />
-    <ClCompile Include="zero\zones\nexus\NexusABehavior.cpp" />
-    <ClCompile Include="zero\zones\nexus\NexusBehavior.cpp" />
+    <ClCompile Include="zero\zones\nexus\PubCoverBehavior.cpp" />
+    <ClCompile Include="zero\zones\nexus\PubOffenseBehavior.cpp" />
+    <ClCompile Include="zero\zones\nexus\TestBehavior.cpp" />
     <ClCompile Include="zero\zones\svs\PowerballBehavior.cpp" />
     <ClCompile Include="zero\zones\svs\Svs.cpp" />
     <ClCompile Include="zero\zones\svs\TerrierBehavior.cpp" />
@@ -235,8 +236,9 @@
     <ClInclude Include="zero\zones\metalgear\GunnerBehavior.h" />
     <ClInclude Include="zero\zones\metalgear\JuggBehavior.h" />
     <ClInclude Include="zero\zones\metalgear\SniperBehavior.h" />
-    <ClInclude Include="zero\zones\nexus\NexusABehavior.h" />
-    <ClInclude Include="zero\zones\nexus\NexusBehavior.h" />
+    <ClInclude Include="zero\zones\nexus\PubCoverBehavior.h" />
+    <ClInclude Include="zero\zones\nexus\PubOffenseBehavior.h" />
+    <ClInclude Include="zero\zones\nexus\TestBehavior.h" />
     <ClInclude Include="zero\zones\svs\nodes\BurstAreaQueryNode.h" />
     <ClInclude Include="zero\zones\svs\nodes\FindNearestGreenNode.h" />
     <ClInclude Include="zero\zones\svs\nodes\IncomingDamageQueryNode.h" />
