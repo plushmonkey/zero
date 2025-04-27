@@ -7,10 +7,10 @@
 namespace zero {
 namespace nexus {
 
-struct NexusABehavior : public behavior::Behavior {
+struct PubOffenseBehavior : public behavior::Behavior {
   void OnInitialize(behavior::ExecuteContext& ctx) override {
     // Setup blackboard here for this specific behavior
-    ctx.blackboard.Set("request_ship", 0);
+    ctx.blackboard.Set("request_ship", 4);
     ctx.blackboard.Set("leash_distance", 35.0f);
 
     std::vector<Vector2f> waypoints{

@@ -1,4 +1,4 @@
-#include "NexusABehavior.h"
+#include "PubCoverBehavior.h"
 
 #include <zero/behavior/BehaviorBuilder.h>
 #include <zero/behavior/BehaviorTree.h>
@@ -28,7 +28,7 @@ using namespace zero::svs;
 namespace zero {
 namespace nexus {
 
-std::unique_ptr<behavior::BehaviorNode> NexusABehavior::CreateTree(behavior::ExecuteContext& ctx) {
+std::unique_ptr<behavior::BehaviorNode> PubCoverBehavior::CreateTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
   BehaviorBuilder builder;

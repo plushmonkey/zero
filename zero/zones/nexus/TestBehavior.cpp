@@ -1,5 +1,3 @@
-#include "NexusBehavior.h"
-
 #include <zero/behavior/BehaviorBuilder.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/behavior/nodes/AimNode.h>
@@ -22,6 +20,8 @@
 #include <zero/zones/svs/nodes/IncomingDamageQueryNode.h>
 #include <zero/zones/svs/nodes/MemoryTargetNode.h>
 #include <zero/zones/svs/nodes/NearbyEnemyWeaponQueryNode.h>
+
+#include "TestBehavior.h"
 
 using namespace zero::svs;
 
@@ -62,7 +62,7 @@ struct ShotSpreadNode : public behavior::BehaviorNode {
   float period = 1.0f;
 };
 
-std::unique_ptr<behavior::BehaviorNode> NexusBehavior::CreateTree(behavior::ExecuteContext& ctx) {
+std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
   BehaviorBuilder builder;
@@ -75,10 +75,11 @@ std::unique_ptr<behavior::BehaviorNode> NexusBehavior::CreateTree(behavior::Exec
   constexpr float kRepelDistance = 16.0f;
   // How much damage that is going towards an enemy before we start bombing. This is to limit the frequency of our
   // bombing so it overlaps bullets and is harder to dodge.
-  constexpr float kBombRequiredDamageOverlap = 750.0f;
+  constexpr float kBombRequiredDamageOverlap = 650.0f;
   // How far away a target needs to be before we start varying our shots around the target.
   constexpr float kShotSpreadDistanceThreshold = 25.0f;
 
+  constexpr float kThorEnemyThreshold = 400.0f;
   // clang-format off
   builder
     .Selector()
@@ -163,15 +164,41 @@ std::unique_ptr<behavior::BehaviorNode> NexusBehavior::CreateTree(behavior::Exec
                             .Child<FaceNode>("aimshot")
                             .Child<BlackboardEraseNode>("rushing")
                             .Selector()
+                                .Sequence()  // Run out the timer 
+                                     .InvertChild<TimerExpiredNode>("run_timer")
+                                     .Child<SeekNode>("aimshot", "run_distance", SeekNode::DistanceResolveType::Dynamic)
+                                     .End()
+                                .Sequence() // Begin running away if our energy is low.
+                                    .Child<TimerExpiredNode>("run_timer")                              
+                                    .InvertChild<PlayerEnergyPercentThresholdNode>(0.2f)
+                                    .Child<SeekNode>("aimshot", "run_distance", SeekNode::DistanceResolveType::Dynamic)
+                                    .Child<TimerSetNode>("run_timer", 500)
+                                    .Sequence()
+                                        .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Decoy)
+                                        .Child<TimerExpiredNode>("decoy_timer")
+                                        .Child<InputActionNode>(InputAction::Decoy)
+                                        .Child<TimerSetNode>("decoy_timer", 1000)    
+                                        .End()
+                                    .End()
+                                .Sequence() // Begin moving away if our energy is low.
+                                    .Child<TimerExpiredNode>("run_timer")
+                                    .InvertChild<PlayerEnergyPercentThresholdNode>(0.4f)
+                                    .Child<SeekNode>("aimshot", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
+                                    .End()
                                 .Sequence() // If our target is very low energy, rush at them
+                                    .Child<TimerExpiredNode>("run_timer")
+                                    .InvertChild<PlayerEnergyPercentThresholdNode>(0.6f)
                                     .Child<PlayerEnergyQueryNode>("nearest_target", "nearest_target_energy")
                                     .InvertChild<ScalarThresholdNode<float>>("nearest_target_energy", kLowEnergyThreshold)
                                     .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Static)
                                     .Child<ScalarNode>(1.0f, "rushing")
-                                    .End()
-                                .Sequence() // Begin moving away if our energy is low.
-                                    .InvertChild<PlayerEnergyPercentThresholdNode>(0.3f)
-                                    .Child<SeekNode>("aimshot", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
+                                    .Sequence() // If we have decent energy rocket at the as well
+                                        .Child<ShipItemCountThresholdNode>(ShipItemType::Rocket)
+                                        .Child<TimerExpiredNode>("rocket_timer")
+                                        .Child<PlayerEnergyPercentThresholdNode>(0.6f)
+                                        .Child<InputActionNode>(InputAction::Rocket)
+                                        .Child<TimerSetNode>("rocket_timer", 300)
+                                        .End()
                                     .End()
                                 .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
                                 .End()
@@ -183,9 +210,11 @@ std::unique_ptr<behavior::BehaviorNode> NexusBehavior::CreateTree(behavior::Exec
                                 .Child<InputActionNode>(InputAction::Burst)
                                 .End()
                             .Sequence(CompositeDecorator::Success) // Bomb fire check.
+                                .Child<TimerExpiredNode>("recharge_timer")
                                 .Child<PlayerEnergyPercentThresholdNode>(0.35f)
                                 .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Bomb)
                                 .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
+                                .InvertChild<InputQueryNode>(InputAction::Thor)
                                 .Child<IncomingDamageQueryNode>("nearest_target", kRepelDistance * 2.5f, 2.75f, "outgoing_damage")
                                 .Child<ScalarThresholdNode<float>>("outgoing_damage", kBombRequiredDamageOverlap) // Check if we have enough bullets overlapping outgoing damage to fire a bomb into.
                                 .Child<DistanceThresholdNode>("nearest_target_position", 10.0f)
@@ -198,7 +227,26 @@ std::unique_ptr<behavior::BehaviorNode> NexusBehavior::CreateTree(behavior::Exec
                                 .Child<RayRectangleInterceptNode>("bomb_fire_ray", "target_bounds")
                                 .Child<InputActionNode>(InputAction::Bomb)
                                 .End()
+                             .Sequence(CompositeDecorator::Success) // Thor fire check.
+                                .InvertChild<PlayerEnergyPercentThresholdNode>(0.35f)
+                                .Child<PlayerEnergyQueryNode>("nearest_target", "nearest_target_energy")
+                                .InvertChild<ScalarThresholdNode<float>>("nearest_target_energy", kThorEnemyThreshold)
+                                .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Thor)
+                                .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Thor)
+                                .InvertChild<InputQueryNode>(InputAction::Bomb)
+
+                                .Child<DistanceThresholdNode>("nearest_target_position", 10.0f)
+                                .Child<ShotVelocityQueryNode>(WeaponType::Thor, "thor_fire_velocity")
+                                .Child<RayNode>("self_position", "thor_fire_velocity", "thor_fire_ray")
+                                .Child<DynamicPlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 3.0f)
+                                .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
+                                .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
+                                .Child<RenderRayNode>("world_camera", "thor_fire_ray", 50.0f, Vector3f(1.0f, 1.0f, 0.0f))
+                                .Child<RayRectangleInterceptNode>("thor_fire_ray", "target_bounds")
+                                .Child<InputActionNode>(InputAction::Thor)
+                                .End()
                             .Sequence(CompositeDecorator::Success) // Determine if a shot should be fired by using weapon trajectory and bounding boxes.
+                                .Child<TimerExpiredNode>("recharge_timer")
                                 .Child<DynamicPlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 4.0f)
                                 .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
                                 .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
