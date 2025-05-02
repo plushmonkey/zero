@@ -21,6 +21,13 @@ struct ExecuteContext;
 
 }  // namespace behavior
 
+struct BehaviorChangeEvent : public Event {
+  std::string previous;
+  std::string name;
+
+  BehaviorChangeEvent(const std::string& previous, const std::string& name) : previous(previous), name(name) {}
+};
+
 struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>,
                        EventHandler<JoinGameEvent>,
                        EventHandler<PlayerEnterEvent>,
@@ -74,8 +81,12 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>,
   };
 
   void SetBehavior(const std::string& name, std::unique_ptr<behavior::BehaviorNode> tree) {
+    std::string previous = behavior_name;
+
     behavior_name = name;
     behavior_tree = std::move(tree);
+
+    Event::Dispatch(BehaviorChangeEvent(previous, name));
   }
 
  private:

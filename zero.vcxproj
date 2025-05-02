@@ -231,6 +231,7 @@
     <ClInclude Include="zero\zones\hyperspace\nodes\SectorNode.h" />
     <ClInclude Include="zero\zones\hyperspace\nodes\GlobalGoToNode.h" />
     <ClInclude Include="zero\zones\local\ArenaSpamBehavior.h" />
+    <ClInclude Include="zero\zones\local\CommandResponseBehavior.h" />
     <ClInclude Include="zero\zones\local\CommandSpamBehavior.h" />
     <ClInclude Include="zero\zones\local\ShipChangeBehavior.h" />
     <ClInclude Include="zero\zones\metalgear\GunnerBehavior.h" />

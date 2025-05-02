@@ -53,8 +53,8 @@ class CommandExecutor {
   virtual std::vector<std::string> GetAliases() = 0;
   virtual std::string GetDescription() = 0;
 
-  inline int GetSecurityLevel() const { return security_level; }
-  void SetSecurityLevel(int level) { security_level = level; }
+  virtual int GetSecurityLevel() const { return security_level; }
+  virtual void SetSecurityLevel(int level) { security_level = level; }
 
  private:
   int security_level = 0;
@@ -74,6 +74,16 @@ class CommandSystem {
   void RegisterCommand(std::shared_ptr<CommandExecutor> executor) {
     for (std::string trigger : executor->GetAliases()) {
       commands_[trigger] = executor;
+    }
+  }
+
+  void UnregisterCommand(const std::string& command_name) {
+    auto iter = commands_.find(command_name);
+    if (iter == commands_.end()) return;
+
+    std::vector<std::string> aliases = iter->second->GetAliases();
+    for (auto& alias : aliases) {
+      commands_.erase(alias);
     }
   }
 

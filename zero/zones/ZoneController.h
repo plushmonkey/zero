@@ -9,7 +9,8 @@ namespace zero {
 
 struct ZoneController : EventHandler<ZeroBot::JoinRequestEvent>,
                         EventHandler<ArenaNameEvent>,
-                        EventHandler<BotController::UpdateEvent> {
+                        EventHandler<BotController::UpdateEvent>,
+                        EventHandler<BehaviorChangeEvent> {
   void HandleEvent(const ZeroBot::JoinRequestEvent& event) override {
     auto zone = event.server.zone;
 
@@ -50,6 +51,7 @@ struct ZoneController : EventHandler<ZeroBot::JoinRequestEvent>,
   }
 
   virtual void HandleEvent(const BotController::UpdateEvent& event) override {}
+  virtual void HandleEvent(const BehaviorChangeEvent& event) override {}
 
   // Return true if this controller should become active.
   virtual bool IsZone(Zone zone) = 0;
