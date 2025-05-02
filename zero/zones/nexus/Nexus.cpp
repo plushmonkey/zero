@@ -7,6 +7,7 @@
 #include <zero/zones/nexus/PubOffenseBehavior.h>
 #include <zero/zones/nexus/PubCoverBehavior.h>
 #include <zero/zones/nexus/TestBehavior.h>
+#include <zero/zones/nexus/DuelBehavior.h>
 
 namespace zero {
 namespace nexus {
@@ -28,6 +29,7 @@ void NexusController::CreateBehaviors(const char* arena_name) {
 
   repo.Add("puboffense", std::make_unique<PubOffenseBehavior>());
   repo.Add("pubcover", std::make_unique<PubCoverBehavior>());
+  repo.Add("duel", std::make_unique<DuelBehavior>());
   repo.Add("test", std::make_unique<TestBehavior>());
 
   SetBehavior("puboffense");

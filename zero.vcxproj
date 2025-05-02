@@ -89,6 +89,7 @@
     <ClCompile Include="zero\zones\devastation\center\CenterBehavior.cpp" />
     <ClCompile Include="zero\zones\devastation\Devastation.cpp" />
     <ClCompile Include="zero\zones\devastation\FrogRaceBehavior.cpp" />
+    <ClCompile Include="zero\zones\nexus\DuelBehavior.cpp" />
     <ClCompile Include="zero\zones\extremegames\CenterBehavior.cpp" />
     <ClCompile Include="zero\zones\extremegames\ExtremeGames.cpp" />
     <ClCompile Include="zero\zones\hyperspace\base\TestBehavior.cpp" />
@@ -219,6 +220,7 @@
     <ClInclude Include="zero\zones\devastation\nodes\GetAttachTargetNode.h" />
     <ClInclude Include="zero\zones\devastation\nodes\GetSpawnNode.h" />
     <ClInclude Include="zero\zones\devastation\nodes\CombatRoleNode.h" />
+    <ClInclude Include="zero\zones\nexus\DuelBehavior.h" />
     <ClInclude Include="zero\zones\extremegames\CenterBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\base\TestBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\center\BallBehavior.h" />
