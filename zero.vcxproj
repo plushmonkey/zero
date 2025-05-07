@@ -89,6 +89,8 @@
     <ClCompile Include="zero\zones\devastation\center\CenterBehavior.cpp" />
     <ClCompile Include="zero\zones\devastation\Devastation.cpp" />
     <ClCompile Include="zero\zones\devastation\FrogRaceBehavior.cpp" />
+    <ClCompile Include="zero\zones\nexus\TwosBehavior.cpp" />
+    <ClCompile Include="zero\zones\nexus\DuelBehavior.cpp" />
     <ClCompile Include="zero\zones\extremegames\CenterBehavior.cpp" />
     <ClCompile Include="zero\zones\extremegames\ExtremeGames.cpp" />
     <ClCompile Include="zero\zones\hyperspace\base\TestBehavior.cpp" />
@@ -107,6 +109,7 @@
     <ClCompile Include="zero\zones\nexus\PubCoverBehavior.cpp" />
     <ClCompile Include="zero\zones\nexus\PubOffenseBehavior.cpp" />
     <ClCompile Include="zero\zones\nexus\TestBehavior.cpp" />
+    <ClCompile Include="zero\zones\nexus\ThreesBehavior.cpp" />
     <ClCompile Include="zero\zones\svs\PowerballBehavior.cpp" />
     <ClCompile Include="zero\zones\svs\Svs.cpp" />
     <ClCompile Include="zero\zones\svs\TerrierBehavior.cpp" />
@@ -219,6 +222,9 @@
     <ClInclude Include="zero\zones\devastation\nodes\GetAttachTargetNode.h" />
     <ClInclude Include="zero\zones\devastation\nodes\GetSpawnNode.h" />
     <ClInclude Include="zero\zones\devastation\nodes\CombatRoleNode.h" />
+    <ClInclude Include="zero\zones\nexus\nodes\NearestTeammateNode.h" />
+    <ClInclude Include="zero\zones\nexus\TwosBehavior.h" />
+    <ClInclude Include="zero\zones\nexus\DuelBehavior.h" />
     <ClInclude Include="zero\zones\extremegames\CenterBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\base\TestBehavior.h" />
     <ClInclude Include="zero\zones\hyperspace\center\BallBehavior.h" />
@@ -237,6 +243,7 @@
     <ClInclude Include="zero\zones\metalgear\GunnerBehavior.h" />
     <ClInclude Include="zero\zones\metalgear\JuggBehavior.h" />
     <ClInclude Include="zero\zones\metalgear\SniperBehavior.h" />
+    <ClInclude Include="zero\zones\nexus\Nexus.h" />
     <ClInclude Include="zero\zones\nexus\PubCoverBehavior.h" />
     <ClInclude Include="zero\zones\nexus\PubOffenseBehavior.h" />
     <ClInclude Include="zero\zones\nexus\TestBehavior.h" />
@@ -246,6 +253,7 @@
     <ClInclude Include="zero\zones\svs\nodes\MemoryTargetNode.h" />
     <ClInclude Include="zero\zones\svs\nodes\DynamicPlayerBoundingBoxQueryNode.h" />
     <ClInclude Include="zero\zones\svs\nodes\NearbyEnemyWeaponQueryNode.h" />
+    <ClInclude Include="zero\zones\nexus\ThreesBehavior.h" />
     <ClInclude Include="zero\zones\svs\PowerballBehavior.h" />
     <ClInclude Include="zero\zones\svs\TerrierBehavior.h" />
     <ClInclude Include="zero\zones\svs\WarbirdBehavior.h" />
