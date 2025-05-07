@@ -3,6 +3,7 @@
 #include <zero/behavior/nodes/AimNode.h>
 #include <zero/behavior/nodes/BlackboardNode.h>
 #include <zero/behavior/nodes/InputActionNode.h>
+#include <zero/behavior/nodes/ChatNode.h>
 #include <zero/behavior/nodes/MapNode.h>
 #include <zero/behavior/nodes/MathNode.h>
 #include <zero/behavior/nodes/MoveNode.h>
@@ -21,12 +22,42 @@
 #include <zero/zones/svs/nodes/MemoryTargetNode.h>
 #include <zero/zones/svs/nodes/NearbyEnemyWeaponQueryNode.h>
 
+#include <zero/zones/nexus/Nexus.h>
 #include "DuelBehavior.h"
+
 
 using namespace zero::svs;
 
 namespace zero {
 namespace nexus {
+
+  struct Placeholder : public behavior::BehaviorNode {
+    Placeholder(const char* something) : something(something) {}
+        
+    behavior::ExecuteResult Execute(behavior::ExecuteContext & ctx) override {
+        float enter_delay = (ctx.bot->game->connection.settings.EnterDelay / 100.0f);
+        Player* self = ctx.bot->game->player_manager.GetSelf();
+
+        // Make sure we are in a ship and not dead.
+        if (!self || self->ship == 8) return behavior::ExecuteResult::Success;
+        if (self->enter_delay > 0.0f && self->enter_delay < enter_delay) return behavior::ExecuteResult::Success;
+    
+        auto opt_tw = ctx.blackboard.Value<Nexus*>("nex");
+        float radius = ctx.bot->game->connection.settings.ShipSettings[self->ship].GetRadius();
+        Nexus* nexus = *opt_tw;
+
+        path::Path entrance_path = ctx.bot->bot_controller->pathfinder->FindPath(
+            ctx.bot->game->GetMap(), self->position, nexus->entrance_position, radius, self->frequency);
+
+       // if (entrance_path.GetRemainingDistance() < nearby_threshold) {
+       //  return behavior::ExecuteResult::Success;
+       // }
+        return behavior::ExecuteResult::Success;
+    }
+    
+  const char* something = nullptr;
+};
+
 
 struct ShotSpreadNode : public behavior::BehaviorNode {
   ShotSpreadNode(const char* aimshot_key, float spread, float period)
@@ -71,30 +102,59 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
   constexpr float kLowEnergyThreshold = 450.0f;
   // This is how far away to check for enemies that are rushing at us with low energy.
   // We will stop dodging and try to finish them off if they are within this distance and low energy.
-  constexpr float kNearbyEnemyThreshold = 20.0f;
+  constexpr float kNearbyEnemyThreshold = 10.0f;
   constexpr float kRepelDistance = 16.0f;
   // How much damage that is going towards an enemy before we start bombing. This is to limit the frequency of our
   // bombing so it overlaps bullets and is harder to dodge.
-  constexpr float kBombRequiredDamageOverlap = 650.0f;
+  constexpr float kBombRequiredDamageOverlap = 250.0f;
   // How far away a target needs to be before we start varying our shots around the target.
-  constexpr float kShotSpreadDistanceThreshold = 25.0f;
+  constexpr float kShotSpreadDistanceThreshold = 10.0f;
 
   constexpr float kThorEnemyThreshold = 400.0f;
   // clang-format off
   builder
     .Selector()
-        .Sequence() // Enter the specified ship if not already in it.
+        .Sequence() //Join the queue first thing and auto join TODO: add command or checks to requeue if something goes wrong later such as recycled arena
+            .InvertChild<BlackboardSetQueryNode>("queued") //Check if we have already joined the queue, if not join
+            .Child<ChatMessageNode>(ChatMessageNode::Public("?next duelpub")) // Invert so this fails and freq is reevaluated.
+            .Child<ChatMessageNode>(ChatMessageNode::Public("?next -a")) // Invert so this fails and freq is reevaluated.
+            .Child<ScalarNode>(1.0f, "queued")
+            .End()
+        .Sequence() // Don't do anything while in spec
+            .Child<PlayerFrequencyQueryNode>("self_freq")
+            .Child<EqualityNode<u16>>("self_freq", 8025)  //Check spec
+            .Child<ScalarNode>(1.0f, "spectating")
+            .End()
+        .Sequence() // Match startup begins when we get taken out of spec (since we sit in spec when waiting) 
+            .Child<BlackboardSetQueryNode>("spectating")  //We just came out of spectating 
+            .Child<TimerSetNode>("match_startup", 600)  //Trigger match start timer (assumming 3 sec + however long it takes the other person to ready up)
+            .Child<BlackboardEraseNode>("spectating")
+            .End()
+        .Sequence() // Enter the specified ship if not already in it and have been taken out of spec.
+            .InvertChild<TimerExpiredNode>("match_startup")            
             .InvertChild<ShipQueryNode>("request_ship")
             .Child<ShipRequestNode>("request_ship")
             .End()
-       .Sequence() // Switch to own frequency when possible.
-            .Child<ReadConfigIntNode<u16>>("Freq", "request_freq")
-            .Child<PlayerFrequencyQueryNode>("self_freq")
-            .InvertChild<EqualityNode<u16>>("self_freq", "request_freq")
-            .Child<TimerExpiredNode>("next_freq_change_tick")
-            .Child<TimerSetNode>("next_freq_change_tick", 300)
-            .Child<PlayerChangeFrequencyNode>("request_freq")
+        .Sequence()  // Fire 1 shot startup shot and set targets position to monitor for when they move so we can get out of the ready check loop
+            .InvertChild<TimerExpiredNode>("match_startup")      
+            .Child<TimerExpiredNode>("pre_fire")  // just needs to be longer than match_start
+            .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bullet)
+            .Child<InputActionNode>(InputAction::Bullet)
+            .Child<TimerSetNode>("pre_fire", 1500)
             .End()
+      // .Sequence()  //If player shot at us cancel startup/ready check
+           // .InvertChild<TimerExpiredNode>("match_startup")      
+          //  .Child<ScalarThresholdNode<float>>("incoming_damage", "startup_damage_trigger")
+          //  .Child<BlackboardEraseNode>("match_startup")
+          //  .End()
+//       .Sequence() // Switch to own frequency when possible.
+//            .Child<ReadConfigIntNode<u16>>("Freq", "request_freq")
+//            .Child<PlayerFrequencyQueryNode>("self_freq")
+//            .InvertChild<EqualityNode<u16>>("self_freq", "request_freq")
+//            .Child<TimerExpiredNode>("next_freq_change_tick")
+//            .Child<TimerSetNode>("next_freq_change_tick", 300)
+//            .Child<PlayerChangeFrequencyNode>("request_freq")
+ //           .End()
         .Selector() // Choose to fight the player or follow waypoints.
             .Sequence() // Find nearest target and either path to them or seek them directly.
                 .Sequence()
@@ -102,45 +162,11 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                     .Child<NearestMemoryTargetNode>("nearest_target")
                     .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
                     .End()
-                .Sequence(CompositeDecorator::Success) // If we have a portal but no location, lay one down.
-                    .Child<ShipItemCountThresholdNode>(ShipItemType::Portal, 1)
-                    .InvertChild<ShipPortalPositionQueryNode>()
-                    .Child<InputActionNode>(InputAction::Portal)
-                    .End()
-                .Selector(CompositeDecorator::Success) // Toggle antiwarp based on energy
-                    .Sequence() // Enable antiwarp if we are healthy
-                        .Child<ShipCapabilityQueryNode>(ShipCapability_Antiwarp)
-                        .Child<PlayerEnergyPercentThresholdNode>(0.75f)
-                        .InvertChild<PlayerStatusQueryNode>(Status_Antiwarp)
-                        .Child<InputActionNode>(InputAction::Antiwarp)
-                        .End()
-                    .Sequence() // Disable antiwarp if we aren't healthy
-                        .Child<ShipCapabilityQueryNode>(ShipCapability_Antiwarp)
-                        .InvertChild<PlayerEnergyPercentThresholdNode>(0.75f)
-                        .Child<PlayerStatusQueryNode>(Status_Antiwarp)
-                        .Child<InputActionNode>(InputAction::Antiwarp)
-                        .End()
-                    .End()
                 .Selector()
                     .Sequence() // Attempt to dodge and use defensive items.
                         .Sequence(CompositeDecorator::Success) // Always check incoming damage so we can use it in repel and portal sequences.
                             .Child<IncomingDamageQueryNode>(kRepelDistance, "incoming_damage")
                             .Child<PlayerCurrentEnergyQueryNode>("self_energy")
-                            .End()
-                        .Sequence(CompositeDecorator::Success) // If we are in danger but can't repel, use our portal.
-                            .InvertChild<ShipItemCountThresholdNode>(ShipItemType::Repel)
-                            .Child<ShipPortalPositionQueryNode>() // Check if we have a portal down.
-                            .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
-                            .Child<TimerExpiredNode>("defense_timer")
-                            .Child<InputActionNode>(InputAction::Warp)
-                            .Child<TimerSetNode>("defense_timer", 100)
-                            .End()
-                        .Sequence(CompositeDecorator::Success) // Use repel when in danger.
-                            .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Repel)
-                            .Child<TimerExpiredNode>("defense_timer")
-                            .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
-                            .Child<InputActionNode>(InputAction::Repel)
-                            .Child<TimerSetNode>("defense_timer", 100)
                             .End()
                         .Sequence(CompositeDecorator::Invert) // Check if enemy is very low energy and close to use. Don't bother dodging if they are rushing us with low energy.
                             .Child<PlayerEnergyQueryNode>("nearest_target", "nearest_target_energy")
@@ -155,98 +181,66 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                         .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
                         .End()
                     .Sequence() // Aim at target and shoot while seeking them.
+                        .Child<TimerExpiredNode>("match_startup") 
                         .Child<AimNode>(WeaponType::Bullet, "nearest_target", "aimshot")
                         .Sequence(CompositeDecorator::Success)
                             .Child<DistanceThresholdNode>("nearest_target_position", kShotSpreadDistanceThreshold)
-                            .Child<ShotSpreadNode>("aimshot", 6.0f, 2.0f)
+                            .Child<ShotSpreadNode>("aimshot", 3.0f, 1.0f)
                             .End()
                         .Parallel()
                             .Child<FaceNode>("aimshot")
                             .Child<BlackboardEraseNode>("rushing")
                             .Selector()
-                                .Sequence()  // Run out the timer 
-                                     .InvertChild<TimerExpiredNode>("run_timer")
-                                     .Child<SeekNode>("aimshot", "run_distance", SeekNode::DistanceResolveType::Dynamic)
-                                     .End()
-                                .Sequence() // Begin running away if our energy is low.
-                                    .Child<TimerExpiredNode>("run_timer")                              
-                                    .InvertChild<PlayerEnergyPercentThresholdNode>(0.2f)
-                                    .Child<SeekNode>("aimshot", "run_distance", SeekNode::DistanceResolveType::Dynamic)
-                                    .Child<TimerSetNode>("run_timer", 500)
-                                    .Sequence()
-                                        .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Decoy)
-                                        .Child<TimerExpiredNode>("decoy_timer")
-                                        .Child<InputActionNode>(InputAction::Decoy)
-                                        .Child<TimerSetNode>("decoy_timer", 1000)    
-                                        .End()
-                                    .End()
-                                .Sequence() // Begin moving away if our energy is low.
-                                    .Child<TimerExpiredNode>("run_timer")
-                                    .InvertChild<PlayerEnergyPercentThresholdNode>(0.4f)
-                                    .Child<SeekNode>("aimshot", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
-                                    .End()
+              
+                      //          .Sequence()  // Run out the timer 
+                      //               .InvertChild<TimerExpiredNode>("run_timer")
+                      //               .Child<SeekNode>("aimshot", "run_distance", SeekNode::DistanceResolveType::Dynamic)
+                      //               .End()
+                      //          .Sequence() // Begin running away if our energy is low.
+                      //              .Child<TimerExpiredNode>("run_timer")                              
+                      //              .InvertChild<PlayerEnergyPercentThresholdNode>(0.2f)
+                      //              .Child<SeekNode>("aimshot", "run_distance", SeekNode::DistanceResolveType::Dynamic)
+                      //              .Child<TimerSetNode>("run_timer", 500)
+                      //              .End()
+
                                 .Sequence() // If our target is very low energy, rush at them
-                                    .Child<TimerExpiredNode>("run_timer")
-                                    .InvertChild<PlayerEnergyPercentThresholdNode>(0.6f)
                                     .Child<PlayerEnergyQueryNode>("nearest_target", "nearest_target_energy")
                                     .InvertChild<ScalarThresholdNode<float>>("nearest_target_energy", kLowEnergyThreshold)
                                     .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Static)
                                     .Child<ScalarNode>(1.0f, "rushing")
-                                    .Sequence() // If we have decent energy rocket at the as well
-                                        .Child<ShipItemCountThresholdNode>(ShipItemType::Rocket)
-                                        .Child<TimerExpiredNode>("rocket_timer")
-                                        .Child<PlayerEnergyPercentThresholdNode>(0.6f)
-                                        .Child<InputActionNode>(InputAction::Rocket)
-                                        .Child<TimerSetNode>("rocket_timer", 300)
-                                        .End()
+                                    .Child<BlackboardEraseNode>("recharge_timer")
+                                    .End()
+                                .Sequence() // Begin moving away if our energy is low.
+                                    .InvertChild<TimerExpiredNode>("recharge_timer")
+                                    .Child<SeekNode>("aimshot", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
+                                    .End()
+                                .Sequence() // Begin moving away if our energy is low.
+                                    .InvertChild<PlayerEnergyPercentThresholdNode>(0.3f)
+                                    .Child<SeekNode>("aimshot", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
+                                    .Child<TimerSetNode>("recharge_timer", 500)
                                     .End()
                                 .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
                                 .End()
-                            .Sequence(CompositeDecorator::Success) // Use burst when near a wall.
-                                .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Burst)
-                                .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
-                                .InvertChild<DistanceThresholdNode>("nearest_target_position", 15.0f)
-                                .Child<BurstAreaQueryNode>()
-                                .Child<InputActionNode>(InputAction::Burst)
-                                .End()
                             .Sequence(CompositeDecorator::Success) // Bomb fire check.
-                                .Child<TimerExpiredNode>("recharge_timer")
-                                .Child<PlayerEnergyPercentThresholdNode>(0.35f)
+                                .Child<TimerExpiredNode>("match_startup") 
+                                .Child<PlayerEnergyPercentThresholdNode>(0.60f)
                                 .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Bomb)
                                 .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
                                 .InvertChild<InputQueryNode>(InputAction::Thor)
                                 .Child<IncomingDamageQueryNode>("nearest_target", kRepelDistance * 2.5f, 2.75f, "outgoing_damage")
                                 .Child<ScalarThresholdNode<float>>("outgoing_damage", kBombRequiredDamageOverlap) // Check if we have enough bullets overlapping outgoing damage to fire a bomb into.
-                                .Child<DistanceThresholdNode>("nearest_target_position", 10.0f)
+                                .Child<DistanceThresholdNode>("nearest_target_position", 8.0f)
                                 .Child<ShotVelocityQueryNode>(WeaponType::Bomb, "bomb_fire_velocity")
                                 .Child<RayNode>("self_position", "bomb_fire_velocity", "bomb_fire_ray")
-                                .Child<DynamicPlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 3.0f)
+                                .Child<DynamicPlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 4.0f)
                                 .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
                                 .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
                                 .Child<RenderRayNode>("world_camera", "bomb_fire_ray", 50.0f, Vector3f(1.0f, 1.0f, 0.0f))
                                 .Child<RayRectangleInterceptNode>("bomb_fire_ray", "target_bounds")
                                 .Child<InputActionNode>(InputAction::Bomb)
                                 .End()
-                             .Sequence(CompositeDecorator::Success) // Thor fire check.
-                                .InvertChild<PlayerEnergyPercentThresholdNode>(0.35f)
-                                .Child<PlayerEnergyQueryNode>("nearest_target", "nearest_target_energy")
-                                .InvertChild<ScalarThresholdNode<float>>("nearest_target_energy", kThorEnemyThreshold)
-                                .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Thor)
-                                .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Thor)
-                                .InvertChild<InputQueryNode>(InputAction::Bomb)
-
-                                .Child<DistanceThresholdNode>("nearest_target_position", 10.0f)
-                                .Child<ShotVelocityQueryNode>(WeaponType::Thor, "thor_fire_velocity")
-                                .Child<RayNode>("self_position", "thor_fire_velocity", "thor_fire_ray")
-                                .Child<DynamicPlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 3.0f)
-                                .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
-                                .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
-                                .Child<RenderRayNode>("world_camera", "thor_fire_ray", 50.0f, Vector3f(1.0f, 1.0f, 0.0f))
-                                .Child<RayRectangleInterceptNode>("thor_fire_ray", "target_bounds")
-                                .Child<InputActionNode>(InputAction::Thor)
-                                .End()
                             .Sequence(CompositeDecorator::Success) // Determine if a shot should be fired by using weapon trajectory and bounding boxes.
-                                .Child<TimerExpiredNode>("recharge_timer")
+                                .Child<TimerExpiredNode>("match_startup")                 
                                 .Child<DynamicPlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 4.0f)
                                 .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
                                 .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
@@ -267,11 +261,6 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                             .End()
                         .End()
                     .End()
-                .End()
-            .Sequence()
-                .Child<FindNearestGreenNode>("nearest_green_position")
-                .Child<GoToNode>("nearest_green_position")
-                .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.0f))
                 .End()
             .Sequence() // Follow set waypoints.
                 .Child<WaypointNode>("waypoints", "waypoint_index", "waypoint_position", 15.0f)

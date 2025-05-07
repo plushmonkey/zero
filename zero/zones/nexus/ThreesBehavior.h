@@ -8,11 +8,11 @@
 namespace zero {
 namespace nexus {
 
-struct DuelBehavior : public behavior::Behavior {
+struct ThreesBehavior : public behavior::Behavior {
   void OnInitialize(behavior::ExecuteContext& ctx) override {
     // Setup blackboard here for this specific behavior
     ctx.blackboard.Set("request_ship", 4);
-    ctx.blackboard.Set("leash_distance", 35.0f);
+    ctx.blackboard.Set("leash_distance", 30.0f);
     ctx.blackboard.Set("run_distance", 50.0f);
     ctx.blackboard.Set("startup_damage_trigger", "50");
 
