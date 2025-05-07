@@ -70,13 +70,18 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
 
   const Vector2f center(512, 512);
   constexpr float kLowEnergyThreshold = 400.0f;
+
   // This is how far away to check for enemies that are rushing at us with low energy.
   // We will stop dodging and try to finish them off if they are within this distance and low energy.
   constexpr float kNearbyEnemyThreshold = 8.0f;
-  constexpr float kRepelDistance = 10.0f;
+
+  // Check for incoming damage within this range
+  constexpr float kRepelDistance = 16.0f;
+
   // How much damage that is going towards an enemy before we start bombing. This is to limit the frequency of our
   // bombing so it overlaps bullets and is harder to dodge.
   constexpr float kBombRequiredDamageOverlap = 400.0f;
+
   // How far away a target needs to be before we start varying our shots around the target.
   constexpr float kShotSpreadDistanceThreshold = 10.0f;
 
@@ -85,6 +90,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
 
   // How far away from a teammate before we regroup
   constexpr float kTeamRange = 75.0f;
+
   // clang-format off
   builder
     .Selector()
