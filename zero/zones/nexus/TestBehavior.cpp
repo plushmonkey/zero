@@ -251,6 +251,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                             .Sequence(CompositeDecorator::Success) // Bomb fire check.
                                 .Child<TimerExpiredNode>("match_startup") 
                                 .Child<TimerExpiredNode>("recharge_timer") 
+                                .InvertChild<BurstAreaQueryNode>() //dont use bombs in areas with walls
                                 .Child<PlayerEnergyPercentThresholdNode>(0.60f)
                                 .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Bomb)
                                 .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
@@ -267,7 +268,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                                 .Child<RenderRayNode>("world_camera", "bomb_fire_ray", 50.0f, Vector3f(1.0f, 1.0f, 0.0f))
                                 .Child<RayRectangleInterceptNode>("bomb_fire_ray", "target_bounds")
                                 .Child<InputActionNode>(InputAction::Bomb)
-                                .InvertChild<TimerSetNode>("recharge_timer", "20")  //add slight backoff after firing a bomb
+                               // .InvertChild<TimerSetNode>("recharge_timer", "20")  //add slight backoff after firing a bomb
                                 .End()
                             .Sequence(CompositeDecorator::Success) // PB thor fire check.
                                 .Child<TimerExpiredNode>("match_startup")
