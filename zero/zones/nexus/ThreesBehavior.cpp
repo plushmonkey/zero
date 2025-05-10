@@ -101,29 +101,29 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
   BehaviorBuilder builder;
 
   const Vector2f center(512, 512);
+
   constexpr float kLowEnergyThreshold = 400.0f;
 
   // This is how far away to check for enemies that are rushing at us with low energy.
   // We will stop dodging and try to finish them off if they are within this distance and low energy.
-  constexpr float kNearbyEnemyThreshold = 8.0f;
+  constexpr float kNearbyEnemyThreshold = 10.0f;
 
-
-  //Check for incoming damage within this range
-  constexpr float kRepelDistance = 16.0f;
+  // Check for incoming damage within this range
+  constexpr float kRepelDistance = 20.0f;
 
   // How much damage that is going towards an enemy before we start bombing. This is to limit the frequency of our
   // bombing so it overlaps bullets and is harder to dodge.
-  constexpr float kBombRequiredDamageOverlap = 400.0f;
-  
+  constexpr float kBombRequiredDamageOverlap = 300.0f;
+
   // How far away a target needs to be before we start varying our shots around the target.
-  constexpr float kShotSpreadDistanceThreshold = 10.0f;
+  constexpr float kShotSpreadDistanceThreshold = 6.0f;
 
   //  If an enemy is near us and we're low energy thor if below this value
   constexpr float kThorEnemyThreshold = 250.0f;
 
   // How far away from a teammate before we regroup
-  constexpr float kTeamRange = 75.0f;
-  
+  constexpr float kTeamRange = 45.0f;
+
   //.Child<ReadConfigIntNode<u16>>("queue_command1", "command1")
   //.Child<ReadConfigIntNode<u16>>("queue_command2", "command2")
   //.Child<ReadConfigIntNode<u16>>("queue_command3", "command3")
@@ -247,7 +247,7 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
                         .Child<DodgeIncomingDamage>(0.4f, 35.0f)
                         .End()
                     .Sequence() // Path to teammate if far away
-                        .Child<NearestTeammateNode>("nearest_teammate") //Make sure we have a teammate
+                        .Child<NearestTeammateNode>("nearest_teammate", 2) //Check 2nd furthest to ensure we don't get stuck 
                         .Child<PlayerPositionQueryNode>("nearest_teammate", "nearest_teammate_position")
                         .Child<DistanceThresholdNode>("nearest_teammate_position", kTeamRange) //If we're already near teammates dont run to them
                         .Child<PlayerEnergyQueryNode>("nearest_target", "nearest_target_energy")
