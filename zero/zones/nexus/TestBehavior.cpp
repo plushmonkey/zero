@@ -74,7 +74,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
 
   // This is how far away to check for enemies that are rushing at us with low energy.
   // We will stop dodging and try to finish them off if they are within this distance and low energy.
-  constexpr float kNearbyEnemyThreshold = 10.0f;
+  constexpr float kNearbyEnemyThreshold = 15.0f;
 
   // Check for incoming damage within this range
   constexpr float kRepelDistance = 20.0f;
@@ -90,7 +90,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
   constexpr float kThorEnemyThreshold = 250.0f;
 
   // How far away from a teammate before we regroup
-  constexpr float kTeamRange = 45.0f;
+  constexpr float kTeamRange = 55.0f;
 
   // clang-format off
   builder
@@ -177,7 +177,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                         .Child<DodgeIncomingDamage>(0.4f, 35.0f)
                         .End()
                     .Sequence() // Path to teammate if far away
-                        .Child<NearestTeammateNode>("nearest_teammate", 2) //Make sure we have a teammate, if more than 1 check the 2nd furthest
+                        .Child<NearestTeammateNode>("nearest_teammate") //Make sure we have a teammate, if more than 1 check the 2nd furthest
                         .Child<PlayerPositionQueryNode>("nearest_teammate", "nearest_teammate_position")
                         .Child<DistanceThresholdNode>("nearest_teammate_position", kTeamRange) //If we're already near teammates dont run to them
                         .Child<PlayerEnergyQueryNode>("nearest_target", "nearest_target_energy")
