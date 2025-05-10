@@ -99,14 +99,14 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
             .InvertChild<ShipQueryNode>("request_ship")
             .Child<ShipRequestNode>("request_ship")
             .End()
-       .Sequence() // Switch to own frequency when possible.
-            .Child<ReadConfigIntNode<u16>>("Freq", "request_freq")
-            .Child<PlayerFrequencyQueryNode>("self_freq")
-            .InvertChild<EqualityNode<u16>>("self_freq", "request_freq")
-            .Child<TimerExpiredNode>("next_freq_change_tick")
-            .Child<TimerSetNode>("next_freq_change_tick", 300)
-            .Child<PlayerChangeFrequencyNode>("request_freq")
-            .End()
+     //  .Sequence() // Switch to own frequency when possible.
+     //       .Child<ReadConfigIntNode<u16>>("Freq", "request_freq")
+     //       .Child<PlayerFrequencyQueryNode>("self_freq")
+     //       .InvertChild<EqualityNode<u16>>("self_freq", "request_freq")
+     //       .Child<TimerExpiredNode>("next_freq_change_tick")
+     //       .Child<TimerSetNode>("next_freq_change_tick", 300)
+     //       .Child<PlayerChangeFrequencyNode>("request_freq")
+     //       .End()
           .Selector() // Choose to fight the player or follow waypoints.
             .Sequence() // Find nearest target and either path to them or seek them directly.
                 .Sequence()
