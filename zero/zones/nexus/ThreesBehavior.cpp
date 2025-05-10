@@ -247,7 +247,7 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
                         .Child<DodgeIncomingDamage>(0.4f, 35.0f)
                         .End()
                     .Sequence() // Path to teammate if far away
-                        .Child<NearestTeammateNode>("nearest_teammate") //Make sure we have a teammate
+                        .Child<NearestTeammateNode>("nearest_teammate", 2) //Check 2nd furthest to ensure we don't get stuck 
                         .Child<PlayerPositionQueryNode>("nearest_teammate", "nearest_teammate_position")
                         .Child<DistanceThresholdNode>("nearest_teammate_position", kTeamRange) //If we're already near teammates dont run to them
                         .Child<PlayerEnergyQueryNode>("nearest_target", "nearest_target_energy")

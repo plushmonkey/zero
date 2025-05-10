@@ -6,21 +6,20 @@
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/game/Game.h>
 #include <zero/game/Logger.h>
+#include <variant>
 
 namespace zero {
 namespace nexus {
 
-struct teamList {
-  Player* player;
-  float distance;
+    struct teamList {
+        Player* player;
+        float distance;
+        bool operator<(const teamList& other) const {
+          return distance < other.distance;  // Sort based on 'distance' in ascending order
+        }
+    //    teamList(Player* player, float distance) : player(player), distance(distance) {}
+    };
 
- teamList(Player* p, float& d) : player(p), distance(d) {}
-  
-  // Sort by distance
-  bool operator < (const teamList& team) const { 
-      return (distance < team.distance); 
-  }
-};
 
 //Returns nearest teammate, optionally if factor is included can provide 2nd nearest temmate or 3rd, etc. as int 1 (for 1st closest), 2 for (2nd closest), etc.
   struct NearestTeammateNode : public behavior::BehaviorNode {
@@ -31,12 +30,6 @@ struct teamList {
     behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
       Player* self = ctx.bot->game->player_manager.GetSelf();
       if (!self) return behavior::ExecuteResult::Failure;
-
-      if (!player_factor) {
-        player_factor = 0;
-      } else {
-        player_factor = player_factor - 1;  //since index starts at 0 if we want the 1st closest teammate we pass a 1, 2 for 2nd closest, etc.
-      }
 
       Player* nearest = GetNearestTeammate(*ctx.bot->game, *self, *ctx.bot->bot_controller->region_registry, player_factor);
 
@@ -49,15 +42,14 @@ struct teamList {
 
    private:
     Player* GetNearestTeammate(Game& game, Player& self, RegionRegistry& region_registry, size_t& player_factor) {
-      Player* teammate = nullptr;
+      Player* best_teammate = nullptr;
       std::vector<teamList> team;
-
-      float closest_dist_sq = std::numeric_limits<float>::max();
+      size_t teamsize = 0;
 
       for (size_t i = 0; i < game.player_manager.player_count; ++i) {
         Player* player = game.player_manager.players + i;
 
-        if (player->name == self.name) continue;
+        if (player->id == self.id) continue;
         if (player->ship >= 8) continue;
         if (player->frequency != self.frequency) continue;
         if (player->IsRespawning()) continue;
@@ -70,20 +62,31 @@ struct teamList {
 
         float dist_sq = player->position.DistanceSq(self.position);
         
-        std::vector<teamList> teammate = {
-            {player, dist_sq},
-        };
-
         //Insert the player and their distance
-        team.insert(team.end(), teammate.begin(), teammate.end());
+        team.emplace_back(player, dist_sq);
       }
-      // Sort the team based on distance then we can return the desired player based on the provided factor
-      std::sort(team.begin(), team.end());
-     
-      //Get the desired teammte by factor
-     teammate = team[player_factor].player;
-     
-     return teammate;
+      
+      teamsize = team.size();
+      
+      //If no teamsize will return null leading to failed execute result
+      if (teamsize >= 1) {
+        // Sort the team based on distance then we can return the desired player based on the provided factor
+        std::sort(team.begin(), team.end());
+
+        // Index starts from 0 not 1
+        size_t index = player_factor - 1;  //Assuming this sorted correctly and they are in order by distance 
+
+        if (index > teamsize - 1) {
+          index = teamsize - 1;
+        }
+        //Try the specified player otherwise return the furthest player (assuming if they specified the 3rd player and they no longer exist you'd get the 2nd player)
+        try {
+          best_teammate = team[index].player;
+        } catch (const std::out_of_range& e) { }   
+      } 
+
+      return best_teammate;
+
   }
 
   inline bool IsSynchronized(Game& game, Player& player) {
@@ -97,7 +100,7 @@ struct teamList {
     return true;
   }
 
-  size_t player_factor = 0;
+  size_t player_factor = 1;
   const char* player_key = nullptr;
 };
 
