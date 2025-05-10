@@ -222,6 +222,7 @@
     <ClInclude Include="zero\zones\devastation\nodes\GetAttachTargetNode.h" />
     <ClInclude Include="zero\zones\devastation\nodes\GetSpawnNode.h" />
     <ClInclude Include="zero\zones\devastation\nodes\CombatRoleNode.h" />
+    <ClInclude Include="zero\zones\nexus\nodes\LowestTargetNode.h" />
     <ClInclude Include="zero\zones\nexus\nodes\NearestTeammateNode.h" />
     <ClInclude Include="zero\zones\nexus\TwosBehavior.h" />
     <ClInclude Include="zero\zones\nexus\DuelBehavior.h" />
