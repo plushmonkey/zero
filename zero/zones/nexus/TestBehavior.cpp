@@ -71,7 +71,10 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
 
   const Vector2f center(512, 512);
 
-  constexpr float kLowEnergyThreshold = 400.0f;
+
+  //Used for target prio
+  constexpr float kLowEnergyThreshold = 800.0f;
+  constexpr float kLowEnergyRushThreshold = 400.0f;
   constexpr float kLowEnergyDistanceThreshold = 25.0f;
 
   // This is how far away to check for enemies that are rushing at us with low energy.
@@ -188,8 +191,8 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                             .Child<TimerSetNode>("defense_timer", 100)
                             .End()
                         .Sequence(CompositeDecorator::Invert) // Check if enemy is very low energy and close to use. Don't bother dodging if they are rushing us with low energy.
-                            .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyThreshold)
-                            .InvertChild<DistanceThresholdNode>("target_position", "self_position", kNearbyEnemyThreshold)
+                            .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
+                            .InvertChild<DistanceThresholdNode>("target_position", "self_position", 10.0f)
                             .End()
                         .Child<DodgeIncomingDamage>(0.4f, 35.0f)
                         .End()
