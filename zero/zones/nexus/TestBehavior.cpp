@@ -208,8 +208,8 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                         .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
                         .End()
                     .Sequence() // Path to target if they aren't immediately visible.
-                        .InvertChild<VisibilityQueryNode>("nearest_target_position")
-                        .Child<GoToNode>("nearest_target_position")
+                        .InvertChild<VisibilityQueryNode>("target_position")
+                        .Child<GoToNode>("target_position")
                         .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
                         .End()
                     .Sequence() // Aim at target and shoot while seeking them.
