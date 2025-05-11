@@ -5,7 +5,6 @@
 #include <zero/ZeroBot.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/game/Game.h>
-#include <zero/game/Logger.h>
 
 namespace zero {
 namespace nexus {
@@ -81,7 +80,7 @@ namespace nexus {
         //Try the specified player otherwise return the furthest player (assuming if they specified the 3rd player and they no longer exist you'd get the 2nd player)
         try {
           best_teammate = team[index].player;
-        } catch (const std::out_of_range& e) { }   
+        } catch (const std::out_of_range&) { }   
       } 
 
       return best_teammate;

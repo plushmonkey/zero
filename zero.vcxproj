@@ -89,6 +89,7 @@
     <ClCompile Include="zero\zones\devastation\center\CenterBehavior.cpp" />
     <ClCompile Include="zero\zones\devastation\Devastation.cpp" />
     <ClCompile Include="zero\zones\devastation\FrogRaceBehavior.cpp" />
+    <ClCompile Include="zero\zones\nexus\TwosBoxBehavior.cpp" />
     <ClCompile Include="zero\zones\nexus\TwosBehavior.cpp" />
     <ClCompile Include="zero\zones\nexus\DuelBehavior.cpp" />
     <ClCompile Include="zero\zones\extremegames\CenterBehavior.cpp" />
@@ -222,6 +223,8 @@
     <ClInclude Include="zero\zones\devastation\nodes\GetAttachTargetNode.h" />
     <ClInclude Include="zero\zones\devastation\nodes\GetSpawnNode.h" />
     <ClInclude Include="zero\zones\devastation\nodes\CombatRoleNode.h" />
+    <ClInclude Include="zero\zones\nexus\TwosBoxBehavior.h" />
+    <ClInclude Include="zero\zones\nexus\nodes\PlayerByNameNode.h" />
     <ClInclude Include="zero\zones\nexus\nodes\LowestTargetNode.h" />
     <ClInclude Include="zero\zones\nexus\nodes\NearestTeammateNode.h" />
     <ClInclude Include="zero\zones\nexus\TwosBehavior.h" />
