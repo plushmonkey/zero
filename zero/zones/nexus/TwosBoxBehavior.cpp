@@ -4,6 +4,7 @@
 #include <zero/behavior/nodes/AttachNode.h>
 #include <zero/behavior/nodes/BlackboardNode.h>
 #include <zero/behavior/nodes/InputActionNode.h>
+#include <zero/behavior/nodes/ChatNode.h>
 #include <zero/behavior/nodes/MapNode.h>
 #include <zero/behavior/nodes/MathNode.h>
 #include <zero/behavior/nodes/MoveNode.h>
@@ -24,14 +25,44 @@
 #include <zero/zones/nexus/nodes/NearestTeammateNode.h>
 #include <zero/zones/nexus/nodes/LowestTargetNode.h>
 #include <zero/zones/trenchwars/nodes/AttachNode.h>
-#include <zero/zones/nexus/nodes/PlayerByNameNode.h>
 
-#include "TestBehavior.h"
+#include <zero/zones/nexus/Nexus.h>
+#include "TwosBoxBehavior.h"
+
 
 using namespace zero::svs;
 
 namespace zero {
 namespace nexus {
+
+//TODO WIP
+  struct Placeholder : public behavior::BehaviorNode {
+    Placeholder(const char* something) : something(something) {}
+        
+    behavior::ExecuteResult Execute(behavior::ExecuteContext & ctx) override {
+        float enter_delay = (ctx.bot->game->connection.settings.EnterDelay / 100.0f);
+        Player* self = ctx.bot->game->player_manager.GetSelf();
+
+        // Make sure we are in a ship and not dead.
+        if (!self || self->ship == 8) return behavior::ExecuteResult::Success;
+        if (self->enter_delay > 0.0f && self->enter_delay < enter_delay) return behavior::ExecuteResult::Success;
+    
+        auto opt_tw = ctx.blackboard.Value<Nexus*>("nex");
+        float radius = ctx.bot->game->connection.settings.ShipSettings[self->ship].GetRadius();
+        Nexus* nexus = *opt_tw;
+
+        path::Path entrance_path = ctx.bot->bot_controller->pathfinder->FindPath(
+            ctx.bot->game->GetMap(), self->position, nexus->entrance_position, radius, self->frequency);
+
+       // if (entrance_path.GetRemainingDistance() < nearby_threshold) {
+       //  return behavior::ExecuteResult::Success;
+       // }
+        return behavior::ExecuteResult::Success;
+    }
+    
+  const char* something = nullptr;
+};
+
 
 struct ShotSpreadNode : public behavior::BehaviorNode {
   ShotSpreadNode(const char* aimshot_key, float spread, float period)
@@ -67,26 +98,24 @@ struct ShotSpreadNode : public behavior::BehaviorNode {
   float period = 1.0f;
 };
 
-std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::ExecuteContext& ctx) {
+std::unique_ptr<behavior::BehaviorNode> TwosBoxBehavior::CreateTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
   BehaviorBuilder builder;
 
   const Vector2f center(512, 512);
 
-  //Used for target prio
-  constexpr float kLowEnergyThreshold = 900.0f; //Energy threshold to prio targets
-  constexpr float kLowEnergyDistanceThreshold = 25.0f;  //Distance threshold for prio targets
+  // Used for target prio
+  constexpr float kLowEnergyThreshold = 900.0f;         // Energy threshold to prio targets
+  constexpr float kLowEnergyDistanceThreshold = 25.0f;  // Distance threshold for prio targets
 
-// Rush threshold / dodge thresholds
-  constexpr float kLowEnergyRushThreshold = 500.0f;  //If within rush distance and below this threshold
-  constexpr float kRushDistanceThreshold = 15.0f;  //If below rush energy threshold and this distance 
-  constexpr u32 kRushRepelThreshold = 1;  //If we don't have this many reps dont rush targets
+  // Don't dodge below this
+  constexpr float kLowEnergyRushThreshold = 500.0f;  // Rush threshold
+  constexpr float kRushDistanceThreshold = 15.0f;
 
   // This is how far away to check for enemies that are rushing at us with low energy.
   // We will stop dodging and try to finish them off if they are within this distance and low energy.
   constexpr float kNearbyEnemyThreshold = 15.0f;
-
 
   // Check for incoming damage within this range
   constexpr float kRepelDistance = 15.0f;
@@ -102,41 +131,85 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
   constexpr float kThorEnemyThreshold = 250.0f;
 
   // How far away from a teammate before we regroup
-  constexpr float kTeamRange = 55.0f;
+  constexpr float kTeamRange = 40.0f;
 
+  constexpr float kAttachRange = 60.0f;
+  
+  //.Child<ReadConfigIntNode<u16>>("queue_command1", "command1")
+  //.Child<ReadConfigIntNode<u16>>("queue_command2", "command2")
+  //.Child<ReadConfigIntNode<u16>>("queue_command3", "command3")
+  //.Child<ChatMessageNode>(ChatMessageNode::PublicBlackboard("command1")) // Invert so this fails and freq is
+  //reevaluated. .Child<ChatMessageNode>(ChatMessageNode::PublicBlackboard("command2")) // Invert so this fails and freq
+  //is reevaluated. .Child<ChatMessageNode>(ChatMessageNode::PublicBlackboard("command3")) // Invert so this fails and
+  //freq is reevaluated.
   // clang-format off
   builder
     .Selector()
         .InvertChild<PlayerSelfNode>("self")
-        .Sequence() // Enter the specified ship if not already in it.
+        .Sequence() //Join the queue first thing and auto join TODO: add command or checks to requeue if something goes wrong later such as recycled arena
+            //.InvertChild<BlackboardSetQueryNode>("queued") //Check if we have already joined the queue, if not join
+            .Child<TimerExpiredNode>("queue")
+            .Child<ChatMessageNode>(ChatMessageNode::Public("?next pairspub")) // Invert so this fails and freq is reevaluated.  //TODO replace this with a config var so we dont need 4 behaviors
+            .Child<ChatMessageNode>(ChatMessageNode::Public("?next -a")) // Invert so this fails and freq is reevaluated.
+            .Child<TimerSetNode>("queue", 6000)
+            //.Child<ScalarNode>(1.0f, "queued")  //was only joining queue on join then stopped working
+            .End()
+        .Sequence() // Don't do anything while in spec
+            .Child<PlayerFrequencyQueryNode>("self_freq")
+            .Child<EqualityNode<u16>>("self_freq", 8025)  //Check spec
+            .Child<ScalarNode>(1.0f, "spectating")
+            .End()
+        .Sequence() // Match startup begins when we get taken out of spec (since we sit in spec when waiting) 
+            .Child<BlackboardSetQueryNode>("spectating")  //We just came out of spectating 
+            .Child<TimerSetNode>("match_startup", 600)  //Trigger match start timer (assumming 3 sec + however long it takes the other person to ready up)
+            .Child<BlackboardEraseNode>("spectating")
+            .End()
+        .Sequence() // Enter the specified ship if not already in it and have been taken out of spec.
+            .InvertChild<TimerExpiredNode>("match_startup")            
             .InvertChild<ShipQueryNode>("request_ship")
             .Child<ShipRequestNode>("request_ship")
             .End()
-     //  .Sequence() // Switch to own frequency when possible.
-     //       .Child<ReadConfigIntNode<u16>>("Freq", "request_freq")
-     //       .Child<PlayerFrequencyQueryNode>("self_freq")
-     //       .InvertChild<EqualityNode<u16>>("self_freq", "request_freq")
-     //       .Child<TimerExpiredNode>("next_freq_change_tick")
-     //       .Child<TimerSetNode>("next_freq_change_tick", 300)
-     //       .Child<PlayerChangeFrequencyNode>("request_freq")
-     //       .End()
-        .Sequence() //Attach if someone is safe and we have full energy
-                .Child<BlackboardSetQueryNode>("tchat_safe")
-                .Child<PlayerEnergyPercentThresholdNode>(1.0f)
-                .Child<TimerExpiredNode>("attach_cooldown")
-                .InvertChild<AttachedQueryNode>("self")
-                .Child<NearestTeammateNode>("nearest_teammate") 
-                .Child<PlayerPositionQueryNode>("nearest_teammate", "nearest_teammate_position")
-                .Child<DistanceThresholdNode>("nearest_teammate_position", kTeamRange) //If we're already near teammates dont run to them               
-                .Child<PlayerByNameNode>("tchat_safe", "tchat_safe_player")
-                .Child<AttachNode>("tchat_safe_player")
-                .Child<TimerSetNode>("attach_cooldown", 100)
-                .Child<BlackboardEraseNode>("tchat_safe")
-                .End()
-            .Sequence() // Detach if attached
-                .Child<AttachedQueryNode>("self")
-                .Child<DetachNode>()
-                .End()
+         .Sequence()  // Fire 1 shot startup shot and set targets position to monitor for when they move so we can get out of the ready check loop
+            .InvertChild<TimerExpiredNode>("match_startup")      
+            .Child<TimerExpiredNode>("pre_fire")  // just needs to be longer than match_start
+            .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bullet)
+            .Child<InputActionNode>(InputAction::Bullet)
+            .Child<TimerSetNode>("pre_fire", 1500)
+            .End()
+        .Sequence()  // Fire 1 shot startup shot and set targets position to monitor for when they move so we can get out of the ready check loop
+            .InvertChild<TimerExpiredNode>("match_startup")      
+            .Child<TimerExpiredNode>("pre_fire")  // just needs to be longer than match_start
+            .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bullet)
+            .Child<InputActionNode>(InputAction::Bullet)
+            .Child<TimerSetNode>("pre_fire", 1500)
+            .End()
+         .Sequence() 
+            .Child<PlayerEnergyPercentThresholdNode>(1.0f)
+            .Child<TimerExpiredNode>("attach_cooldown")
+            .Child<NearestTeammateNode>("nearest_teammate")   
+            .Child<PlayerPositionQueryNode>("nearest_teammate", "nearest_teammate_position")
+            .Child<DistanceThresholdNode>("nearest_teammate_position", kAttachRange) 
+            .InvertChild<AttachedQueryNode>("self")
+            .Child<AttachNode>("nearest_teammate")
+            .Child<TimerSetNode>("attach_cooldown", 100)
+            .End()
+        .Sequence() // Detach if attached
+            .Child<AttachedQueryNode>("self")
+            .Child<DetachNode>()
+            .End()
+      // .Sequence()  //If player shot at us cancel startup/ready check
+           // .InvertChild<TimerExpiredNode>("match_startup")      
+          //  .Child<ScalarThresholdNode<float>>("incoming_damage", "startup_damage_trigger")
+          //  .Child<BlackboardEraseNode>("match_startup")
+          //  .End()
+//       .Sequence() // Switch to own frequency when possible.
+//            .Child<ReadConfigIntNode<u16>>("Freq", "request_freq")
+//            .Child<PlayerFrequencyQueryNode>("self_freq")
+//            .InvertChild<EqualityNode<u16>>("self_freq", "request_freq")
+//            .Child<TimerExpiredNode>("next_freq_change_tick")
+//            .Child<TimerSetNode>("next_freq_change_tick", 300)
+//            .Child<PlayerChangeFrequencyNode>("request_freq")
+ //           .End()
           .Selector() // Choose to fight the player or follow waypoints.
             .Sequence() // Find nearest target and either path to them or seek them directly.              
                 .Sequence(CompositeDecorator::Success)
@@ -177,20 +250,6 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                         .InvertChild<DistanceThresholdNode>("target_position", 35.0f) // If we are far from enemy, turn off multifire
                         .Child<ShipMultifireQueryNode>()  //Check if multifire is on
                         .Child<InputActionNode>(InputAction::Multifire)  //Turn off multifire
-                        .End()
-                    .End()
-                .Selector(CompositeDecorator::Success) // Toggle antiwarp based on energy
-                    .Sequence() // Enable antiwarp if we are healthy
-                        .Child<ShipCapabilityQueryNode>(ShipCapability_Antiwarp)
-                        .Child<PlayerEnergyPercentThresholdNode>(0.75f)
-                        .InvertChild<PlayerStatusQueryNode>(Status_Antiwarp)
-                        .Child<InputActionNode>(InputAction::Antiwarp)
-                        .End()
-                    .Sequence() // Disable antiwarp if we aren't healthy
-                        .Child<ShipCapabilityQueryNode>(ShipCapability_Antiwarp)
-                        .InvertChild<PlayerEnergyPercentThresholdNode>(0.75f)
-                        .Child<PlayerStatusQueryNode>(Status_Antiwarp)
-                        .Child<InputActionNode>(InputAction::Antiwarp)
                         .End()
                     .End()
                 .Selector()
@@ -244,7 +303,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                             .Child<BlackboardEraseNode>("rushing")                      
                             .Selector()
                                .Sequence() // If there is any low target with in this range prioritize
-                                    .Child<ShipItemCountThresholdNode>(ShipItemType::Repel, kRushRepelThreshold) //dont rush if we have no reps
+                                    .Child<ShipItemCountThresholdNode>(ShipItemType::Repel) //dont rush if we have no reps
                                     .InvertChild<DistanceThresholdNode>("target_position", "self_position", kLowEnergyDistanceThreshold)
                                     .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
                                     .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Static)
@@ -305,7 +364,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                                 .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Thor)  //If its not on cd
                                 .InvertChild<InputQueryNode>(InputAction::Bomb)  //If we're not bombing
                                  .InvertChild<ScalarThresholdNode<float>>("target_energy", kThorEnemyThreshold)  //If the enemy is low health
-                                .InvertChild<DistanceThresholdNode>("target_position", 12.0f) //If the enemy within pb range
+                                .InvertChild<DistanceThresholdNode>("target_position", 8.0f) //If the enemy within pb range
                                 .Child<ShotVelocityQueryNode>(WeaponType::Thor, "thor_fire_velocity")
                                 .Child<RayNode>("self_position", "thor_fire_velocity", "thor_fire_ray")
                                 .Child<DynamicPlayerBoundingBoxQueryNode>("target", "target_bounds", 4.0f)
