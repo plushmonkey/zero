@@ -10,6 +10,7 @@
 #include <zero/zones/nexus/DuelBehavior.h>
 #include <zero/zones/nexus/TwosBehavior.h>
 #include <zero/zones/nexus/ThreesBehavior.h>
+#include <zero/zones/nexus/TwosBoxBehavior.h>
 
 #include <zero/zones/nexus/Nexus.h>
 
@@ -36,19 +37,20 @@ struct NexusController : ZoneController, EventHandler<ChatEvent> {
 static NexusController controller;
 
 void NexusController::HandleEvent(const ChatEvent& event) {
+  std::string sender = event.sender;
+  std::string message = event.message;
 
+  auto& chat_queue = bot->bot_controller->chat_queue;
 
-    std::string sender = event.sender;
-    std::string message = event.message;
+  if (event.type == ChatType::Team && (message.find("SAFE") == std::string::npos) &&
+      !(message.find("NOT") != std::string::npos)) {
+    //std::string response = "test " + sender + " test";
+    //bot->bot_controller->chat_queue.SendTeam(response.c_str());
     
-    auto& chat_queue = bot->bot_controller->chat_queue;
- 
-    if (event.type == ChatType::Team && message.find("NOT SAFE") != std::string::npos && chat_queue.IsEmpty()) {
-      std::string response = "test " + sender + " test";
-      bot->bot_controller->chat_queue.SendTeam(response.c_str());
-      bot->execute_ctx.blackboard.Set("tchat_not_safe", sender);
-      //Event::Dispatch(ChatQueueEvent::Public("On my way!"));
-    }
+    bot->execute_ctx.blackboard.Set("tchat_safe", sender);
+    // Event::Dispatch(ChatQueueEvent::Public("On my way!"));
+  }
+
 }
 
 void NexusController::CreateBehaviors(const char* arena_name) {
@@ -66,7 +68,9 @@ void NexusController::CreateBehaviors(const char* arena_name) {
   repo.Add("duel", std::make_unique<DuelBehavior>());
   repo.Add("twos", std::make_unique<TwosBehavior>());
   repo.Add("threes", std::make_unique<ThreesBehavior>());
+  repo.Add("twosbox", std::make_unique<TwosBoxBehavior>());
   repo.Add("test", std::make_unique<TestBehavior>());
+  
 
   SetBehavior("puboffense");
 }
