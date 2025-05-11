@@ -122,6 +122,25 @@ struct ArriveNode : public BehaviorNode {
   float deceleration;
 };
 
+struct AvoidTeamNode : public BehaviorNode {
+  AvoidTeamNode(const char* dist_key) : dist_key(dist_key) {}
+  AvoidTeamNode(float dist) : dist(dist) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    if (dist_key) {
+      auto opt_dist = ctx.blackboard.Value<float>(dist_key);
+      if (!opt_dist) return ExecuteResult::Failure;
+      dist = *opt_dist;
+    }
+
+    ctx.bot->bot_controller->steering.AvoidTeam(ctx.bot->bot_controller->game, dist);
+    return ExecuteResult::Success;
+  }
+
+  float dist = 0.0f;
+  const char* dist_key = nullptr;
+};
+
 struct RotationThresholdSetNode : public BehaviorNode {
   RotationThresholdSetNode(const char* threshold_key) : threshold_key(threshold_key) {}
   RotationThresholdSetNode(float threshold) : threshold(threshold) {}

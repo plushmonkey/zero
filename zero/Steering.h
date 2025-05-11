@@ -179,6 +179,40 @@ struct Steering {
       this->force += force_acc * (1.0f / force_count);
     }
   }
+
+  // Repel self from teammate to avoid synchronized movements
+  void AvoidTeam(Game& game, float dist) {
+    auto& pm = game.player_manager;
+
+    auto self = pm.GetSelf();
+    if (!self || dist <= 0.0f) return;
+
+    Vector2f avoid_force;
+    float count = 0.0f;
+
+    for (size_t i = 0; i < pm.player_count; ++i) {
+      Player* player = pm.players + i;
+
+      if (player->frequency != self->frequency) continue;
+      if (player->id == self->id) continue;
+      if (player->IsRespawning()) continue;
+      if (player->position == Vector2f(0, 0)) continue;
+      if (!game.player_manager.IsSynchronized(*player)) continue;
+
+      float dist_sq = player->position.DistanceSq(self->position);
+      if (dist_sq > dist * dist) continue;
+
+      float team_dist = sqrtf(dist_sq);
+      float diff = dist - team_dist;
+
+      avoid_force += Normalize(self->position - player->position) * (diff * diff);
+      ++count;
+    }
+
+    if (count > 0) {
+      this->force += (avoid_force / count);
+    }
+  }
 };
 
 }  // namespace zero
