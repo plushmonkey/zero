@@ -214,11 +214,6 @@ struct Steering {
       this->force += (avoid_force / count);
     }
 
-    std::string c = std::to_string(count);
-    std::string log = "Returning nearest teammate: " + c;
-
-    Log(LogLevel::Info, log.c_str());
-
   }
 };
 
