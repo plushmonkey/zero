@@ -3,6 +3,7 @@
 #include <math.h>
 #include <zero/Math.h>
 #include <zero/game/Game.h>
+#include <zero/game/Logger.h>
 
 namespace zero {
 
@@ -212,6 +213,12 @@ struct Steering {
     if (count > 0) {
       this->force += (avoid_force / count);
     }
+
+    std::string c = std::to_string(count);
+    std::string log = "Returning nearest teammate: " + c;
+
+    Log(LogLevel::Info, log.c_str());
+
   }
 };
 

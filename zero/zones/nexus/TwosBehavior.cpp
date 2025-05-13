@@ -184,7 +184,7 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
 //            .Child<TimerSetNode>("next_freq_change_tick", 300)
 //            .Child<PlayerChangeFrequencyNode>("request_freq")
  //           .End()
-          .Selector() // Choose to fight the player or follow waypoints.
+           .Selector() // Choose to fight the player or follow waypoints.
             .Sequence() // Find nearest target and either path to them or seek them directly.              
                 .Sequence(CompositeDecorator::Success)
                     .Child<PlayerPositionQueryNode>("self_position")    
@@ -278,6 +278,7 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
                     .Sequence() // Path to target if they aren't immediately visible.
                         .InvertChild<VisibilityQueryNode>("target_position")
                         .Child<GoToNode>("target_position")
+                        .Child<AvoidTeamNode>(8.0f)
                         .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
                         .End()
                     .Sequence() // Aim at target and shoot while seeking them.
@@ -291,7 +292,7 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
                             .Child<BlackboardEraseNode>("rushing")                      
                             .Selector()
                                .Sequence() // If there is any low target with in this range prioritize
-                                    .Child<ShipItemCountThresholdNode>(ShipItemType::Repel) //dont rush if we have no reps
+                                    //.Child<ShipItemCountThresholdNode>(ShipItemType::Repel, kRushRepelThreshold) //dont rush if we have no reps
                                     .InvertChild<DistanceThresholdNode>("target_position", "self_position", kLowEnergyDistanceThreshold)
                                     .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
                                     .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Static)
@@ -321,7 +322,11 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
                                         .Child<TimerSetNode>("decoy_timer", 1000)    
                                         .End()
                                     .End()
-                                .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
+                                .Sequence(CompositeDecorator::Success) 
+                                    .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
+                                    .InvertChild<BlackboardSetQueryNode>("rushing")
+                                    .Child<AvoidTeamNode>(8.0f)
+                                    .End()
                                 .End()
                             .Sequence(CompositeDecorator::Success) // Bomb fire check.
                                 .Child<TimerExpiredNode>("match_startup") 

@@ -120,23 +120,6 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
      //       .Child<TimerSetNode>("next_freq_change_tick", 300)
      //       .Child<PlayerChangeFrequencyNode>("request_freq")
      //       .End()
-        .Sequence() //Attach if someone is safe and we have full energy
-                .Child<BlackboardSetQueryNode>("tchat_safe")
-                .Child<PlayerEnergyPercentThresholdNode>(1.0f)
-                .Child<TimerExpiredNode>("attach_cooldown")
-                .InvertChild<AttachedQueryNode>("self")
-                .Child<NearestTeammateNode>("nearest_teammate") 
-                .Child<PlayerPositionQueryNode>("nearest_teammate", "nearest_teammate_position")
-                .Child<DistanceThresholdNode>("nearest_teammate_position", kTeamRange) //If we're already near teammates dont run to them               
-                .Child<PlayerByNameNode>("tchat_safe", "tchat_safe_player")
-                .Child<AttachNode>("tchat_safe_player")
-                .Child<TimerSetNode>("attach_cooldown", 100)
-                .Child<BlackboardEraseNode>("tchat_safe")
-                .End()
-            .Sequence() // Detach if attached
-                .Child<AttachedQueryNode>("self")
-                .Child<DetachNode>()
-                .End()
           .Selector() // Choose to fight the player or follow waypoints.
             .Sequence() // Find nearest target and either path to them or seek them directly.              
                 .Sequence(CompositeDecorator::Success)
@@ -231,6 +214,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                     .Sequence() // Path to target if they aren't immediately visible.
                         .InvertChild<VisibilityQueryNode>("target_position")
                         .Child<GoToNode>("target_position")
+                        .Child<AvoidTeamNode>(8.0f)
                         .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
                         .End()
                     .Sequence() // Aim at target and shoot while seeking them.
@@ -244,7 +228,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                             .Child<BlackboardEraseNode>("rushing")                      
                             .Selector()
                                .Sequence() // If there is any low target with in this range prioritize
-                                    .Child<ShipItemCountThresholdNode>(ShipItemType::Repel, kRushRepelThreshold) //dont rush if we have no reps
+                                    //.Child<ShipItemCountThresholdNode>(ShipItemType::Repel, kRushRepelThreshold) //dont rush if we have no reps
                                     .InvertChild<DistanceThresholdNode>("target_position", "self_position", kLowEnergyDistanceThreshold)
                                     .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
                                     .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Static)
@@ -274,7 +258,11 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                                         .Child<TimerSetNode>("decoy_timer", 1000)    
                                         .End()
                                     .End()
-                                .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
+                                .Sequence(CompositeDecorator::Success) 
+                                    .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
+                                    .InvertChild<BlackboardSetQueryNode>("rushing")
+                                    .Child<AvoidTeamNode>(8.0f)
+                                    .End()
                                 .End()
                             .Sequence(CompositeDecorator::Success) // Bomb fire check.
                                 .Child<TimerExpiredNode>("match_startup") 
@@ -305,7 +293,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                                 .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Thor)  //If its not on cd
                                 .InvertChild<InputQueryNode>(InputAction::Bomb)  //If we're not bombing
                                  .InvertChild<ScalarThresholdNode<float>>("target_energy", kThorEnemyThreshold)  //If the enemy is low health
-                                .InvertChild<DistanceThresholdNode>("target_position", 12.0f) //If the enemy within pb range
+                                .InvertChild<DistanceThresholdNode>("target_position", 8.0f) //If the enemy within pb range
                                 .Child<ShotVelocityQueryNode>(WeaponType::Thor, "thor_fire_velocity")
                                 .Child<RayNode>("self_position", "thor_fire_velocity", "thor_fire_ray")
                                 .Child<DynamicPlayerBoundingBoxQueryNode>("target", "target_bounds", 4.0f)
