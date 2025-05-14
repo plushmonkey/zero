@@ -212,6 +212,7 @@ struct Steering {
     if (count > 0) {
       this->force += (avoid_force / count);
     }
+
   }
 };
 
