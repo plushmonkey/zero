@@ -3,7 +3,6 @@
 #include <math.h>
 #include <zero/Math.h>
 #include <zero/game/Game.h>
-#include <zero/game/Logger.h>
 
 namespace zero {
 

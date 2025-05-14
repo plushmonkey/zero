@@ -104,16 +104,17 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
   const Vector2f center(512, 512);
 
   // Used for target prio
-  constexpr float kLowEnergyThreshold = 900.0f;         // Energy threshold to prio targets
-  constexpr float kLowEnergyDistanceThreshold = 25.0f;  // Distance threshold for prio targets
+  constexpr float kLowEnergyThreshold = 800.0f;         // Energy threshold to prio targets
+  constexpr float kLowEnergyDistanceThreshold = 20.0f;  // Distance threshold for prio targets
 
   // Don't dodge below this
-  constexpr float kLowEnergyRushThreshold = 500.0f;  // Rush threshold
-  constexpr float kRushDistanceThreshold = 15.0f;
+  constexpr float kLowEnergyRushThreshold = 400.0f;  // Rush threshold
+  constexpr float kRushDistanceThreshold = 15.0f;  //We will rush if someone is low energy within this range
+  constexpr u32 kRushRepelThreshold = 1;  // If we don't have this many reps dont rush targets
 
   // This is how far away to check for enemies that are rushing at us with low energy.
   // We will stop dodging and try to finish them off if they are within this distance and low energy.
-  constexpr float kNearbyEnemyThreshold = 15.0f;
+  constexpr float kNearbyEnemyThreshold = 10.0f;
 
   // Check for incoming damage within this range
   constexpr float kRepelDistance = 15.0f;
@@ -126,10 +127,14 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
   constexpr float kShotSpreadDistanceThreshold = 40.0f;
 
   //  If an enemy is near us and we're low energy thor if below this value
-  constexpr float kThorEnemyThreshold = 250.0f;
+  constexpr float kThorEnemyThreshold = 200.0f;
 
   // How far away from a teammate before we regroup
-  constexpr float kTeamRange = 40.0f;
+  constexpr float kTeamRange = 30.0f;
+
+  constexpr float kLeashDistance = 25.0f;
+
+  constexpr float kAvoidTeamDistance = 5.0f;
   
   //.Child<ReadConfigIntNode<u16>>("queue_command1", "command1")
   //.Child<ReadConfigIntNode<u16>>("queue_command2", "command2")
@@ -278,7 +283,7 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
                     .Sequence() // Path to target if they aren't immediately visible.
                         .InvertChild<VisibilityQueryNode>("target_position")
                         .Child<GoToNode>("target_position")
-                        .Child<AvoidTeamNode>(8.0f)
+                        .Child<AvoidTeamNode>(kAvoidTeamDistance)
                         .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
                         .End()
                     .Sequence() // Aim at target and shoot while seeking them.
@@ -292,7 +297,7 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
                             .Child<BlackboardEraseNode>("rushing")                      
                             .Selector()
                                .Sequence() // If there is any low target with in this range prioritize
-                                    //.Child<ShipItemCountThresholdNode>(ShipItemType::Repel, kRushRepelThreshold) //dont rush if we have no reps
+                                    .Child<ShipItemCountThresholdNode>(ShipItemType::Repel, kRushRepelThreshold) //dont rush if we have no reps
                                     .InvertChild<DistanceThresholdNode>("target_position", "self_position", kLowEnergyDistanceThreshold)
                                     .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
                                     .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Static)
@@ -310,7 +315,7 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
                                     .End()
                                 .Sequence()  //Keep enemy distance while reacharging
                                     .InvertChild<TimerExpiredNode>("recharge_timer")
-                                    .Child<SeekNode>("aimshot", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
+                                    .Child<SeekNode>("aimshot", kLeashDistance, SeekNode::DistanceResolveType::Dynamic)
                                     .End()
                                 .Sequence() 
                                     .InvertChild<PlayerEnergyPercentThresholdNode>(0.3f)
@@ -325,7 +330,7 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
                                 .Sequence(CompositeDecorator::Success) 
                                     .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
                                     .InvertChild<BlackboardSetQueryNode>("rushing")
-                                    .Child<AvoidTeamNode>(8.0f)
+                                    .Child<AvoidTeamNode>(kAvoidTeamDistance)
                                     .End()
                                 .End()
                             .Sequence(CompositeDecorator::Success) // Bomb fire check.
