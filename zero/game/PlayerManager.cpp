@@ -237,7 +237,14 @@ void PlayerManager::Update(float dt) {
       abs(server_timestamp - last_position_tick) >= position_delay) {
     SendPositionPacket();
   }
+
+  if (damage_count > 0 && TICK_DIFF(current_tick, last_send_damage_tick) >= 10) {
+    connection.SendDamage(damage_count, damages);
+    damage_count = 0;
+    last_send_damage_tick = current_tick;
+  }
 }
+
 void PlayerManager::Render(Camera& camera, SpriteRenderer& renderer) {
   Player* self = GetPlayerById(player_id);
 
@@ -433,6 +440,18 @@ void PlayerManager::RenderPlayerName(Camera& camera, SpriteRenderer& renderer, P
 
     renderer.PushText(camera, display, color, current_position.PixelRounded(), Layer::Ships);
   }
+}
+
+void PlayerManager::PushDamage(PlayerId shooter_id, WeaponData weapon_data, int energy, int damage) {
+  if (damage_count >= ZERO_ARRAY_SIZE(damages)) return;
+
+  Damage& dmg = damages[damage_count++];
+
+  dmg.timestamp = GetCurrentTick();
+  dmg.shooter_id = shooter_id;
+  dmg.weapon_data = weapon_data;
+  dmg.energy = (s16)energy;
+  dmg.damage = (s16)damage;
 }
 
 void PlayerManager::SendPositionPacket() {
@@ -1621,6 +1640,11 @@ void PlayerManager::SimulatePlayer(Player& player, float dt, bool extrapolating)
   TileId tile_id = connection.map.GetTileId(player.position);
   if (tile_id == kTileIdWormhole && player.id == this->player_id) {
     float energy_cost = ship_controller->ship.energy * 0.8f;
+
+    if (connection.send_damage) {
+      WeaponData wd = {WeaponType::Wormhole, 0, 0, 0, 0, 0};
+      PushDamage(this->player_id, wd, (int)player.energy, (int)energy_cost);
+    }
 
     this->Spawn(false);
     player.velocity = Vector2f(0, 0);

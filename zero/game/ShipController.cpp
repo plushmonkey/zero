@@ -2038,6 +2038,20 @@ void ShipController::OnWeaponHit(Weapon& weapon) {
 
   if (damage <= 0) return;
 
+  if (connection.send_damage) {
+    WeaponData wd = weapon.data;
+
+    if ((type == WeaponType::Bullet || type == WeaponType::BouncingBullet) && weapon.data.shrap > 0) {
+      wd.type = WeaponType::Shrapnel;
+      wd.shrapbouncing = 0;
+      wd.shraplevel = 0;
+      wd.shrap = 0;
+      wd.alternate = 0;
+    }
+
+    player_manager.PushDamage(shooter->id, wd, (int)self->energy, damage);
+  }
+
   bool died = false;
 
   if (self->energy < damage) {

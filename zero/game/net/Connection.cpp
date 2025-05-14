@@ -683,6 +683,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
       case ProtocolS2C::ModifyLVZ: {
       } break;
       case ProtocolS2C::ToggleSendDamage: {
+        send_damage = !send_damage;
       } break;
       case ProtocolS2C::WatchDamage: {
       } break;
@@ -989,6 +990,36 @@ void Connection::SendBallGoal(u8 ball_id, s16 x, s16 y) {
 #pragma pack(pop)
 
   packet_sequencer.SendReliableMessage(*this, (u8*)&pkt, sizeof(pkt));
+}
+
+void zero::Connection::SendDamage(size_t damage_count, Damage* damages) {
+  if (!send_damage || damage_count == 0) return;
+
+  u8 data[kMaxPacketSize];
+  NetworkBuffer buffer(data, kMaxPacketSize);
+
+  buffer.WriteU8((u8)ProtocolC2S::WatchDamage);
+  buffer.WriteU32(damages[0].timestamp);
+
+  for (size_t i = 0; i < damage_count; ++i) {
+    const Damage& dmg = damages[i];
+
+    buffer.WriteU16(dmg.shooter_id);
+    buffer.WriteU16(*(u16*)&dmg.weapon_data);
+    buffer.WriteU16((u16)dmg.energy);
+    buffer.WriteU16((u16)dmg.damage);
+
+    int timestamp_offset = TICK_DIFF(dmg.timestamp, damages[0].timestamp);
+    if (timestamp_offset < 0) {
+      timestamp_offset = 0;
+    } else if (timestamp_offset > 255) {
+      timestamp_offset = 255;
+    }
+
+    buffer.WriteU8((u8)timestamp_offset);
+  }
+
+  packet_sequencer.SendReliableMessage(*this, buffer.data, buffer.GetSize());
 }
 
 ConnectResult Connection::Connect(const char* ip, u16 port) {
