@@ -1,6 +1,7 @@
 #include <zero/behavior/BehaviorBuilder.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/behavior/nodes/AimNode.h>
+#include <zero/behavior/nodes/AttachNode.h>
 #include <zero/behavior/nodes/BlackboardNode.h>
 #include <zero/behavior/nodes/InputActionNode.h>
 #include <zero/behavior/nodes/ChatNode.h>
@@ -23,6 +24,8 @@
 #include <zero/zones/svs/nodes/NearbyEnemyWeaponQueryNode.h>
 #include <zero/zones/nexus/nodes/NearestTeammateNode.h>
 #include <zero/zones/nexus/nodes/LowestTargetNode.h>
+#include <zero/zones/trenchwars/nodes/AttachNode.h>
+#include <zero/zones/nexus/nodes/PlayerByNameNode.h>
 
 #include <zero/zones/nexus/Nexus.h>
 #include "TwosBehavior.h"
@@ -148,6 +151,7 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
   // clang-format off
   builder
     .Selector()
+         .InvertChild<PlayerSelfNode>("self")
         .Sequence() //Join the queue first thing and auto join TODO: add command or checks to requeue if something goes wrong later such as recycled arena
             //.InvertChild<BlackboardSetQueryNode>("queued") //Check if we have already joined the queue, if not join
             .Child<TimerExpiredNode>("queue")
@@ -177,6 +181,25 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
             .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bullet)
             .Child<InputActionNode>(InputAction::Bullet)
             .Child<TimerSetNode>("pre_fire", 1500)
+            .End()
+        .Sequence() //Attach if someone is safe and we have full energy
+            .Child<BlackboardSetQueryNode>("tchat_safe")
+            .InvertChild<TimerExpiredNode>("tchat_safe_timer")
+            .Child<PlayerEnergyPercentThresholdNode>(1.0f)
+            .Child<TimerExpiredNode>("attach_cooldown")
+            .InvertChild<AttachedQueryNode>("self")
+            .Child<NearestTeammateNode>("nearest_teammate") 
+            .Child<PlayerPositionQueryNode>("nearest_teammate", "nearest_teammate_position")
+            .Child<DistanceThresholdNode>("nearest_teammate_position", kTeamRange) //If we're already near teammates dont run to them               
+            .Child<PlayerByNameNode>("tchat_safe", "tchat_safe_player")
+            .Child<AttachNode>("tchat_safe_player")
+            .Child<TimerSetNode>("attach_cooldown", 100)
+            .Child<BlackboardEraseNode>("tchat_safe")
+            .Child<BlackboardEraseNode>("tchat_safe_timer")
+            .End()
+        .Sequence() // Detach if attached
+            .Child<AttachedQueryNode>("self")
+            .Child<DetachNode>()
             .End()
       // .Sequence()  //If player shot at us cancel startup/ready check
            // .InvertChild<TimerExpiredNode>("match_startup")      

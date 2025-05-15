@@ -43,11 +43,12 @@ void NexusController::HandleEvent(const ChatEvent& event) {
   auto& chat_queue = bot->bot_controller->chat_queue;
 
   if (event.type == ChatType::Team && (message.find("SAFE") == std::string::npos) &&
-      !(message.find("NOT") != std::string::npos)) {
+      !(message.find("NOT") == std::string::npos)) {
     //std::string response = "test " + sender + " test";
     //bot->bot_controller->chat_queue.SendTeam(response.c_str());
     
     bot->execute_ctx.blackboard.Set("tchat_safe", sender);
+    bot->execute_ctx.blackboard.Set<u32>("tchat_safe_timer", GetCurrentTick() + 2000);
     // Event::Dispatch(ChatQueueEvent::Public("On my way!"));
   }
 
