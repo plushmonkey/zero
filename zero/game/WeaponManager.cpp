@@ -274,7 +274,12 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon, u32 current_tick) {
   KDNode* node = nullptr;
 
   if (player_manager.kdtree) {
-    node = player_manager.kdtree->RangeSearch(weapon.position, max_distance);
+    // Range search is L2 distance, so max distance should be multiplied by sqrt(2) to handle box corner cases.
+    constexpr float sqrt2 = 1.5f;
+    // Add some buffer room for rounding errors
+    max_distance += 1.0f;
+
+    node = player_manager.kdtree->RangeSearch(weapon.position, max_distance * sqrt2);
   }
 
   if (node) {
