@@ -141,6 +141,16 @@ struct AvoidTeamNode : public BehaviorNode {
   const char* dist_key = nullptr;
 };
 
+struct AvoidWallsNode : public BehaviorNode {
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+
+    ctx.bot->bot_controller->steering.AvoidWalls(ctx.bot->bot_controller->game);
+    return ExecuteResult::Success;
+  }
+
+};
+
 struct RotationThresholdSetNode : public BehaviorNode {
   RotationThresholdSetNode(const char* threshold_key) : threshold_key(threshold_key) {}
   RotationThresholdSetNode(float threshold) : threshold(threshold) {}
