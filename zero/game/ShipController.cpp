@@ -2060,6 +2060,7 @@ void ShipController::OnWeaponHit(Weapon& weapon) {
     if (is_bomb && shooter->id == self->id) {
       self->energy = 1.0f;
     } else {
+      player_manager.SendDamagePacket();
       connection.SendDeath(weapon.player_id, self->bounty);
 
       self->enter_delay = (connection.settings.EnterDelay / 100.0f) + kAnimDurationShipExplode;

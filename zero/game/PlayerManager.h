@@ -104,6 +104,7 @@ struct PlayerManager {
   void RemovePlayer(Player* player);
 
   void PushDamage(PlayerId shooter_id, WeaponData weapon_data, int energy, int damage);
+  void SendDamagePacket();
 
   void SendPositionPacket();
   void SimulatePlayer(Player& player, float dt, bool extrapolating);

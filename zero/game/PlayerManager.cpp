@@ -239,8 +239,7 @@ void PlayerManager::Update(float dt) {
   }
 
   if (damage_count > 0 && TICK_DIFF(current_tick, last_send_damage_tick) >= 10) {
-    connection.SendDamage(damage_count, damages);
-    damage_count = 0;
+    SendDamagePacket();
     last_send_damage_tick = current_tick;
   }
 }
@@ -452,6 +451,11 @@ void PlayerManager::PushDamage(PlayerId shooter_id, WeaponData weapon_data, int 
   dmg.weapon_data = weapon_data;
   dmg.energy = (s16)energy;
   dmg.damage = (s16)damage;
+}
+
+void PlayerManager::SendDamagePacket() {
+  connection.SendDamage(damage_count, damages);
+  damage_count = 0;
 }
 
 void PlayerManager::SendPositionPacket() {
