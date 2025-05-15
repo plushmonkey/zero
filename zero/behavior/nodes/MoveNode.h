@@ -141,6 +141,32 @@ struct AvoidTeamNode : public BehaviorNode {
   const char* dist_key = nullptr;
 };
 
+struct AvoidEnemyNode : public BehaviorNode {
+  AvoidEnemyNode(const char* dist_key) : dist_key(dist_key) {}
+  AvoidEnemyNode(float dist) : dist(dist) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    if (dist_key) {
+      auto opt_dist = ctx.blackboard.Value<float>(dist_key);
+      if (!opt_dist) return ExecuteResult::Failure;
+      dist = *opt_dist;
+    }
+
+    ctx.bot->bot_controller->steering.AvoidEnemy(ctx.bot->bot_controller->game, dist);
+    return ExecuteResult::Success;
+  }
+
+  float dist = 0.0f;
+  const char* dist_key = nullptr;
+};
+
+struct AvoidWallsNode : public BehaviorNode {
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    ctx.bot->bot_controller->steering.AvoidWalls(ctx.bot->bot_controller->game);
+    return ExecuteResult::Success;
+  }
+};
+
 struct RotationThresholdSetNode : public BehaviorNode {
   RotationThresholdSetNode(const char* threshold_key) : threshold_key(threshold_key) {}
   RotationThresholdSetNode(float threshold) : threshold(threshold) {}
