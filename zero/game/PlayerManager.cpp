@@ -447,7 +447,7 @@ void PlayerManager::PushDamage(PlayerId shooter_id, WeaponData weapon_data, int 
 
   Damage& dmg = damages[damage_count++];
 
-  dmg.timestamp = GetCurrentTick();
+  dmg.timestamp = connection.GetServerTick();
   dmg.shooter_id = shooter_id;
   dmg.weapon_data = weapon_data;
   dmg.energy = (s16)energy;
