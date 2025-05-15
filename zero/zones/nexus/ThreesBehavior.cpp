@@ -139,6 +139,8 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
 
   constexpr float kAvoidTeamDistance = 5.0f;
 
+  constexpr float kAvoidEnemyDistance = 10.0f;
+
   //.Child<ReadConfigIntNode<u16>>("queue_command1", "command1")
   //.Child<ReadConfigIntNode<u16>>("queue_command2", "command2")
   //.Child<ReadConfigIntNode<u16>>("queue_command3", "command3")
@@ -286,7 +288,10 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
                     .Sequence() // Path to target if they aren't immediately visible.
                         .InvertChild<VisibilityQueryNode>("target_position")
                         .Child<GoToNode>("target_position")
-                        .Child<AvoidTeamNode>(kAvoidTeamDistance)
+                        .Parallel(CompositeDecorator::Success)
+                            .Child<AvoidTeamNode>(kAvoidTeamDistance)
+                            .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
+                            .End()
                         .Child<RenderPathNode>(Vector3f(1.0f, 0.5f, 0.5f))
                         .End()
                     .Sequence() // Aim at target and shoot while seeking them.
@@ -319,6 +324,7 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
                                 .Sequence()  //Keep enemy distance while reacharging
                                     .InvertChild<TimerExpiredNode>("recharge_timer")
                                     .Child<SeekNode>("aimshot", kLeashDistance, SeekNode::DistanceResolveType::Dynamic)
+                                    .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
                                     .Child<AvoidWallsNode>()
                                     .End()
                                 .Sequence() 

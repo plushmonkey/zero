@@ -131,6 +131,10 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
   // How far away from a teammate before we regroup
   constexpr float kTeamRange = 55.0f;
 
+  constexpr float kAvoidTeamDistance = 5.0f;
+
+  constexpr float kAvoidEnemyDistance = 10.0f;
+
   // clang-format off
 
   builder
@@ -270,6 +274,10 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                     .Sequence() // Path to target if they aren't immediately visible.
                         .InvertChild<VisibilityQueryNode>("target_position")
                         .Child<GoToNode>("target_position")
+                        .Parallel(CompositeDecorator::Success)
+                            .Child<AvoidTeamNode>(kAvoidTeamDistance)
+                            .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
+                            .End()
                         .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
                         .End()
                     .Sequence() // Aim at target and shoot while seeking them.
@@ -302,6 +310,7 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                                 .Sequence()  //Keep enemy distance while reacharging
                                     .InvertChild<TimerExpiredNode>("recharge_timer")             
                                     .Child<SeekNode>("aimshot", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
+                                    .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
                                     .Child<AvoidWallsNode>()
                                     .End()
                                 .Sequence() 
