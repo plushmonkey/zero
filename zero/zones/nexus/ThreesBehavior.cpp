@@ -190,7 +190,7 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
             .InvertChild<AttachedQueryNode>("self")
             .Child<NearestTeammateNode>("nearest_teammate") 
             .Child<PlayerPositionQueryNode>("nearest_teammate", "nearest_teammate_position")
-            .Child<DistanceThresholdNode>("nearest_teammate_position", kTeamRange) //If we're already near teammates dont run to them               
+            .Child<DistanceThresholdNode>("nearest_teammate_position", kTeamRange) //If we're already near teammates dont attach to them               
             .Child<PlayerByNameNode>("tchat_safe", "tchat_safe_player")
             .Child<AttachNode>("tchat_safe_player")
             .Child<TimerSetNode>("attach_cooldown", 100)
@@ -258,6 +258,7 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
                     .End()
                 .Selector(CompositeDecorator::Success) // Toggle antiwarp based on energy
                     .Sequence() // Enable antiwarp if we are healthy
+                        .Child<TimerExpiredNode>("tchat_safe_timer")  
                         .Child<ShipCapabilityQueryNode>(ShipCapability_Antiwarp)
                         .Child<PlayerEnergyPercentThresholdNode>(0.75f)
                         .InvertChild<PlayerStatusQueryNode>(Status_Antiwarp)

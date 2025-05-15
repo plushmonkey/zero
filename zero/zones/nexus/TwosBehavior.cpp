@@ -258,6 +258,7 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
                     .End()
                 .Selector(CompositeDecorator::Success) // Toggle antiwarp based on energy
                     .Sequence() // Enable antiwarp if we are healthy
+                        .Child<TimerExpiredNode>("tchat_safe_timer")        
                         .Child<ShipCapabilityQueryNode>(ShipCapability_Antiwarp)
                         .Child<PlayerEnergyPercentThresholdNode>(0.75f)
                         .InvertChild<PlayerStatusQueryNode>(Status_Antiwarp)
