@@ -131,6 +131,10 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
   // How far away from a teammate before we regroup
   constexpr float kTeamRange = 55.0f;
 
+  constexpr float kAvoidTeamDistance = 5.0f;
+
+  constexpr float kAvoidEnemyDistance = 10.0f;
+
   // clang-format off
 
   builder
@@ -256,8 +260,8 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                         .Sequence(CompositeDecorator::Invert) // Check if enemy is very low energy and close to use. Don't bother dodging if they are rushing us with low energy.
                             .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
                             .InvertChild<DistanceThresholdNode>("target_position", "self_position", kRushDistanceThreshold)
-                            .End()
-                        .Child<DodgeIncomingDamage>(0.3f, 30.0f)
+                            .End()  
+                        .Child<DodgeIncomingDamage>(0.05f, 25.0f) //was .3 30
                         .End()
                     .Sequence() // Path to teammate if far away
                         .Child<NearestTeammateNode>("nearest_teammate", 2) //Make sure we have at least 1 teammate close, if more than one stay with the broader group
@@ -270,6 +274,10 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                     .Sequence() // Path to target if they aren't immediately visible.
                         .InvertChild<VisibilityQueryNode>("target_position")
                         .Child<GoToNode>("target_position")
+                        .Parallel(CompositeDecorator::Success)
+                            .Child<AvoidTeamNode>(kAvoidTeamDistance)
+                            .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
+                            .End()
                         .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
                         .End()
                     .Sequence() // Aim at target and shoot while seeking them.
@@ -300,8 +308,10 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                                     .Child<BlackboardEraseNode>("recharge_timer")
                                     .End()
                                 .Sequence()  //Keep enemy distance while reacharging
-                                    .InvertChild<TimerExpiredNode>("recharge_timer")
+                                    .InvertChild<TimerExpiredNode>("recharge_timer")             
                                     .Child<SeekNode>("aimshot", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
+                                    .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
+                                    .Child<AvoidWallsNode>()
                                     .End()
                                 .Sequence() 
                                     .InvertChild<PlayerEnergyPercentThresholdNode>(0.3f)

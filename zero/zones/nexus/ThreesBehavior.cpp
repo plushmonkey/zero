@@ -107,11 +107,11 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
   const Vector2f center(512, 512);
 
   // Used for target prio
-  constexpr float kLowEnergyThreshold = 900.0f;         // Energy threshold to prio targets
+  constexpr float kLowEnergyThreshold = 800.0f;         // Energy threshold to prio targets
   constexpr float kLowEnergyDistanceThreshold = 25.0f;  // Distance threshold for prio targets
 
   // Rush threshold / dodge thresholds
-  constexpr float kLowEnergyRushThreshold = 500.0f;  // If within rush distance and below this threshold
+  constexpr float kLowEnergyRushThreshold = 400.0f;  // If within rush distance and below this threshold
   constexpr float kRushDistanceThreshold = 15.0f;    // If below rush energy threshold and this distance
   constexpr u32 kRushRepelThreshold = 1;             // If we don't have this many reps dont rush targets
 
@@ -133,7 +133,13 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
   constexpr float kThorEnemyThreshold = 250.0f;
 
   // How far away from a teammate before we regroup
-  constexpr float kTeamRange = 55.0f;
+  constexpr float kTeamRange = 45.0f;
+
+  constexpr float kLeashDistance = 25.0f;
+
+  constexpr float kAvoidTeamDistance = 5.0f;
+
+  constexpr float kAvoidEnemyDistance = 10.0f;
 
   //.Child<ReadConfigIntNode<u16>>("queue_command1", "command1")
   //.Child<ReadConfigIntNode<u16>>("queue_command2", "command2")
@@ -188,7 +194,7 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
 //            .Child<TimerSetNode>("next_freq_change_tick", 300)
 //            .Child<PlayerChangeFrequencyNode>("request_freq")
  //           .End()
-          .Selector() // Choose to fight the player or follow waypoints.
+           .Selector() // Choose to fight the player or follow waypoints.
             .Sequence() // Find nearest target and either path to them or seek them directly.              
                 .Sequence(CompositeDecorator::Success)
                     .Child<PlayerPositionQueryNode>("self_position")    
@@ -269,7 +275,7 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
                             .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
                             .InvertChild<DistanceThresholdNode>("target_position", "self_position", kRushDistanceThreshold)
                             .End()
-                        .Child<DodgeIncomingDamage>(0.3f, 30.0f)
+                        .Child<DodgeIncomingDamage>(0.05f, 25.0f) //was .3 30
                         .End()
                     .Sequence() // Path to teammate if far away
                         .Child<NearestTeammateNode>("nearest_teammate", 2) //Make sure we have at least 1 teammate close, if more than one stay with the broader group
@@ -282,8 +288,11 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
                     .Sequence() // Path to target if they aren't immediately visible.
                         .InvertChild<VisibilityQueryNode>("target_position")
                         .Child<GoToNode>("target_position")
-                        .Child<AvoidTeamNode>(8.0f)
-                        .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
+                        .Parallel(CompositeDecorator::Success)
+                            .Child<AvoidTeamNode>(kAvoidTeamDistance)
+                            .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
+                            .End()
+                        .Child<RenderPathNode>(Vector3f(1.0f, 0.5f, 0.5f))
                         .End()
                     .Sequence() // Aim at target and shoot while seeking them.
                         .Child<TimerExpiredNode>("match_startup") 
@@ -296,7 +305,7 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
                             .Child<BlackboardEraseNode>("rushing")                      
                             .Selector()
                                .Sequence() // If there is any low target with in this range prioritize
-                                    //.Child<ShipItemCountThresholdNode>(ShipItemType::Repel, kRushRepelThreshold) //dont rush if we have no reps
+                                    .Child<ShipItemCountThresholdNode>(ShipItemType::Repel, kRushRepelThreshold) //dont rush if we have no reps
                                     .InvertChild<DistanceThresholdNode>("target_position", "self_position", kLowEnergyDistanceThreshold)
                                     .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
                                     .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Static)
@@ -314,7 +323,9 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
                                     .End()
                                 .Sequence()  //Keep enemy distance while reacharging
                                     .InvertChild<TimerExpiredNode>("recharge_timer")
-                                    .Child<SeekNode>("aimshot", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
+                                    .Child<SeekNode>("aimshot", kLeashDistance, SeekNode::DistanceResolveType::Dynamic)
+                                    .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
+                                    .Child<AvoidWallsNode>()
                                     .End()
                                 .Sequence() 
                                     .InvertChild<PlayerEnergyPercentThresholdNode>(0.3f)
@@ -329,7 +340,6 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
                                 .Sequence(CompositeDecorator::Success) 
                                     .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
                                     .InvertChild<BlackboardSetQueryNode>("rushing")
-                                    .Child<AvoidTeamNode>(8.0f)
                                     .End()
                                 .End()
                             .Sequence(CompositeDecorator::Success) // Bomb fire check.
