@@ -1,6 +1,7 @@
 #pragma once
 
 #include <zero/BotController.h>
+#include <zero/ChatQueue.h>
 #include <zero/ZeroBot.h>
 #include <zero/behavior/Behavior.h>
 #include <zero/game/GameEvent.h>
@@ -9,6 +10,7 @@ namespace zero {
 
 struct ZoneController : EventHandler<ZeroBot::JoinRequestEvent>,
                         EventHandler<ArenaNameEvent>,
+                        EventHandler<JoinGameEvent>,
                         EventHandler<BotController::UpdateEvent>,
                         EventHandler<BehaviorChangeEvent> {
   void HandleEvent(const ZeroBot::JoinRequestEvent& event) override {
@@ -17,6 +19,23 @@ struct ZoneController : EventHandler<ZeroBot::JoinRequestEvent>,
     bot = &event.bot;
 
     in_zone = IsZone(event.server.zone);
+  }
+
+  void HandleEvent(const JoinGameEvent& event) override {
+    if (!in_zone) return;
+
+    const char* group_lookups[] = {to_string(bot->server_info.zone), "General"};
+
+    auto opt_chats = bot->config->GetString(group_lookups, ZERO_ARRAY_SIZE(group_lookups), "Chat");
+    if (opt_chats) {
+      std::string chat_command = std::string("?chat=") + *opt_chats;
+      Event::Dispatch(ChatQueueEvent::Public(chat_command.data()));
+    }
+
+    auto opt_chat_broadcast = bot->config->GetInt(group_lookups, ZERO_ARRAY_SIZE(group_lookups), "CommandBroadcast");
+    if (opt_chat_broadcast) {
+      bot->commands->SetChatBroadcast(*opt_chat_broadcast);
+    }
   }
 
   void HandleEvent(const ArenaNameEvent& event) override {

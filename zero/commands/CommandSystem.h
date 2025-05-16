@@ -87,6 +87,8 @@ class CommandSystem {
     }
   }
 
+  void SetChatBroadcast(bool enabled) { chat_broadcast = enabled; }
+
   int GetSecurityLevel(const std::string& player);
 
   Commands& GetCommands() { return commands_; }
@@ -104,6 +106,8 @@ class CommandSystem {
 
   int default_security_level_ = 0;
   int arena_security_level_ = 5;
+
+  bool chat_broadcast = false;
 
   std::vector<std::shared_ptr<CommandExecutor>> default_commands_;
 };

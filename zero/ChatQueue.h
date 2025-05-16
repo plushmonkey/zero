@@ -15,6 +15,7 @@ struct ChatQueueEvent {
   std::string message;
   const char* target_name = nullptr;
   u16 frequency = 0;
+  u16 channel = 0;
 
   static ChatQueueEvent Public(const char* message) {
     ChatQueueEvent event;
@@ -50,6 +51,16 @@ struct ChatQueueEvent {
     event.type = ChatType::OtherTeam;
     event.message = message;
     event.frequency = frequency;
+
+    return event;
+  }
+
+  static ChatQueueEvent Channel(u16 channel, const char* message) {
+    ChatQueueEvent event;
+
+    event.type = ChatType::Channel;
+    event.message = message;
+    event.channel = channel;
 
     return event;
   }
@@ -101,6 +112,7 @@ struct ChatQueue : EventHandler<ChatQueueEvent>, EventHandler<ChatEvent> {
   void SendPrivate(const char* target_name, const char* message);
   void SendTeam(const char* message);
   void SendFrequency(u16 frequency, const char* message);
+  void SendChannel(u16 channel, const char* message);
 
   void HandleEvent(const ChatQueueEvent& event) override;
   void HandleEvent(const ChatEvent& event) override;

@@ -37,6 +37,13 @@ RequestShip = 6
 [Nexus]
 Freq = 123
 
+[TrenchWars]
+RequestShip = 3
+# Sets the chats to join when entering.
+Chat = zerotw
+# Set this to 1 to broadcast command use to the first chat.
+CommandBroadcast = 1
+
 # Only these servers are supported. The names must not be changed.
 [Servers]
 Local = 127.0.0.1:5000

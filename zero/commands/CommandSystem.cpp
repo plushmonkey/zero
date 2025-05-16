@@ -461,6 +461,7 @@ void CommandSystem::OnChatPacket(const u8* pkt, size_t size) {
   }
 
   std::vector<std::string_view> tokens = Tokenize(msg, ';');
+  bool executed = false;
 
   for (std::string_view current_msg : tokens) {
     std::size_t split = current_msg.find(' ');
@@ -503,10 +504,19 @@ void CommandSystem::OnChatPacket(const u8* pkt, size_t size) {
           if (!(command.GetFlags() & CommandFlag_Lockable) || !bb.ValueOr<bool>("CmdLock", false) ||
               security_level > 0) {
             command.Execute(*this, bot, std::string(sender_name), arg);
+            executed = true;
           }
         }
       }
     }
+  }
+
+  if (executed && chat_broadcast) {
+    std::string broadcast = sender_name.empty() ? "[Arena]" : sender_name.data();
+    broadcast += " executed command: ";
+    broadcast += std::string_view(msg_raw, msg_size);
+
+    Event::Dispatch(ChatQueueEvent::Channel(1, broadcast.data()));
   }
 }
 
