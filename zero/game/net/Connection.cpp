@@ -33,6 +33,9 @@
 
 namespace zero {
 
+// Client features that extend beyond the VIE client so the server knows we support them.
+// Works with SubspaceServer.NET:
+// https://github.com/gigamon-dev/SubspaceServer/blob/master/src/Packets/Game/LoginPacket.cs
 enum {
   ClientFeature_WatchDamage = (1 << 0),
   ClientFeature_BatchPositions = (1 << 1),
@@ -116,7 +119,7 @@ Connection::TickResult Connection::Tick() {
   addr.sin_addr.s_addr = remote_addr.addr;
 
   zero::Tick current_tick = GetCurrentTick();
-  
+
   constexpr u32 kConnectTimeout = 500;
   if (login_state == Connection::LoginState::EncryptionRequested &&
       TICK_DIFF(current_tick, connect_tick) >= kConnectTimeout) {
@@ -264,7 +267,16 @@ void Connection::SendPassword(bool registration) {
   buffer.WriteU16(version);     // Version
 
   buffer.WriteU16(444);
-  buffer.WriteU16(ClientFeature_WatchDamage | ClientFeature_WarpTo);
+
+  u16 client_features = 0;
+
+  client_features |= ClientFeature_WatchDamage;
+  client_features |= ClientFeature_BatchPositions;
+  client_features |= ClientFeature_WarpTo;
+  // We don't render LVZ, but it doesn't hurt to receive their packets in case we want to do something with them.
+  client_features |= ClientFeature_Lvz;
+
+  buffer.WriteU16(client_features);
 
   buffer.WriteU32(0x00);
   buffer.WriteU32(0x00);
