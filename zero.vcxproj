@@ -116,6 +116,7 @@
     <ClCompile Include="zero\zones\svs\TerrierBehavior.cpp" />
     <ClCompile Include="zero\zones\svs\WarbirdBehavior.cpp" />
     <ClCompile Include="zero\zones\svs\WarzoneBehavior.cpp" />
+    <ClCompile Include="zero\zones\trenchwars\BasingBehavior.cpp" />
     <ClCompile Include="zero\zones\trenchwars\SharkBehavior.cpp" />
     <ClCompile Include="zero\zones\trenchwars\SpiderBehavior.cpp" />
     <ClCompile Include="zero\zones\trenchwars\TerrierBehavior.cpp" />
@@ -262,7 +263,9 @@
     <ClInclude Include="zero\zones\svs\TerrierBehavior.h" />
     <ClInclude Include="zero\zones\svs\WarbirdBehavior.h" />
     <ClInclude Include="zero\zones\svs\WarzoneBehavior.h" />
+    <ClInclude Include="zero\zones\trenchwars\BasingBehavior.h" />
     <ClInclude Include="zero\zones\trenchwars\nodes\AttachNode.h" />
+    <ClInclude Include="zero\zones\trenchwars\nodes\BaseNode.h" />
     <ClInclude Include="zero\zones\trenchwars\nodes\FlagNode.h" />
     <ClInclude Include="zero\zones\trenchwars\SharkBehavior.h" />
     <ClInclude Include="zero\zones\trenchwars\SpiderBehavior.h" />
