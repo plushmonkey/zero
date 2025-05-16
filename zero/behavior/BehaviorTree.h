@@ -20,8 +20,11 @@ struct TreePrinter {
   int depth = 0;
   std::vector<std::string> output;
   bool render_brackets = false;
+  bool render_text = true;
 
   void Print(std::string_view str) {
+    if (!render_text) return;
+
     int depth_size = depth * 2;
     std::string buffer;
 

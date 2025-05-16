@@ -285,5 +285,19 @@ struct RenderVectorNode : public BehaviorNode {
   bool player_center = false;
 };
 
+struct RenderEnableTreeNode : public BehaviorNode {
+  RenderEnableTreeNode(bool enabled) : enabled(enabled) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    if (gDebugTreePrinter) {
+      gDebugTreePrinter->render_text = enabled;
+    }
+
+    return ExecuteResult::Success;
+  }
+
+  bool enabled = true;
+};
+
 }  // namespace behavior
 }  // namespace zero
