@@ -33,6 +33,16 @@
 
 namespace zero {
 
+enum {
+  ClientFeature_WatchDamage = (1 << 0),
+  ClientFeature_BatchPositions = (1 << 1),
+  ClientFeature_WarpTo = (1 << 2),
+  ClientFeature_Lvz = (1 << 3),
+  ClientFeature_Redirect = (1 << 4),
+  ClientFeature_Continuum = (ClientFeature_WatchDamage | ClientFeature_BatchPositions | ClientFeature_WarpTo |
+                             ClientFeature_Lvz | ClientFeature_Redirect),
+};
+
 extern const char* kPlayerName;
 extern const char* kPlayerPassword;
 
@@ -253,7 +263,8 @@ void Connection::SendPassword(bool registration) {
   buffer.WriteU16(0x00);        // Always zero
   buffer.WriteU16(version);     // Version
 
-  buffer.WriteU32(444);
+  buffer.WriteU16(444);
+  buffer.WriteU16(ClientFeature_WatchDamage | ClientFeature_WarpTo);
 
   buffer.WriteU32(0x00);
   buffer.WriteU32(0x00);
