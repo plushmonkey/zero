@@ -1120,7 +1120,7 @@ int GetEstimatedWeaponDamage(Weapon& weapon, Connection& connection) {
         s32 duration = connection.settings.BulletAliveTime - remaining;
 
         if (duration <= 25) {
-          damage = connection.settings.InactiveShrapDamage / 1000;
+          damage = (connection.settings.InactiveShrapDamage / 1000) * weapon.data.level;
         } else {
           float multiplier = connection.settings.ShrapnelDamagePercent / 1000.0f;
 
