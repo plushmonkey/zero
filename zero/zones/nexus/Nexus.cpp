@@ -10,6 +10,7 @@
 #include <zero/zones/nexus/DuelBehavior.h>
 #include <zero/zones/nexus/TwosBehavior.h>
 #include <zero/zones/nexus/ThreesBehavior.h>
+#include <zero/zones/nexus/FoursBehavior.h>
 #include <zero/zones/nexus/TwosBoxBehavior.h>
 
 #include <zero/zones/nexus/Nexus.h>
@@ -68,6 +69,7 @@ void NexusController::CreateBehaviors(const char* arena_name) {
   repo.Add("duel", std::make_unique<DuelBehavior>());
   repo.Add("twos", std::make_unique<TwosBehavior>());
   repo.Add("threes", std::make_unique<ThreesBehavior>());
+  repo.Add("fours", std::make_unique<FoursBehavior>());
   repo.Add("twosbox", std::make_unique<TwosBoxBehavior>());
   repo.Add("test", std::make_unique<TestBehavior>());
   
