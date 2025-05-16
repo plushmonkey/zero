@@ -4,6 +4,7 @@
 #include <zero/behavior/nodes/AttachNode.h>
 #include <zero/behavior/nodes/BlackboardNode.h>
 #include <zero/behavior/nodes/InputActionNode.h>
+#include <zero/behavior/nodes/ChatNode.h>
 #include <zero/behavior/nodes/MapNode.h>
 #include <zero/behavior/nodes/MathNode.h>
 #include <zero/behavior/nodes/MoveNode.h>
@@ -118,6 +119,25 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
             .InvertChild<ShipQueryNode>("request_ship")
             .Child<ShipRequestNode>("request_ship")
             .End()
+        .Sequence() //Attach if someone is safe and we have full energy
+            .Child<BlackboardSetQueryNode>("tchat_safe")
+            .InvertChild<TimerExpiredNode>("tchat_safe_timer")
+            .Child<PlayerEnergyPercentThresholdNode>(1.0f)
+            .Child<TimerExpiredNode>("attach_cooldown")
+            .InvertChild<AttachedQueryNode>("self")
+            .Child<NearestTeammateNode>("nearest_teammate") 
+            .Child<PlayerPositionQueryNode>("nearest_teammate", "nearest_teammate_position")
+            .Child<DistanceThresholdNode>("nearest_teammate_position", kTeamRange) //If we're already near teammates dont run to them               
+            .Child<PlayerByNameNode>("tchat_safe", "tchat_safe_player")
+            .Child<AttachNode>("tchat_safe_player")
+            .Child<TimerSetNode>("attach_cooldown", 100)
+            .Child<BlackboardEraseNode>("tchat_safe")
+            .Child<BlackboardEraseNode>("tchat_safe_timer")
+            .End()
+        .Sequence() // Detach if attached
+            .Child<AttachedQueryNode>("self")
+            .Child<DetachNode>()
+            .End()
      //  .Sequence() // Switch to own frequency when possible.
      //       .Child<ReadConfigIntNode<u16>>("Freq", "request_freq")
      //       .Child<PlayerFrequencyQueryNode>("self_freq")
@@ -170,6 +190,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                     .End()
                 .Selector(CompositeDecorator::Success) // Toggle antiwarp based on energy
                     .Sequence() // Enable antiwarp if we are healthy
+                        .Child<TimerExpiredNode>("tchat_safe_timer")  
                         .Child<ShipCapabilityQueryNode>(ShipCapability_Antiwarp)
                         .Child<PlayerEnergyPercentThresholdNode>(0.75f)
                         .InvertChild<PlayerStatusQueryNode>(Status_Antiwarp)

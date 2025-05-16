@@ -101,9 +101,11 @@ ExecuteResult SequenceNode::Execute(ExecuteContext& ctx) {
 
     if (result == ExecuteResult::Failure) {
       this->running_node_index_ = 0;
+      DepthDecrease();
       return result;
     } else if (result == ExecuteResult::Running) {
       this->running_node_index_ = index;
+      DepthDecrease();
       return result;
     }
   }
@@ -149,6 +151,7 @@ ExecuteResult SelectorNode::Execute(ExecuteContext& ctx) {
     ExecuteResult child_result = child->Execute(ctx);
 
     if (child_result == ExecuteResult::Running || child_result == ExecuteResult::Success) {
+      DepthDecrease();
       return child_result;
     }
   }

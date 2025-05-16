@@ -349,8 +349,10 @@ bool Game::Update(const InputState& input, float dt) {
         max_jitter_distance = 2.0f;
       }
 
-      camera.position.x += sinf(GetCurrentTick() * 0.75f) * strength * max_jitter_distance;
-      camera.position.y += sinf(GetCurrentTick() * 0.63f) * strength * max_jitter_distance;
+      if (g_Settings.camera_jitter) {
+        camera.position.x += sinf(GetCurrentTick() * 0.75f) * strength * max_jitter_distance;
+        camera.position.y += sinf(GetCurrentTick() * 0.63f) * strength * max_jitter_distance;
+      }
 
       jitter_time -= dt;
     }

@@ -181,55 +181,31 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
   return builder.Build();
 }
 
-std::unique_ptr<behavior::BehaviorNode> SharkBehavior::CreateTree(behavior::ExecuteContext& ctx) {
+std::unique_ptr<behavior::BehaviorNode> CreateSharkTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
   BehaviorBuilder builder;
 
-  // This is how far away to check for enemies that are rushing at us with low energy.
-  // We will stop dodging and try to finish them off if they are within this distance and low energy.
-  constexpr float kNearbyEnemyThreshold = 10.0f;
-
   // clang-format off
   builder
     .Selector()
-        .Sequence() // Enter the specified ship if not already in it.
-            .InvertChild<ShipQueryNode>("request_ship")
-            .Child<ShipRequestNode>("request_ship")
-            .End()
         .Composite(CreateFlagroomTravelBehavior())
-        .Selector() // Choose to fight the player or follow waypoints.
-            .Sequence() // Find nearest target and either path to them or seek them directly.
-                .Sequence() // Find an enemy
-                    .Child<PlayerPositionQueryNode>("self_position")
-                    .Child<svs::NearestMemoryTargetNode>("nearest_target")
-                    .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
-                    .End()
-                .Selector()
-                    .Composite(CreateDefensiveTree())
-                    .Sequence() // Go to enemy and attack if they are in the flag room.
-                        .Child<InFlagroomNode>("nearest_target_position")
-                        .Selector()
-                            .Sequence()
-                                .InvertChild<VisibilityQueryNode>("nearest_target_position")
-                                .Child<GoToNode>("nearest_target_position")
-                                .End()
-                            .Composite(CreateOffensiveTree("nearest_target", "nearest_target_position"))
-                            .End()
-                        .End()
-                    .End()
+        .Sequence() // Find nearest target and either path to them or seek them directly.
+            .Sequence() // Find an enemy
+                .Child<PlayerPositionQueryNode>("self_position")
+                .Child<svs::NearestMemoryTargetNode>("nearest_target")
+                .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
                 .End()
-            .Sequence() // Follow set waypoints.
-                .Child<WaypointNode>("waypoints", "waypoint_index", "waypoint_position", 15.0f)
-                .Selector()
-                    .Sequence()
-                        .InvertChild<ShipTraverseQueryNode>("waypoint_position")
-                        .Child<GoToNode>("waypoint_position")
-                        .Child<RenderPathNode>(Vector3f(0.0f, 0.5f, 1.0f))
-                        .End()
-                    .Parallel()
-                        .Child<FaceNode>("waypoint_position")
-                        .Child<ArriveNode>("waypoint_position", 1.25f)
+            .Selector()
+                .Composite(CreateDefensiveTree())
+                .Sequence() // Go to enemy and attack if they are in the flag room.
+                    .Child<InFlagroomNode>("nearest_target_position")
+                    .Selector()
+                        .Sequence()
+                            .InvertChild<VisibilityQueryNode>("nearest_target_position")
+                            .Child<GoToNode>("nearest_target_position")
+                            .End()
+                        .Composite(CreateOffensiveTree("nearest_target", "nearest_target_position"))
                         .End()
                     .End()
                 .End()

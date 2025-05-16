@@ -148,6 +148,9 @@ void BotController::Update(RenderContext& rc, float dt, InputState& input, behav
     if (should_print) {
       // Set to true to render { and } for each composite node.
       tree_printer.render_brackets = false;
+      // Set this to false to disable rendering of the text, then enable it in your behavior tree with
+      // .Child<RenderEnableTreeNode>(true)
+      tree_printer.render_text = true;
 
       behavior::gDebugTreePrinter = &tree_printer;
     }

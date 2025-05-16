@@ -14,6 +14,7 @@ struct GameSettings {
   bool render_stars;
   bool debug_window = false;
   bool debug_behavior_tree = false;
+  bool camera_jitter = false;
 
   EncryptMethod encrypt_method = EncryptMethod::Continuum;
 

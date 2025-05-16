@@ -231,23 +231,55 @@ class SetShipCommand : public CommandExecutor {
       return;
     }
 
-    if (!isdigit(args[0][0])) {
+    char value = args[0][0];
+
+    // Return to previous ship.
+    if (value == 'p' || value == 'P') {
+      auto opt_previous = bot.execute_ctx.blackboard.Value<int>("previous_ship");
+
+      if (opt_previous) {
+        // Toggle request_ship and previous_ship
+        SetPreviousShip(bot);
+        bot.execute_ctx.blackboard.Set<int>("request_ship", *opt_previous);
+      }
+
+      return;
+    }
+
+    if (!isdigit(value)) {
       SendUsage(bot, sender.data());
       return;
     }
 
-    parsed_ship_num = args[0][0] - '0';
+    parsed_ship_num = value - '0';
 
     if (parsed_ship_num < 1 || parsed_ship_num > 9) {
       SendUsage(bot, sender.data());
       return;
     }
 
-    bot.execute_ctx.blackboard.Set("request_ship", parsed_ship_num - 1);
+    SetPreviousShip(bot);
+    bot.execute_ctx.blackboard.Set<int>("request_ship", parsed_ship_num - 1);
+  }
+
+  void SetPreviousShip(ZeroBot& bot) {
+    auto opt_request_ship = bot.execute_ctx.blackboard.Value<int>("request_ship");
+
+    if (opt_request_ship) {
+      // Use our "request_ship" value as our previous ship.
+      bot.execute_ctx.blackboard.Set<int>("previous_ship", *opt_request_ship);
+    } else {
+      auto self = bot.game->player_manager.GetSelf();
+
+      if (self) {
+        // Use our current ship as our previous ship in case we don't have "request_ship" set.
+        bot.execute_ctx.blackboard.Set<int>("previous_ship", self->ship);
+      }
+    }
   }
 
   void SendUsage(ZeroBot& bot, const char* player) {
-    Event::Dispatch(ChatQueueEvent::Private(player, "Usage: !setship [shipNum 1-9]"));
+    Event::Dispatch(ChatQueueEvent::Private(player, "Usage: !setship [shipNum 1-9|previous]"));
   }
 
   CommandAccessFlags GetAccess() override { return CommandAccess_Standard; }

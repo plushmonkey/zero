@@ -8,9 +8,7 @@
 #include <zero/game/GameEvent.h>
 #include <zero/game/Logger.h>
 #include <zero/zones/ZoneController.h>
-#include <zero/zones/trenchwars/SharkBehavior.h>
-#include <zero/zones/trenchwars/SpiderBehavior.h>
-#include <zero/zones/trenchwars/TerrierBehavior.h>
+#include <zero/zones/trenchwars/BasingBehavior.h>
 
 #include <bitset>
 #include <deque>
@@ -47,11 +45,9 @@ void TwController::CreateBehaviors(const char* arena_name) {
 
   auto& repo = bot->bot_controller->behaviors;
 
-  repo.Add("spider", std::make_unique<SpiderBehavior>());
-  repo.Add("terrier", std::make_unique<TerrierBehavior>());
-  repo.Add("shark", std::make_unique<SharkBehavior>());
+  repo.Add("basing", std::make_unique<BasingBehavior>());
 
-  SetBehavior("spider");
+  SetBehavior("basing");
 }
 
 void TwController::CreateFlagroomBitset() {

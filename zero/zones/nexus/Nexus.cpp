@@ -41,14 +41,27 @@ void NexusController::HandleEvent(const ChatEvent& event) {
   std::string sender = event.sender;
   std::string message = event.message;
 
+  
   auto& chat_queue = bot->bot_controller->chat_queue;
-
-  if (event.type == ChatType::Team && (message.find("SAFE") == std::string::npos) &&
-      !(message.find("NOT") != std::string::npos)) {
-    //std::string response = "test " + sender + " test";
-    //bot->bot_controller->chat_queue.SendTeam(response.c_str());
+  
+  
+  if (event.type == ChatType::Team && message.find("SAFE") != std::string::npos && 
+      !(message.find("NOT") != std::string::npos)) {  
     
+      // SAFE
+    Log(LogLevel::Info, "Setting tchat_safe");
     bot->execute_ctx.blackboard.Set("tchat_safe", sender);
+    bot->execute_ctx.blackboard.Set<u32>("tchat_safe_timer", GetCurrentTick() + 600);
+   
+    // Event::Dispatch(ChatQueueEvent::Public("On my way!"));
+  } else if (event.type == ChatType::Team && message.find("SAFE") != std::string::npos &&
+    
+      // NOT SAFE
+    message.find("NOT") != std::string::npos) {
+    Log(LogLevel::Info, "Setting tchat_notsafe");
+    bot->execute_ctx.blackboard.Set("tchat_notsafe", sender);
+    bot->execute_ctx.blackboard.Set<u32>("tchat_notsafe_timer", GetCurrentTick() + 600);
+
     // Event::Dispatch(ChatQueueEvent::Public("On my way!"));
   }
 

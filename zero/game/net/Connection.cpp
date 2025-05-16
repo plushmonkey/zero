@@ -33,6 +33,19 @@
 
 namespace zero {
 
+// Client features that extend beyond the VIE client so the server knows we support them.
+// Works with SubspaceServer.NET:
+// https://github.com/gigamon-dev/SubspaceServer/blob/master/src/Packets/Game/LoginPacket.cs
+enum {
+  ClientFeature_WatchDamage = (1 << 0),
+  ClientFeature_BatchPositions = (1 << 1),
+  ClientFeature_WarpTo = (1 << 2),
+  ClientFeature_Lvz = (1 << 3),
+  ClientFeature_Redirect = (1 << 4),
+  ClientFeature_Continuum = (ClientFeature_WatchDamage | ClientFeature_BatchPositions | ClientFeature_WarpTo |
+                             ClientFeature_Lvz | ClientFeature_Redirect),
+};
+
 extern const char* kPlayerName;
 extern const char* kPlayerPassword;
 
@@ -106,7 +119,7 @@ Connection::TickResult Connection::Tick() {
   addr.sin_addr.s_addr = remote_addr.addr;
 
   zero::Tick current_tick = GetCurrentTick();
-  
+
   constexpr u32 kConnectTimeout = 500;
   if (login_state == Connection::LoginState::EncryptionRequested &&
       TICK_DIFF(current_tick, connect_tick) >= kConnectTimeout) {
@@ -253,7 +266,17 @@ void Connection::SendPassword(bool registration) {
   buffer.WriteU16(0x00);        // Always zero
   buffer.WriteU16(version);     // Version
 
-  buffer.WriteU32(444);
+  buffer.WriteU16(444);
+
+  u16 client_features = 0;
+
+  client_features |= ClientFeature_WatchDamage;
+  client_features |= ClientFeature_BatchPositions;
+  client_features |= ClientFeature_WarpTo;
+  // We don't render LVZ, but it doesn't hurt to receive their packets in case we want to do something with them.
+  client_features |= ClientFeature_Lvz;
+
+  buffer.WriteU16(client_features);
 
   buffer.WriteU32(0x00);
   buffer.WriteU32(0x00);
