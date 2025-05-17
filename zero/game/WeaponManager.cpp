@@ -2,11 +2,13 @@
 
 #include <assert.h>
 #include <math.h>
+#include <string.h>
 #include <zero/game/Buffer.h>
 #include <zero/game/Camera.h>
 #include <zero/game/Clock.h>
 #include <zero/game/GameEvent.h>
 #include <zero/game/KDTree.h>
+#include <zero/game/Logger.h>
 #include <zero/game/Memory.h>
 #include <zero/game/PlayerManager.h>
 #include <zero/game/Radar.h>
@@ -14,8 +16,6 @@
 #include <zero/game/net/Connection.h>
 #include <zero/game/net/PacketDispatcher.h>
 #include <zero/game/render/Graphics.h>
-
-#include <chrono>
 
 // TODO: Spatial partition acceleration structures
 
@@ -305,21 +305,23 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon, u32 current_tick) {
       bool hit = true;
 
       if (is_prox) {
-        weapon.prox_hit_player_id = player->id;
-        weapon.sensor_end_tick = MAKE_TICK(weapon.last_tick + connection.settings.BombExplodeDelay);
+        if (weapon.prox_hit_player_id == kInvalidPlayerId) {
+          weapon.prox_hit_player_id = player->id;
+          weapon.sensor_end_tick = MAKE_TICK(weapon.last_tick + connection.settings.BombExplodeDelay);
 
-        if (initial_sim) {
-          // Activate the proximity explode delay immediately because the bomb was spawned on top of an enemy.
-          weapon.sensor_end_tick = weapon.last_tick;
-        }
+          if (initial_sim) {
+            // Activate the proximity explode delay immediately because the bomb was spawned on top of an enemy.
+            weapon.sensor_end_tick = weapon.last_tick;
+          }
 
-        float dx = abs(weapon.position.x - player->position.x);
-        float dy = abs(weapon.position.y - player->position.y);
+          float dx = abs(weapon.position.x - player->position.x);
+          float dy = abs(weapon.position.y - player->position.y);
 
-        if (dx > dy) {
-          weapon.prox_highest_offset = dx;
-        } else {
-          weapon.prox_highest_offset = dy;
+          if (dx > dy) {
+            weapon.prox_highest_offset = dx;
+          } else {
+            weapon.prox_highest_offset = dy;
+          }
         }
 
         weapon_radius = 4.0f / 16.0f;
@@ -488,6 +490,9 @@ void WeaponManager::ClearWeapons(Player& player) {
 }
 
 bool WeaponManager::HasLinkRemoved(u32 link_id) {
+  // This should never happen, but check just to make sure.
+  if (link_id == kInvalidLink) return false;
+
   for (size_t i = 0; i < link_removal_count; ++i) {
     if (link_removals[i].link_id == link_id) {
       return true;
@@ -498,6 +503,9 @@ bool WeaponManager::HasLinkRemoved(u32 link_id) {
 }
 
 void WeaponManager::AddLinkRemoval(u32 link_id, WeaponSimulateResult result) {
+  // This should never happen, but check just to make sure.
+  if (link_id == kInvalidLink) return;
+
   assert(link_removal_count < ZERO_ARRAY_SIZE(link_removals));
 
   WeaponLinkRemoval* removal = link_removals + link_removal_count++;
@@ -882,6 +890,9 @@ WeaponSimulateResult WeaponManager::GenerateWeapon(u16 player_id, WeaponData wea
                                                    u32 pos_x, u32 pos_y, s32 vel_x, s32 vel_y, const Vector2f& heading,
                                                    u32 link_id) {
   Weapon* weapon = weapons + weapon_count++;
+
+  // Shouldn't be necessary, but do it anyway in case something wasn't initialized.
+  memset(weapon, 0, sizeof(Weapon));
 
   weapon->data = weapon_data;
   weapon->player_id = player_id;
