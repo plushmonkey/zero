@@ -261,7 +261,7 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                             .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
                             .InvertChild<DistanceThresholdNode>("target_position", "self_position", kRushDistanceThreshold)
                             .End()  
-                        .Child<DodgeIncomingDamage>(0.05f, 25.0f) //was .3 30
+                        .Child<DodgeIncomingDamage>(0.1f, 50.0f) //was .3 30
                         .End()
                     .Sequence() // Path to teammate if far away
                         .Child<NearestTeammateNode>("nearest_teammate", 2) //Make sure we have at least 1 teammate close, if more than one stay with the broader group

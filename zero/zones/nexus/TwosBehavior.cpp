@@ -107,13 +107,13 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
   const Vector2f center(512, 512);
 
   // Used for target prio
-  constexpr float kLowEnergyThreshold = 800.0f;         // Energy threshold to prio targets
-  constexpr float kLowEnergyDistanceThreshold = 20.0f;  // Distance threshold for prio targets
+  constexpr float kLowEnergyThreshold = 900.0f;         // Energy threshold to prio targets
+  constexpr float kLowEnergyDistanceThreshold = 25.0f;  // Distance threshold for prio targets
 
-  // Don't dodge below this
-  constexpr float kLowEnergyRushThreshold = 400.0f;  // Rush threshold
-  constexpr float kRushDistanceThreshold = 15.0f;  //We will rush if someone is low energy within this range
-  constexpr u32 kRushRepelThreshold = 1;  // If we don't have this many reps dont rush targets
+  // Rush threshold / dodge thresholds
+  constexpr float kLowEnergyRushThreshold = 450.0f;  // If within rush distance and below this threshold
+  constexpr float kRushDistanceThreshold = 15.0f;    // If below rush energy threshold and this distance
+  constexpr u32 kRushRepelThreshold = 1;             // If we don't have this many reps dont rush targets
 
   // This is how far away to check for enemies that are rushing at us with low energy.
   // We will stop dodging and try to finish them off if they are within this distance and low energy.
@@ -133,13 +133,13 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
   constexpr float kThorEnemyThreshold = 200.0f;
 
   // How far away from a teammate before we regroup
-  constexpr float kTeamRange = 30.0f;
+  constexpr float kTeamRange = 40.0f;
 
   constexpr float kLeashDistance = 25.0f;
 
-  constexpr float kAvoidTeamDistance = 5.0f;
+  constexpr float kAvoidTeamDistance = 8.0f;
 
-  constexpr float kAvoidEnemyDistance = 10.0f;
+  constexpr float kAvoidEnemyDistance = 15.0f;
 
   constexpr float kMultiFireDistance = 35.0f; //Use multifire for targets over this range
   
@@ -158,6 +158,7 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
             //.InvertChild<BlackboardSetQueryNode>("queued") //Check if we have already joined the queue, if not join
             .Child<TimerExpiredNode>("queue")
             .Child<ChatMessageNode>(ChatMessageNode::Public("?next 2v2pub")) // Invert so this fails and freq is reevaluated.  //TODO replace this with a config var so we dont need 4 behaviors
+      .Child<ChatMessageNode>(ChatMessageNode::Public("?return")) // Invert so this fails and freq is reevaluated.  //TODO replace this with a config var so we dont need 4 behaviors
             .Child<TimerSetNode>("queue", 6000)
             //.Child<ScalarNode>(1.0f, "queued")  //was only joining queue on join then stopped working
             .End()
@@ -299,7 +300,7 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
                             .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
                             .InvertChild<DistanceThresholdNode>("target_position", "self_position", kRushDistanceThreshold)
                             .End()
-                        .Child<DodgeIncomingDamage>(0.05f, 25.0f) //was .3 30
+                        .Child<DodgeIncomingDamage>(0.1f, 50.0f) //was .3 30
                         .End()
                     .Sequence() // Path to teammate if far away
                         .Child<NearestTeammateNode>("nearest_teammate", 2) //Make sure we have at least 1 teammate close, if more than one stay with the broader group
