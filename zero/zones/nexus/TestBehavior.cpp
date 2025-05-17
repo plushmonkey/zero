@@ -34,6 +34,43 @@ using namespace zero::svs;
 namespace zero {
 namespace nexus {
 
+// Looks for nearby walls, find away vector, and seek to it.
+// Returns failure if no wall is nearby.
+struct SeekFromWallNode : public behavior::BehaviorNode {
+  SeekFromWallNode(float search_distance) : search_distance(search_distance) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto self = ctx.bot->game->player_manager.GetSelf();
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    Vector2f pos = self->position;
+
+    constexpr Vector2f kSearchDirections[] = {Vector2f(0, -1), Vector2f(1, 0), Vector2f(0, 1), Vector2f(-1, 0)};
+
+    auto& map = ctx.bot->game->connection.map;
+
+    Vector2f away_vector;
+
+    for (Vector2f direction : kSearchDirections) {
+      auto cast = map.CastTo(self->position, self->position + direction * search_distance, self->frequency);
+
+      if (cast.hit) {
+        // We hit a wall, so move away from it.
+        away_vector -= direction;
+      }
+    }
+
+    if (away_vector.LengthSq() > 0.0f) {
+      ctx.bot->bot_controller->steering.Seek(*ctx.bot->game, self->position + Normalize(away_vector) * 10.0f);
+      return behavior::ExecuteResult::Success;
+    }
+
+    return behavior::ExecuteResult::Failure;
+  }
+
+  float search_distance = 0.0f;
+};
+
 struct ShotSpreadNode : public behavior::BehaviorNode {
   ShotSpreadNode(const char* aimshot_key, float spread, float period)
       : aimshot_key(aimshot_key), spread(spread), period(period) {}
@@ -231,7 +268,11 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                             .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
                             .InvertChild<DistanceThresholdNode>("target_position", "self_position", kRushDistanceThreshold)
                             .End()
-                        .Child<DodgeIncomingDamage>(0.1f, 50.0f) //was .3 30
+                        .Child<DodgeIncomingDamage>(0.2f, 45.0f) //was .3 30
+                        .End()
+                    .Sequence() //Avoid walls unless we're rushing
+                        .InvertChild<BlackboardSetQueryNode>("rushing")
+                        .Child<SeekFromWallNode>(4.0f)
                         .End()
                     .Sequence()  //Keep enemy distance while reacharging
                         .InvertChild<TimerExpiredNode>("recharge_timer")
@@ -318,7 +359,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                             .Sequence(CompositeDecorator::Success) // Bomb fire check.
                                 .Child<TimerExpiredNode>("match_startup") 
                                 .Child<TimerExpiredNode>("recharge_timer") 
-                                .InvertChild<BurstAreaQueryNode>() //dont use bombs in areas with walls
+                                .InvertChild<SeekFromWallNode>(4.0f)
                                 .Child<PlayerEnergyPercentThresholdNode>(0.45f)
                                 .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Bomb)
                                 .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
