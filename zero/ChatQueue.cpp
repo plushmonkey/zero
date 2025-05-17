@@ -57,6 +57,22 @@ void ChatQueue::SendFrequency(u16 frequency, const char* message) {
   entry->frequency = frequency;
 }
 
+void ChatQueue::SendChannel(u16 channel, const char* message) {
+  auto self = chat_controller.player_manager.GetSelf();
+  if (!self) return;
+
+  QueueEntry* entry = AcquireEntry();
+  if (!entry) return;
+
+  entry->type = ChatType::Channel;
+
+  if (channel > 1) {
+    sprintf(entry->message, "%d;%s", (int)channel, message);
+  } else {
+    strcpy(entry->message, message);
+  }
+}
+
 void ChatQueue::HandleEvent(const ChatQueueEvent& event) {
   switch (event.type) {
     case ChatType::Public: {
@@ -70,6 +86,17 @@ void ChatQueue::HandleEvent(const ChatQueueEvent& event) {
     } break;
     case ChatType::OtherTeam: {
       SendFrequency(event.frequency, event.message.data());
+    } break;
+    case ChatType::Channel: {
+      if (!event.message.empty()) {
+        const char* data = event.message.data();
+
+        if (data[0] == ';') {
+          ++data;
+        }
+
+        SendChannel(event.channel, data);
+      }
     } break;
     default: {
     } break;

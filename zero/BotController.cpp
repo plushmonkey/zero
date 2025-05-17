@@ -18,7 +18,6 @@ void BotController::HandleEvent(const JoinGameEvent& event) {
   Log(LogLevel::Debug, "Clearing bot behaviors from JoinGameEvent.");
 
   behaviors.Clear();
-  chat_queue.Reset();
 
   // Clear the pathfinder so it will rebuild on ship change.
   pathfinder = nullptr;
@@ -29,6 +28,10 @@ void BotController::HandleEvent(const JoinGameEvent& event) {
 
 void BotController::HandleEvent(const PlayerEnterEvent& event) {
   if (event.player.id != game.player_manager.player_id) return;
+
+  // Clear chat queue from the enter event so we can queue messages during join event that occurs after.
+  chat_queue.Reset();
+
   if (event.player.ship >= 8) return;
 
   float radius = game.connection.settings.ShipSettings[event.player.ship].GetRadius();
