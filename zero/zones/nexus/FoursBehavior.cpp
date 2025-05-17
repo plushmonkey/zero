@@ -196,7 +196,7 @@ std::unique_ptr<behavior::BehaviorNode> FoursBehavior::CreateTree(behavior::Exec
 //            .Child<TimerSetNode>("next_freq_change_tick", 300)
 //            .Child<PlayerChangeFrequencyNode>("request_freq")
  //           .End()
-      .Selector() // Choose to fight the player or follow waypoints.
+  .Selector() // Choose to fight the player or follow waypoints.
             .Sequence() // Find nearest target and either path to them or seek them directly.              
                 .Sequence(CompositeDecorator::Success)
                     .Child<PlayerPositionQueryNode>("self_position") //Always track self position
@@ -282,6 +282,27 @@ std::unique_ptr<behavior::BehaviorNode> FoursBehavior::CreateTree(behavior::Exec
                             .End()
                         .Child<DodgeIncomingDamage>(0.1f, 50.0f) //was .3 30
                         .End()
+                    .Sequence()  //Keep enemy distance while reacharging
+                        .InvertChild<TimerExpiredNode>("recharge_timer")
+                         .InvertChild<DistanceThresholdNode>("nearest_enemy_position", kLeashDistance + 2.0f)  //dont bomb from too far
+                         .Child<DistanceThresholdNode>("nearest_enemy_position", kLeashDistance - 2.0f)  //check to ensure no enemies are on top of us
+                        .Sequence(CompositeDecorator::Success) // Face away from target so it can dodge while waiting for bomb cooldown.
+                            .Child<PerpendicularNode>("nearest_enemy_position", "self_position", "away_dir", true)
+                            .Child<VectorSubtractNode>("nearest_enemy_position", "self_position", "target_direction", true)
+                            .Child<VectorAddNode>("away_dir", "target_direction", "away_dir", true)
+                            .Child<VectorAddNode>("self_position", "away_dir", "away_pos")
+                            .Child<VectorNode>("away_pos", "face_position")
+                            .Child<FaceNode>("face_position")
+                            .End()
+                        .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
+                        .Child<AvoidWallsNode>()
+                        .End()
+                    .Sequence()  //Keep enemy distance while reacharging
+                        .InvertChild<TimerExpiredNode>("recharge_timer")
+                        .Child<SeekNode>("aimshot", kLeashDistance, SeekNode::DistanceResolveType::Dynamic)
+                        .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
+                        .Child<AvoidWallsNode>()
+                        .End()
                     .Sequence() // Path to teammate if far away
                         .Child<NearestTeammateNode>("nearest_teammate", 2) //Make sure we have at least 1 teammate close, if more than one stay with the broader group
                         .Child<PlayerPositionQueryNode>("nearest_teammate", "nearest_teammate_position")
@@ -326,12 +347,6 @@ std::unique_ptr<behavior::BehaviorNode> FoursBehavior::CreateTree(behavior::Exec
                                         .Child<InputActionNode>(InputAction::Rocket)
                                         .Child<TimerSetNode>("rocket_timer", 2000)
                                         .End() 
-                                    .End()
-                                .Sequence()  //Keep enemy distance while reacharging
-                                    .InvertChild<TimerExpiredNode>("recharge_timer")
-                                    .Child<SeekNode>("aimshot", kLeashDistance, SeekNode::DistanceResolveType::Dynamic)
-                                    .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
-                                    .Child<AvoidWallsNode>()
                                     .End()
                                 .Sequence() 
                                     .InvertChild<PlayerEnergyPercentThresholdNode>(0.3f)

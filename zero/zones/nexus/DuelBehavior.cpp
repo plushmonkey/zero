@@ -107,16 +107,16 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
   constexpr float kLowEnergyDistanceThreshold = 25.0f;  // Distance threshold for prio targets
 
   // Rush threshold / dodge thresholds
-  constexpr float kLowEnergyRushThreshold = 500.0f;  // If within rush distance and below this threshold
+  constexpr float kLowEnergyRushThreshold = 450.0f;  // If within rush distance and below this threshold
   constexpr float kRushDistanceThreshold = 15.0f;    // If below rush energy threshold and this distance
   constexpr u32 kRushRepelThreshold = 1;             // If we don't have this many reps dont rush targets
 
   // This is how far away to check for enemies that are rushing at us with low energy.
   // We will stop dodging and try to finish them off if they are within this distance and low energy.
-  constexpr float kNearbyEnemyThreshold = 15.0f;
+  constexpr float kNearbyEnemyThreshold = 10.0f;
 
   // Check for incoming damage within this range
-  constexpr float kRepelDistance = 15.0f;
+  constexpr float kRepelDistance = 10.0f;
 
   // How much damage that is going towards an enemy before we start bombing. This is to limit the frequency of our
   // bombing so it overlaps bullets and is harder to dodge.
@@ -126,14 +126,18 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
   constexpr float kShotSpreadDistanceThreshold = 40.0f;
 
   //  If an enemy is near us and we're low energy thor if below this value
-  constexpr float kThorEnemyThreshold = 250.0f;
+  constexpr float kThorEnemyThreshold = 200.0f;
 
   // How far away from a teammate before we regroup
-  constexpr float kTeamRange = 55.0f;
+  constexpr float kTeamRange = 35.0f;
 
-  constexpr float kAvoidTeamDistance = 5.0f;
+  constexpr float kLeashDistance = 25.0f;
 
-  constexpr float kAvoidEnemyDistance = 10.0f;
+  constexpr float kAvoidTeamDistance = 8.0f;
+
+  constexpr float kAvoidEnemyDistance = 15.0f;
+
+  constexpr float kMultiFireDistance = 35.0f;  // Use multifire for targets over this range
 
   // clang-format off
 
@@ -180,17 +184,19 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
 //            .Child<TimerSetNode>("next_freq_change_tick", 300)
 //            .Child<PlayerChangeFrequencyNode>("request_freq")
  //           .End()
-         .Selector() // Choose to fight the player or follow waypoints.
+  .Selector() // Choose to fight the player or follow waypoints.
             .Sequence() // Find nearest target and either path to them or seek them directly.              
                 .Sequence(CompositeDecorator::Success)
-                    .Child<PlayerPositionQueryNode>("self_position")    
+                    .Child<PlayerPositionQueryNode>("self_position") //Always track self position
+                    .Child<NearestMemoryTargetNode>("nearest_enemy") //Always track nearest enemey
+                    .Child<PlayerPositionQueryNode>("nearest_enemy", "nearest_enemy_position") //Always track nearest enemy position so we can use it for some checks
                     .Sequence() 
                         .Child<NearestMemoryTargetNode>("target")
                         .Child<PlayerPositionQueryNode>("target", "target_position")
                         .Child<PlayerEnergyQueryNode>("target", "target_energy")
                         .Child<AimNode>(WeaponType::Bullet, "target", "aimshot")
                         .End()
-                     .Sequence() //If is someone low nearby override target 
+                     .Sequence() //If is someone low nearby override target instead of just using nearest
                         .Child<LowestTargetNode>("lowest_target")
                         .Child<PlayerPositionQueryNode>("lowest_target", "lowest_target_position")
                         .Child<PlayerEnergyQueryNode>("lowest_target", "lowest_target_energy")
@@ -210,20 +216,21 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                 .Selector(CompositeDecorator::Success) // Enable multifire if ship supports it and it's disabled.
                     .Sequence()
                         .Child<ShipCapabilityQueryNode>(ShipCapability_Multifire)
-                        .Child<DistanceThresholdNode>("target_position", 35.0f) // If we are far from enemy, use multifire
+                        .Child<DistanceThresholdNode>("target_position", kMultiFireDistance) // If we are far from enemy, use multifire
                         .InvertChild<ShipMultifireQueryNode>()  //Check if multifire is off
                         .InvertChild<BlackboardSetQueryNode>("rushing") //dont multi if rushing
                         .Child<InputActionNode>(InputAction::Multifire) //Turn on multifire
                         .End()
                     .Sequence()
                         .Child<ShipCapabilityQueryNode>(ShipCapability_Multifire)
-                        .InvertChild<DistanceThresholdNode>("target_position", 35.0f) // If we are far from enemy, turn off multifire
+                        .InvertChild<DistanceThresholdNode>("target_position",kMultiFireDistance) // If we are far from enemy, turn off multifire
                         .Child<ShipMultifireQueryNode>()  //Check if multifire is on
                         .Child<InputActionNode>(InputAction::Multifire)  //Turn off multifire
                         .End()
                     .End()
                 .Selector(CompositeDecorator::Success) // Toggle antiwarp based on energy
                     .Sequence() // Enable antiwarp if we are healthy
+                        .Child<TimerExpiredNode>("tchat_safe_timer")        
                         .Child<ShipCapabilityQueryNode>(ShipCapability_Antiwarp)
                         .Child<PlayerEnergyPercentThresholdNode>(0.75f)
                         .InvertChild<PlayerStatusQueryNode>(Status_Antiwarp)
@@ -260,8 +267,29 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                         .Sequence(CompositeDecorator::Invert) // Check if enemy is very low energy and close to use. Don't bother dodging if they are rushing us with low energy.
                             .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
                             .InvertChild<DistanceThresholdNode>("target_position", "self_position", kRushDistanceThreshold)
-                            .End()  
+                            .End()
                         .Child<DodgeIncomingDamage>(0.1f, 50.0f) //was .3 30
+                        .End()
+                    .Sequence()  //Keep enemy distance while reacharging
+                        .InvertChild<TimerExpiredNode>("recharge_timer")
+                         .InvertChild<DistanceThresholdNode>("nearest_enemy_position", kLeashDistance + 2.0f)  //dont bomb from too far
+                         .Child<DistanceThresholdNode>("nearest_enemy_position", kLeashDistance - 2.0f)  //check to ensure no enemies are on top of us
+                        .Sequence(CompositeDecorator::Success) // Face away from target so it can dodge while waiting for bomb cooldown.
+                            .Child<PerpendicularNode>("nearest_enemy_position", "self_position", "away_dir", true)
+                            .Child<VectorSubtractNode>("nearest_enemy_position", "self_position", "target_direction", true)
+                            .Child<VectorAddNode>("away_dir", "target_direction", "away_dir", true)
+                            .Child<VectorAddNode>("self_position", "away_dir", "away_pos")
+                            .Child<VectorNode>("away_pos", "face_position")
+                            .Child<FaceNode>("face_position")
+                            .End()
+                        .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
+                        .Child<AvoidWallsNode>()
+                        .End()
+                    .Sequence()  //Keep enemy distance while reacharging
+                        .InvertChild<TimerExpiredNode>("recharge_timer")
+                        .Child<SeekNode>("aimshot", kLeashDistance, SeekNode::DistanceResolveType::Dynamic)
+                        .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
+                        .Child<AvoidWallsNode>()
                         .End()
                     .Sequence() // Path to teammate if far away
                         .Child<NearestTeammateNode>("nearest_teammate", 2) //Make sure we have at least 1 teammate close, if more than one stay with the broader group
@@ -279,7 +307,7 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                             .Child<AvoidTeamNode>(kAvoidTeamDistance)
                             .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
                             .End()
-                        .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
+                        .Child<RenderPathNode>(Vector3f(1.0f, 0.5f, 0.5f))
                         .End()
                     .Sequence() // Aim at target and shoot while seeking them.
                         .Child<TimerExpiredNode>("match_startup") 
@@ -297,6 +325,7 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                                     .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
                                     .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Static)
                                     .Child<ScalarNode>(1.0f, "rushing")
+                                    .Child<BlackboardEraseNode>("recharge_timer")
                                     .Sequence(CompositeDecorator::Success) //Optionally rocket if the target is too far and we have decent energy
                                         .Child<ShipItemCountThresholdNode>(ShipItemType::Rocket)
                                         .Child<PlayerEnergyPercentThresholdNode>(0.6f)
@@ -305,17 +334,11 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                                         .Child<TimerExpiredNode>("rocket_timer")
                                         .Child<InputActionNode>(InputAction::Rocket)
                                         .Child<TimerSetNode>("rocket_timer", 2000)
-                                        .End()
-                                    .Child<BlackboardEraseNode>("recharge_timer")
-                                    .End()
-                                .Sequence()  //Keep enemy distance while reacharging
-                                    .InvertChild<TimerExpiredNode>("recharge_timer")             
-                                    .Child<SeekNode>("aimshot", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
-                                    .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
-                                    .Child<AvoidWallsNode>()
+                                        .End() 
                                     .End()
                                 .Sequence() 
                                     .InvertChild<PlayerEnergyPercentThresholdNode>(0.3f)
+                                    .InvertChild<BlackboardSetQueryNode>("rushing")
                                     .Child<TimerSetNode>("recharge_timer", 700)  
                                     .Sequence(CompositeDecorator::Success)
                                         .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Decoy)
@@ -324,7 +347,10 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                                         .Child<TimerSetNode>("decoy_timer", 1000)    
                                         .End()
                                     .End()
-                                .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
+                                .Sequence(CompositeDecorator::Success) 
+                                    .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
+                                    .InvertChild<BlackboardSetQueryNode>("rushing")
+                                    .End()
                                 .End()
                             .Sequence(CompositeDecorator::Success) // Bomb fire check.
                                 .Child<TimerExpiredNode>("match_startup") 
@@ -337,13 +363,13 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                                 .Child<IncomingDamageQueryNode>("target", kRepelDistance * 2.5f, 2.75f, "outgoing_damage")
                                 .Child<ScalarThresholdNode<float>>("outgoing_damage", kBombRequiredDamageOverlap) // Check if we have enough bullets overlapping outgoing damage to fire a bomb into.
                                 .InvertChild<DistanceThresholdNode>("target_position", 50.0f)  //dont bomb from too far
-                                .Child<DistanceThresholdNode>("target_position", 12.0f)  //dont pb yourself
+                                .Child<DistanceThresholdNode>("nearest_enemy_position", 12.0f)  //check to ensure no enemies are on top of us
                                 .Child<ShotVelocityQueryNode>(WeaponType::Bomb, "bomb_fire_velocity")
                                 .Child<RayNode>("self_position", "bomb_fire_velocity", "bomb_fire_ray")
                                 .Child<DynamicPlayerBoundingBoxQueryNode>("target", "target_bounds", 4.0f)
                                 .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
                                 .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
-                                .Child<RenderRayNode>("world_camera", "bomb_fire_ray", 50.0f, Vector3f(1.0f, 1.0f, 0.0f))
+                                .Child<RenderRayNode>("world_camera", "bomb_fire_ray", 50.0f, Vector3f(1.0f, 0.0f, 0.0f))
                                 .Child<RayRectangleInterceptNode>("bomb_fire_ray", "target_bounds")
                                 .Child<InputActionNode>(InputAction::Bomb)
                                // .InvertChild<TimerSetNode>("recharge_timer", "20")  //add slight backoff after firing a bomb
@@ -360,8 +386,8 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                                 .Child<RayNode>("self_position", "thor_fire_velocity", "thor_fire_ray")
                                 .Child<DynamicPlayerBoundingBoxQueryNode>("target", "target_bounds", 4.0f)
                                 .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
-                                .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
-                                .Child<RenderRayNode>("world_camera", "thor_fire_ray", 50.0f, Vector3f(1.0f, 1.0f, 0.0f))
+                                .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(0.0f, 1.0f, 0.0f))
+                                .Child<RenderRayNode>("world_camera", "thor_fire_ray", 50.0f, Vector3f(0.0f, 1.0f, 0.0f))
                                 .Child<RayRectangleInterceptNode>("thor_fire_ray", "target_bounds")
                                 .Child<InputActionNode>(InputAction::Thor) //Thor
                                 .End()
@@ -370,7 +396,7 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                                 .Child<TimerExpiredNode>("recharge_timer") 
                                 .Child<DynamicPlayerBoundingBoxQueryNode>("target", "target_bounds", 4.0f)
                                 .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
-                                .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
+                                .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(0.0f, 0.0f, 1.0f))
                                 .Selector()
                                     .Child<BlackboardSetQueryNode>("rushing")
                                     .Child<PlayerEnergyPercentThresholdNode>(0.3f)
