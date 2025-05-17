@@ -141,13 +141,15 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
   // How far away from a teammate before we regroup
   constexpr float kTeamRange = 35.0f;
 
-  constexpr float kLeashDistance = 25.0f;
-
-  constexpr float kAvoidTeamDistance = 8.0f;
-
-  constexpr float kAvoidEnemyDistance = 15.0f;
+  
+  constexpr float kLeashDistance = 25.0f; //distance to leash away from nearest enemy while recharging energy
+  constexpr float kAvoidEnemyDistance = 15.0f; //should be less than kLeashDstiance
+  
+  constexpr float kAvoidTeamDistance = 6.0f;  //distance to stay away from team members when pathing
 
   constexpr float kMultiFireDistance = 35.0f;  // Use multifire for targets over this range
+
+  constexpr float kAvoidWallDistance = 3.0f;
 
   // clang-format off
   builder
@@ -197,6 +199,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                         .Child<AimNode>(WeaponType::Bullet, "target", "aimshot")
                         .End()
                      .Sequence() //If is someone low nearby override target instead of just using nearest
+                        .Child<TimerExpiredNode>("recharge_timer") //if we're recharging we should always be leashing to nearest enemy so ignore low health
                         .Child<LowestTargetNode>("lowest_target")
                         .Child<PlayerPositionQueryNode>("lowest_target", "lowest_target_position")
                         .Child<PlayerEnergyQueryNode>("lowest_target", "lowest_target_energy")
@@ -272,12 +275,13 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                         .End()
                     .Sequence() //Avoid walls unless we're rushing
                         .InvertChild<BlackboardSetQueryNode>("rushing")
-                        .Child<SeekFromWallNode>(4.0f)
+                        .Child<SeekFromWallNode>(kAvoidWallDistance)
                         .End()
-                    .Sequence()  //Keep enemy distance while reacharging
+                    .Sequence()  //Keep enemy distance while reacharging, if within seek range face away from target to help dodging
                         .InvertChild<TimerExpiredNode>("recharge_timer")
                          .InvertChild<DistanceThresholdNode>("nearest_enemy_position", kLeashDistance + 2.0f)  //dont bomb from too far
                          .Child<DistanceThresholdNode>("nearest_enemy_position", kLeashDistance - 2.0f)  //check to ensure no enemies are on top of us
+                        .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
                         .Sequence(CompositeDecorator::Success) // Face away from target so it can dodge while waiting for bomb cooldown.
                             .Child<PerpendicularNode>("nearest_enemy_position", "self_position", "away_dir", true)
                             .Child<VectorSubtractNode>("nearest_enemy_position", "self_position", "target_direction", true)
@@ -286,14 +290,11 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                             .Child<VectorNode>("away_pos", "face_position")
                             .Child<FaceNode>("face_position")
                             .End()
-                        .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
-                        .Child<AvoidWallsNode>()
                         .End()
                     .Sequence()  //Keep enemy distance while reacharging
                         .InvertChild<TimerExpiredNode>("recharge_timer")
                         .Child<SeekNode>("aimshot", kLeashDistance, SeekNode::DistanceResolveType::Dynamic)
                         .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
-                        .Child<AvoidWallsNode>()
                         .End()
                     .Sequence() // Path to teammate if far away
                         .Child<NearestTeammateNode>("nearest_teammate", 2) //Make sure we have at least 1 teammate close, if more than one stay with the broader group
@@ -308,8 +309,8 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                         .InvertChild<VisibilityQueryNode>("target_position")
                         .Child<GoToNode>("target_position")
                         .Parallel(CompositeDecorator::Success)
-                            .Child<AvoidTeamNode>(kAvoidTeamDistance)
-                            .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
+                            .Child<AvoidTeamNode>(kAvoidTeamDistance) //Avoid team while pathing
+                            .Child<AvoidEnemyNode>(kAvoidEnemyDistance) //Prevent enemies from sitting on top of us if not the same as the target
                             .End()
                         .Child<RenderPathNode>(Vector3f(1.0f, 0.5f, 0.5f))
                         .End()
