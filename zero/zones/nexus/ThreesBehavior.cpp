@@ -143,12 +143,12 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
   const Vector2f center(512, 512);
 
  // Used for target prio
-  constexpr float kLowEnergyThreshold = 800.0f;         // Energy threshold to prio targets
-  constexpr float kLowEnergyDistanceThreshold = 20.0f;  // Distance threshold for prio targets
+  constexpr float kLowEnergyThreshold = 700.0f;         // Energy threshold to prio targets
+  constexpr float kLowEnergyDistanceThreshold = 15.0f;  // Distance threshold for prio targets
 
-  // Rush threshold / dodge thresholds
+  // Stop dodging thresholds
   constexpr float kLowEnergyRushThreshold = 300.0f;  // If within rush distance and below this threshold
-  constexpr float kRushDistanceThreshold = 10.0f;    // If below rush energy threshold and this distance
+  constexpr float kRushDistanceThreshold = 8.0f;    // If below rush energy threshold and this distance
   constexpr u32 kRushRepelThreshold = 1;             // If we don't have this many reps dont rush targets
 
   // This is how far away to check for enemies that are rushing at us with low energy.
@@ -255,7 +255,7 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
 //            .Child<TimerSetNode>("next_freq_change_tick", 300)
 //            .Child<PlayerChangeFrequencyNode>("request_freq")
  //           .End()
-    .Selector() // Choose to fight the player or follow waypoints.
+   .Selector() // Choose to fight the player or follow waypoints.
             .Sequence() // Find nearest target and either path to them or seek them directly.              
                 .Sequence(CompositeDecorator::Success)
                     .Child<PlayerPositionQueryNode>("self_position") //Always track self position

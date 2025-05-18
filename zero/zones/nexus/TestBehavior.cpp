@@ -277,11 +277,6 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                             .End()
                         .Child<DodgeIncomingDamage>(0.25f, 45.0f) //was .3 30
                         .End()
-                    .Sequence() //Avoid walls unless we're rushing
-                        .InvertChild<BlackboardSetQueryNode>("rushing")
-                        .InvertChild<TileQueryNode>(kTileIdSafe)
-                        .Child<SeekFromWallNode>(kAvoidWallDistance)
-                        .End()
                     .Sequence()  //Keep enemy distance while reacharging, if within seek range face away from target to help dodging
                         .InvertChild<TimerExpiredNode>("recharge_timer")
                         .Child<SeekNode>("nearest_aimshot", kLeashDistanceAttack, SeekNode::DistanceResolveType::Dynamic)  
