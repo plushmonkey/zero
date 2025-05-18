@@ -138,13 +138,13 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
 
   const Vector2f center(512, 512);
 
-  // Used for target prio
-  constexpr float kLowEnergyThreshold = 900.0f;         // Energy threshold to prio targets
-  constexpr float kLowEnergyDistanceThreshold = 25.0f;  // Distance threshold for prio targets
+   // Used for target prio
+  constexpr float kLowEnergyThreshold = 700.0f;         // Energy threshold to prio targets
+  constexpr float kLowEnergyDistanceThreshold = 20.0f;  // Distance threshold for prio targets
 
   // Rush threshold / dodge thresholds
-  constexpr float kLowEnergyRushThreshold = 450.0f;  // If within rush distance and below this threshold
-  constexpr float kRushDistanceThreshold = 15.0f;    // If below rush energy threshold and this distance
+  constexpr float kLowEnergyRushThreshold = 350.0f;  // If within rush distance and below this threshold
+  constexpr float kRushDistanceThreshold = 10.0f;    // If below rush energy threshold and this distance
   constexpr u32 kRushRepelThreshold = 1;             // If we don't have this many reps dont rush targets
 
   // This is how far away to check for enemies that are rushing at us with low energy.
@@ -165,18 +165,18 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
   constexpr float kThorEnemyThreshold = 200.0f;
 
   // How far away from a teammate before we regroup
-  constexpr float kTeamRange = 35.0f;
+  constexpr float kTeamRange = 40.0f;
 
-  constexpr float kLeashDistance = 25.0f;
-  constexpr float kLeashDistanceAttack = 15.0f;
+  constexpr float kLeashDistance = 30.0f;
+  constexpr float kLeashDistanceAttack = 20.0f;
 
   constexpr float kAvoidTeamDistance = 8.0f;
 
-  constexpr float kAvoidEnemyDistance = 15.0f;
+  constexpr float kAvoidEnemyDistance = 10.0f;
 
   constexpr float kMultiFireDistance = 35.0f;  // Use multifire for targets over this range
 
-  constexpr float kAvoidWallDistance = 3.0f;
+  constexpr float kAvoidWallDistance = 2.0f;
 
   // clang-format off
 
@@ -223,12 +223,14 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
 //            .Child<TimerSetNode>("next_freq_change_tick", 300)
 //            .Child<PlayerChangeFrequencyNode>("request_freq")
  //           .End()
-   .Selector() // Choose to fight the player or follow waypoints.
+    .Selector() // Choose to fight the player or follow waypoints.
             .Sequence() // Find nearest target and either path to them or seek them directly.              
                 .Sequence(CompositeDecorator::Success)
                     .Child<PlayerPositionQueryNode>("self_position") //Always track self position
                     .Child<NearestMemoryTargetNode>("nearest_enemy") //Always track nearest enemey
                     .Child<PlayerPositionQueryNode>("nearest_enemy", "nearest_enemy_position") //Always track nearest enemy position so we can use it for some checks
+                    .Child<PlayerEnergyQueryNode>("nearest_enemy", "nearest_enemy_energy")
+                    .Child<AimNode>(WeaponType::Bullet, "nearest_enemy", "nearest_aimshot")
                     .Sequence() 
                         .Child<NearestMemoryTargetNode>("target")
                         .Child<PlayerPositionQueryNode>("target", "target_position")
@@ -286,7 +288,8 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                 .Selector()
                     .Sequence() // Attempt to dodge and use defensive items.
                         .Sequence(CompositeDecorator::Success) // Always check incoming damage so we can use it in repel and portal sequences.
-                            .Child<IncomingDamageQueryNode>(kRepelDistance, "incoming_damage")
+                            .Child<RepelDistanceQueryNode>("repel_distance")
+                            .Child<IncomingDamageQueryNode>("repel_distance", "incoming_damage")
                             .Child<PlayerCurrentEnergyQueryNode>("self_energy")
                             .End()
                         .Sequence(CompositeDecorator::Success) // If we are in danger but can't repel, use our portal.
@@ -308,18 +311,19 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                             .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
                             .InvertChild<DistanceThresholdNode>("target_position", "self_position", kRushDistanceThreshold)
                             .End()
-                        .Child<DodgeIncomingDamage>(0.2f, 45.0f) //was .3 30
+                        .Child<DodgeIncomingDamage>(0.25f, 45.0f) //was .3 30
                         .End()
                     .Sequence() //Avoid walls unless we're rushing
                         .InvertChild<BlackboardSetQueryNode>("rushing")
+                        .InvertChild<TileQueryNode>(kTileIdSafe)
                         .Child<SeekFromWallNode>(kAvoidWallDistance)
                         .End()
                     .Sequence()  //Keep enemy distance while reacharging, if within seek range face away from target to help dodging
                         .InvertChild<TimerExpiredNode>("recharge_timer")
-                         .InvertChild<DistanceThresholdNode>("nearest_enemy_position", kLeashDistance + 2.0f)  //dont bomb from too far
-                         .Child<DistanceThresholdNode>("nearest_enemy_position", kLeashDistance - 2.0f)  //check to ensure no enemies are on top of us
-                        .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
+                        .Child<SeekNode>("nearest_aimshot", kLeashDistanceAttack, SeekNode::DistanceResolveType::Dynamic)  
                         .Sequence(CompositeDecorator::Success) // Face away from target so it can dodge while waiting for bomb cooldown.
+                            .InvertChild<DistanceThresholdNode>("nearest_enemy_position", kLeashDistance + 2.0f)  //dont bomb from too far
+                            .Child<DistanceThresholdNode>("nearest_enemy_position", kLeashDistance - 2.0f)  //check to ensure no enemies are on top of us
                             .Child<PerpendicularNode>("nearest_enemy_position", "self_position", "away_dir", true)
                             .Child<VectorSubtractNode>("nearest_enemy_position", "self_position", "target_direction", true)
                             .Child<VectorAddNode>("away_dir", "target_direction", "away_dir", true)
@@ -327,11 +331,6 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                             .Child<VectorNode>("away_pos", "face_position")
                             .Child<FaceNode>("face_position")
                             .End()
-                        .End()
-                    .Sequence()  //Keep enemy distance while reacharging
-                        .InvertChild<TimerExpiredNode>("recharge_timer")
-                        .Child<SeekNode>("aimshot", kLeashDistance, SeekNode::DistanceResolveType::Dynamic)
-                        .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
                         .End()
                     .Sequence() // Path to teammate if far away
                         .Child<NearestTeammateNode>("nearest_teammate", 2) //Make sure we have at least 1 teammate close, if more than one stay with the broader group
@@ -362,9 +361,9 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                             .Child<BlackboardEraseNode>("rushing")                      
                             .Selector()
                                .Sequence() // If there is any low target with in this range prioritize
+                                    //.Child<ShipItemCountThresholdNode>(ShipItemType::Repel, kRushRepelThreshold) //dont rush if we have no reps
                                     .InvertChild<DistanceThresholdNode>("target_position", "self_position", kLowEnergyDistanceThreshold)
-                                    //.InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
-                                    .Child<ScalarThresholdNode<float>>("self_energy", "target_energy")
+                                    .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
                                     .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Static)
                                     .Child<ScalarNode>(1.0f, "rushing")
                                     .Child<BlackboardEraseNode>("recharge_timer")
@@ -390,20 +389,10 @@ std::unique_ptr<behavior::BehaviorNode> DuelBehavior::CreateTree(behavior::Execu
                                         .End()
                                     .End()
                                 .Sequence(CompositeDecorator::Success) 
-                                   // .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
-                                    .Child<SeekNode>("aimshot", kLeashDistanceAttack, SeekNode::DistanceResolveType::Dynamic)  
-                                    .InvertChild<DistanceThresholdNode>("nearest_enemy_position", kLeashDistanceAttack + 2.0f)  //dont bomb from too far
-                                    .Child<DistanceThresholdNode>("nearest_enemy_position", kLeashDistanceAttack - 2.0f)  //check to ensure no enemies are on top of us
-                                    .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
-                                    .Sequence(CompositeDecorator::Success) // Face away from target so it can dodge while waiting for bomb cooldown.
-                                        .Child<PerpendicularNode>("nearest_enemy_position", "self_position", "away_dir", true)
-                                        .Child<VectorSubtractNode>("nearest_enemy_position", "self_position", "target_direction", true)
-                                        .Child<VectorAddNode>("away_dir", "target_direction", "away_dir", true)
-                                        .Child<VectorAddNode>("self_position", "away_dir", "away_pos")
-                                        .Child<VectorNode>("away_pos", "face_position")
-                                        .Child<FaceNode>("face_position")
-                                        .End()
-                                    .End()
+                                 //  .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
+                                   .Child<AvoidTeamNode>(kAvoidTeamDistance)
+                                   .Child<SeekNode>("nearest_aimshot", kLeashDistanceAttack, SeekNode::DistanceResolveType::Dynamic)  
+                                   .End()
                                 .End()
                             .Sequence(CompositeDecorator::Success) // Bomb fire check.
                                 .Child<TimerExpiredNode>("match_startup") 
