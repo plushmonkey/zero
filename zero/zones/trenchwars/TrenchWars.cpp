@@ -180,14 +180,15 @@ void TwController::CreateFlagroomBitset() {
     MapCoord coord;
     int depth;
     int door_traverse_count;
+    int corridor_count;
 
-    VisitState(MapCoord coord, int depth, int door_traverse_count)
-        : coord(coord), depth(depth), door_traverse_count(door_traverse_count) {}
+    VisitState(MapCoord coord, int depth, int door_traverse_count, int corridor_count)
+        : coord(coord), depth(depth), door_traverse_count(door_traverse_count), corridor_count(corridor_count) {}
   };
 
   std::deque<VisitState> stack;
 
-  stack.emplace_back(MapCoord(flag_x, flag_y), 0, 0);
+  stack.emplace_back(MapCoord(flag_x, flag_y), 0, 0, 0);
 
   visit(stack.front().coord);
 
@@ -206,6 +207,8 @@ void TwController::CreateFlagroomBitset() {
 
     stack.pop_front();
 
+    // Cap the side entrances so they aren't included in the flag room tiles.
+    if (current.corridor_count >= 4) continue;
     if (current.depth >= kMaxFloodDistance) continue;
     if (map.IsSolidEmptyDoors(coord.x, coord.y, 0xFFFF)) continue;
 
@@ -215,11 +218,13 @@ void TwController::CreateFlagroomBitset() {
     if (door_traverse_count > 0 && flag_y - coord.y > 16) continue;
     if (door_traverse_count > kMaxFlagroomDoorTraverse) continue;
 
-    bool center = coord.y - flag_y > 0 && (s32)fabsf(coord.x - (float)flag_x) < 3;
-    CorridorType corridor_type = get_corridor_type(coord, center);
+    bool in_corridor_area = coord.y - flag_y > 0 && (s32)fabsf(coord.x - (float)flag_x) < 3;
+    in_corridor_area |= fabsf(coord.x - (float)flag_x) > 34;
+
+    CorridorType corridor_type = get_corridor_type(coord, in_corridor_area);
 
     if (corridor_type != CorridorType::None) {
-      if (!center && corridor_type == CorridorType::Vertical) {
+      if (!in_corridor_area && corridor_type == CorridorType::Vertical) {
         Vector2f corridor((float)coord.x, (float)coord.y);
 
         // Push this corridor 1 horizontally toward flag so it's within the flagroom.
@@ -239,6 +244,7 @@ void TwController::CreateFlagroomBitset() {
       }
 
       current.depth = kMaxFloodDistance - kCorridorInclusion;
+      ++current.corridor_count;
     }
 
     MapCoord west(coord.x - 1, coord.y);
@@ -250,22 +256,22 @@ void TwController::CreateFlagroomBitset() {
         pathfinder.GetProcessor().GetNode(path::NodePoint(coord.x, coord.y)), kShipRadius);
 
     if (edgeset.IsSet(path::CoordOffset::WestIndex()) && !visited(west)) {
-      stack.emplace_back(west, current.depth + 1, door_traverse_count);
+      stack.emplace_back(west, current.depth + 1, door_traverse_count, current.corridor_count);
       visit(west);
     }
 
     if (edgeset.IsSet(path::CoordOffset::EastIndex()) && !visited(east)) {
-      stack.emplace_back(east, current.depth + 1, door_traverse_count);
+      stack.emplace_back(east, current.depth + 1, door_traverse_count, current.corridor_count);
       visit(east);
     }
 
     if (edgeset.IsSet(path::CoordOffset::NorthIndex()) && !visited(north)) {
-      stack.emplace_back(north, current.depth + 1, door_traverse_count);
+      stack.emplace_back(north, current.depth + 1, door_traverse_count, current.corridor_count);
       visit(north);
     }
 
     if (edgeset.IsSet(path::CoordOffset::SouthIndex()) && !visited(south)) {
-      stack.emplace_back(south, current.depth + 1, door_traverse_count);
+      stack.emplace_back(south, current.depth + 1, door_traverse_count, current.corridor_count);
       visit(south);
     }
   }

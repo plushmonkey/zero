@@ -1639,7 +1639,7 @@ void PlayerManager::SimulatePlayer(Player& player, float dt, bool extrapolating)
 
   TileId tile_id = connection.map.GetTileId(player.position);
   if (tile_id == kTileIdWormhole && player.id == this->player_id) {
-    float energy_cost = ship_controller->ship.energy * 0.8f;
+    float energy_cost = player.energy * 0.8f;
 
     if (connection.send_damage) {
       WeaponData wd = {WeaponType::Wormhole, 0, 0, 0, 0, 0};

@@ -706,7 +706,9 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
       case ProtocolS2C::ModifyLVZ: {
       } break;
       case ProtocolS2C::ToggleSendDamage: {
-        send_damage = !send_damage;
+        if (size == 2) {
+          send_damage = buffer.ReadU8() != 0;
+        }
       } break;
       case ProtocolS2C::WatchDamage: {
       } break;
