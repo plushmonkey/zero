@@ -143,7 +143,7 @@ std::unique_ptr<behavior::BehaviorNode> TwosBehavior::CreateTree(behavior::Execu
   const Vector2f center(512, 512);
 
   // Used for target prio
-  constexpr float kLowEnergyThreshold = 800.0f;         // Energy threshold to prio targets
+  constexpr float kLowEnergyThreshold = 700.0f;         // Energy threshold to prio targets
   constexpr float kLowEnergyDistanceThreshold = 20.0f;  // Distance threshold for prio targets
 
   // Rush threshold / dodge thresholds
