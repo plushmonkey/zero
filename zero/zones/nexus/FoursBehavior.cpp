@@ -148,7 +148,7 @@ std::unique_ptr<behavior::BehaviorNode> FoursBehavior::CreateTree(behavior::Exec
 
   // Rush threshold / dodge thresholds
   constexpr float kLowEnergyRushThreshold = 300.0f;  // If within rush distance and below this threshold
-  constexpr float kRushDistanceThreshold = 10.0f;    // If below rush energy threshold and this distance
+  constexpr float kRushDistanceThreshold = 8.0f;    // If below rush energy threshold and this distance
   constexpr u32 kRushRepelThreshold = 1;             // If we don't have this many reps dont rush targets
 
   // This is how far away to check for enemies that are rushing at us with low energy.
