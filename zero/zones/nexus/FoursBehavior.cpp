@@ -148,7 +148,7 @@ std::unique_ptr<behavior::BehaviorNode> FoursBehavior::CreateTree(behavior::Exec
 
   // Rush threshold / dodge thresholds
   constexpr float kLowEnergyRushThreshold = 300.0f;  // If within rush distance and below this threshold
-  constexpr float kRushDistanceThreshold = 8.0f;    // If below rush energy threshold and this distance
+  constexpr float kRushDistanceThreshold = 10.0f;    // If below rush energy threshold and this distance
   constexpr u32 kRushRepelThreshold = 1;             // If we don't have this many reps dont rush targets
 
   // This is how far away to check for enemies that are rushing at us with low energy.
@@ -156,7 +156,7 @@ std::unique_ptr<behavior::BehaviorNode> FoursBehavior::CreateTree(behavior::Exec
   constexpr float kNearbyEnemyThreshold = 10.0f;
 
   // Check for incoming damage within this range
-  constexpr float kRepelDistance = 10.0f;
+  constexpr float kRepelDistance = 7.0f;
 
   // How much damage that is going towards an enemy before we start bombing. This is to limit the frequency of our
   // bombing so it overlaps bullets and is harder to dodge.

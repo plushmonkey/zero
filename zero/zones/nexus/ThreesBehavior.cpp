@@ -156,7 +156,7 @@ std::unique_ptr<behavior::BehaviorNode> ThreesBehavior::CreateTree(behavior::Exe
   constexpr float kNearbyEnemyThreshold = 10.0f;
 
   // Check for incoming damage within this range
-  constexpr float kRepelDistance = 8.0f;
+  constexpr float kRepelDistance = 7.0f;
 
   // How much damage that is going towards an enemy before we start bombing. This is to limit the frequency of our
   // bombing so it overlaps bullets and is harder to dodge.
