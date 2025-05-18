@@ -112,21 +112,22 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
 
   const Vector2f center(512, 512);
 
-  // Used for target prio
-  constexpr float kLowEnergyThreshold = 700.0f;         // Energy threshold to prio targets
-  constexpr float kLowEnergyDistanceThreshold = 20.0f;  // Distance threshold for prio targets
+  // Pursue targets below these thresholds, otherwise attack from distance
+  constexpr float kLowEnergyThreshold = 700.0f;         // Energy threshold
+  constexpr float kLowEnergyDistanceThreshold = 18.0f;  // Distance threshold
+  constexpr u32 kRushRepelThreshold = 1;  // If we don't have this many reps dont rush targets (in testing)
 
-  // Rush threshold / dodge thresholds
-  constexpr float kLowEnergyRushThreshold = 300.0f;  // If within rush distance and below this threshold
-  constexpr float kRushDistanceThreshold = 10.0f;    // If below rush energy threshold and this distance
-  constexpr u32 kRushRepelThreshold = 1;             // If we don't have this many reps dont rush targets
+  // Stop attempting to dodge when target is below these thresholds
+  constexpr float kLowEnergyRushThreshold = 300.0f;  // Energy threshold
+  constexpr float kRushDistanceThreshold = 8.0f;     // Distance threshold
 
-  // This is how far away to check for enemies that are rushing at us with low energy.
-  // We will stop dodging and try to finish them off if they are within this distance and low energy.
-  constexpr float kNearbyEnemyThreshold = 10.0f;
+  // Other dodge
+  constexpr float kDodgeVelocityThreshold = 10.0f;
+  constexpr float kDodgeRangeSlow = 20.0f;
+  constexpr float kDodgeRangeFast = 45.0f;  // When
 
-  // Check for incoming damage within this range
-  constexpr float kRepelDistance = 7.0f;
+  // Check for incoming damage within this range, if greater than current energy rep
+  constexpr float kRepelDistance = 9.0f;
 
   // How much damage that is going towards an enemy before we start bombing. This is to limit the frequency of our
   // bombing so it overlaps bullets and is harder to dodge.
@@ -135,24 +136,24 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
   // How far away a target needs to be before we start varying our shots around the target.
   constexpr float kShotSpreadDistanceThreshold = 40.0f;
 
-  //  If an enemy is near us and we're low energy thor if below this value
-  constexpr float kThorEnemyThreshold = 200.0f;
+  //  If an enemy is near us and we're low energy attempt to pb thor target
+  constexpr float kThorEnemyThreshold = 250.0f;
 
-  // How far away from a teammate before we regroup
-  constexpr float kTeamRange = 40.0f;
+  // Distance away from team before we regroup
+  constexpr float kTeamRange = 45.0f;       // Distance away from team member before we regroup
+  constexpr int kTeamRangeMemberIndex = 3;  // Use the 3rd furthest teammate as the base, otherwise the next furthest
 
-  constexpr float kLeashDistance = 30.0f;
-  constexpr float kLeashDistanceAttack = 20.0f;
+  // Leash Settings
+  constexpr float kLeashDistance = 30.0f;        // Used for low-energy retreating
+  constexpr float kLeashDistanceAttack = 20.0f;  // Used for default attack distance
 
-  constexpr float kAvoidTeamDistance = 8.0f;
-
-  constexpr float kAvoidEnemyDistance = 10.0f;
-
-  constexpr float kMultiFireDistance = 35.0f;  // Use multifire for targets over this range
-
+  // Misc
+  constexpr float kAvoidTeamDistance = 8.0f;    // Check to ensure we're not all stacked
+  constexpr float kAvoidEnemyDistance = 10.0f;  // Additional check when pathing to prevent enemies from sitting on us
+  constexpr float kMultiFireDistance = 35.0f;   // Use multifire for targets over this range
   constexpr float kAvoidWallDistance = 3.0f;
-
   // clang-format off
+
   builder
     .Selector()
         .InvertChild<PlayerSelfNode>("self")
@@ -179,15 +180,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
             .Child<AttachedQueryNode>("self")
             .Child<DetachNode>()
             .End()
-     //  .Sequence() // Switch to own frequency when possible.
-     //       .Child<ReadConfigIntNode<u16>>("Freq", "request_freq")
-     //       .Child<PlayerFrequencyQueryNode>("self_freq")
-     //       .InvertChild<EqualityNode<u16>>("self_freq", "request_freq")
-     //       .Child<TimerExpiredNode>("next_freq_change_tick")
-     //       .Child<TimerSetNode>("next_freq_change_tick", 300)
-     //       .Child<PlayerChangeFrequencyNode>("request_freq")
-     //       .End()
-   .Selector() // Choose to fight the player or follow waypoints.
+.Selector() // Choose to fight the player or follow waypoints.
             .Sequence() // Find nearest target and either path to them or seek them directly.              
                 .Sequence(CompositeDecorator::Success)
                     .Child<PlayerPositionQueryNode>("self_position") //Always track self position
@@ -195,13 +188,13 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                     .Child<PlayerPositionQueryNode>("nearest_enemy", "nearest_enemy_position") //Always track nearest enemy position so we can use it for some checks
                     .Child<PlayerEnergyQueryNode>("nearest_enemy", "nearest_enemy_energy")
                     .Child<AimNode>(WeaponType::Bullet, "nearest_enemy", "nearest_aimshot")
-                    .Sequence() 
+                    .Sequence() // Default targert is nearest
                         .Child<NearestMemoryTargetNode>("target")
                         .Child<PlayerPositionQueryNode>("target", "target_position")
                         .Child<PlayerEnergyQueryNode>("target", "target_energy")
                         .Child<AimNode>(WeaponType::Bullet, "target", "aimshot")
                         .End()
-                     .Sequence() //If is someone low nearby override target instead of just using nearest
+                     .Sequence() // If is someone low nearby override target instead of just using nearest
                         .Child<TimerExpiredNode>("recharge_timer") //if we're recharging we should always be leashing to nearest enemy so ignore low health
                         .Child<LowestTargetNode>("lowest_target")
                         .Child<PlayerPositionQueryNode>("lowest_target", "lowest_target_position")
@@ -252,8 +245,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                 .Selector()
                     .Sequence() // Attempt to dodge and use defensive items.
                         .Sequence(CompositeDecorator::Success) // Always check incoming damage so we can use it in repel and portal sequences.
-                            .Child<RepelDistanceQueryNode>("repel_distance")
-                            .Child<IncomingDamageQueryNode>("repel_distance", "incoming_damage")
+                            .Child<IncomingDamageQueryNode>(kRepelDistance, "incoming_damage")
                             .Child<PlayerCurrentEnergyQueryNode>("self_energy")
                             .End()
                         .Sequence(CompositeDecorator::Success) // If we are in danger but can't repel, use our portal.
@@ -275,14 +267,20 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                             .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
                             .InvertChild<DistanceThresholdNode>("target_position", "self_position", kRushDistanceThreshold)
                             .End()
-                        .Child<DodgeIncomingDamage>(0.25f, 45.0f) //was .3 30
+                        .Sequence(CompositeDecorator::Invert)  // If we're moving fast increase dodge distance threshold
+                                .Child<PlayerVelocityQueryNode>("self_velocity")
+                                .Child<VectorDotNode>("self_velocity", "target_direction", "forward_velocity")
+                                .Child<ScalarThresholdNode<float>>("forward_velocity", kDodgeVelocityThreshold)
+                                .Child<DodgeIncomingDamage>(0.2f, kDodgeRangeFast)
+                                .End()
+                        .Child<DodgeIncomingDamage>(0.1f, kDodgeRangeSlow) //was .3 30
                         .End()
                     .Sequence()  //Keep enemy distance while reacharging, if within seek range face away from target to help dodging
                         .InvertChild<TimerExpiredNode>("recharge_timer")
-                        .Child<SeekNode>("nearest_aimshot", kLeashDistanceAttack, SeekNode::DistanceResolveType::Dynamic)  
-                        .Sequence(CompositeDecorator::Success) // Face away from target so it can dodge while waiting for bomb cooldown.
-                            .InvertChild<DistanceThresholdNode>("nearest_enemy_position", kLeashDistance + 2.0f)  //dont bomb from too far
-                            .Child<DistanceThresholdNode>("nearest_enemy_position", kLeashDistance - 2.0f)  //check to ensure no enemies are on top of us
+                        .Child<SeekNode>("nearest_aimshot", kLeashDistance, SeekNode::DistanceResolveType::Dynamic)  
+                        .Sequence(CompositeDecorator::Success) // Face away from target when at leash range
+                            .InvertChild<DistanceThresholdNode>("nearest_enemy_position", kLeashDistance + 2.0f)  
+                            .Child<DistanceThresholdNode>("nearest_enemy_position", kLeashDistance - 2.0f)  
                             .Child<PerpendicularNode>("nearest_enemy_position", "self_position", "away_dir", true)
                             .Child<VectorSubtractNode>("nearest_enemy_position", "self_position", "target_direction", true)
                             .Child<VectorAddNode>("away_dir", "target_direction", "away_dir", true)
@@ -292,7 +290,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                             .End()
                         .End()
                     .Sequence() // Path to teammate if far away
-                        .Child<NearestTeammateNode>("nearest_teammate", 2) //Make sure we have at least 1 teammate close, if more than one stay with the broader group
+                        .Child<NearestTeammateNode>("nearest_teammate", kTeamRangeMemberIndex) //Make sure we have at least 1 teammate close, if more than one stay with the broader group
                         .Child<PlayerPositionQueryNode>("nearest_teammate", "nearest_teammate_position")
                         .Child<DistanceThresholdNode>("nearest_teammate_position", kTeamRange) //If we're already near teammates dont run to them
                         .Child<ScalarThresholdNode<float>>("target_energy", kLowEnergyThreshold)  //If we're going for a kill or someone is diving dont run
@@ -301,6 +299,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                         .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
                         .End()
                     .Sequence() // Path to target if they aren't immediately visible.
+                        .Child<TimerExpiredNode>("match_startup")
                         .InvertChild<VisibilityQueryNode>("target_position")
                         .Child<GoToNode>("target_position")
                         .Parallel(CompositeDecorator::Success)
@@ -317,7 +316,7 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                             .End()
                         .Parallel()     
                             .Child<FaceNode>("aimshot")
-                            .Child<BlackboardEraseNode>("rushing")                      
+                            .Child<BlackboardEraseNode>("rushing")
                             .Selector()
                                .Sequence() // If there is any low target with in this range prioritize
                                     //.Child<ShipItemCountThresholdNode>(ShipItemType::Repel, kRushRepelThreshold) //dont rush if we have no reps
@@ -374,7 +373,6 @@ std::unique_ptr<behavior::BehaviorNode> TestBehavior::CreateTree(behavior::Execu
                                 .Child<RenderRayNode>("world_camera", "bomb_fire_ray", 50.0f, Vector3f(1.0f, 0.0f, 0.0f))
                                 .Child<RayRectangleInterceptNode>("bomb_fire_ray", "target_bounds")
                                 .Child<InputActionNode>(InputAction::Bomb)
-                               // .InvertChild<TimerSetNode>("recharge_timer", "20")  //add slight backoff after firing a bomb
                                 .End()
                             .Sequence(CompositeDecorator::Success) // PB thor fire check.
                                 .Child<TimerExpiredNode>("match_startup")

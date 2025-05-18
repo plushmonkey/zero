@@ -25,6 +25,7 @@
 #include <zero/zones/nexus/nodes/NearestTeammateNode.h>
 #include <zero/zones/nexus/nodes/LowestTargetNode.h>
 #include <zero/zones/trenchwars/nodes/AttachNode.h>
+#include <zero/zones/nexus/nodes/PlayerByNameNode.h>
 
 #include <zero/zones/nexus/Nexus.h>
 #include "TwosBoxBehavior.h"
@@ -63,6 +64,42 @@ namespace nexus {
   const char* something = nullptr;
 };
 
+// Looks for nearby walls, find away vector, and seek to it.
+// Returns failure if no wall is nearby.
+struct SeekFromWallNode : public behavior::BehaviorNode {
+  SeekFromWallNode(float search_distance) : search_distance(search_distance) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto self = ctx.bot->game->player_manager.GetSelf();
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    Vector2f pos = self->position;
+
+    constexpr Vector2f kSearchDirections[] = {Vector2f(0, -1), Vector2f(1, 0), Vector2f(0, 1), Vector2f(-1, 0)};
+
+    auto& map = ctx.bot->game->connection.map;
+
+    Vector2f away_vector;
+
+    for (Vector2f direction : kSearchDirections) {
+      auto cast = map.CastTo(self->position, self->position + direction * search_distance, self->frequency);
+
+      if (cast.hit) {
+        // We hit a wall, so move away from it.
+        away_vector -= direction;
+      }
+    }
+
+    if (away_vector.LengthSq() > 0.0f) {
+      ctx.bot->bot_controller->steering.Seek(*ctx.bot->game, self->position + Normalize(away_vector) * 10.0f);
+      return behavior::ExecuteResult::Success;
+    }
+
+    return behavior::ExecuteResult::Failure;
+  }
+
+  float search_distance = 0.0f;
+};
 
 struct ShotSpreadNode : public behavior::BehaviorNode {
   ShotSpreadNode(const char* aimshot_key, float spread, float period)
@@ -105,20 +142,22 @@ std::unique_ptr<behavior::BehaviorNode> TwosBoxBehavior::CreateTree(behavior::Ex
 
   const Vector2f center(512, 512);
 
-  // Used for target prio
-  constexpr float kLowEnergyThreshold = 900.0f;         // Energy threshold to prio targets
-  constexpr float kLowEnergyDistanceThreshold = 25.0f;  // Distance threshold for prio targets
+  // Pursue targets below these thresholds, otherwise attack from distance
+  constexpr float kLowEnergyThreshold = 700.0f;     // Energy threshold
+  constexpr float kLowEnergyDistanceThreshold = 18.0f;  // Distance threshold
+  constexpr u32 kRushRepelThreshold = 1;  // If we don't have this many reps dont rush targets (in testing)
 
-  // Don't dodge below this
-  constexpr float kLowEnergyRushThreshold = 500.0f;  // Rush threshold
-  constexpr float kRushDistanceThreshold = 15.0f;
+  // Stop attempting to dodge when target is below these thresholds
+  constexpr float kLowEnergyRushThreshold = 300.0f;  // Energy threshold
+  constexpr float kRushDistanceThreshold = 8.0f;     // Distance threshold
 
-  // This is how far away to check for enemies that are rushing at us with low energy.
-  // We will stop dodging and try to finish them off if they are within this distance and low energy.
-  constexpr float kNearbyEnemyThreshold = 15.0f;
+  // Other dodge
+  constexpr float kDodgeVelocityThreshold = 10.0f;
+  constexpr float kDodgeRangeSlow = 20.0f;
+  constexpr float kDodgeRangeFast = 45.0f;  // When
 
-  // Check for incoming damage within this range
-  constexpr float kRepelDistance = 7.0f;
+  // Check for incoming damage within this range, if greater than current energy rep
+  constexpr float kRepelDistance = 9.0f;
 
   // How much damage that is going towards an enemy before we start bombing. This is to limit the frequency of our
   // bombing so it overlaps bullets and is harder to dodge.
@@ -127,30 +166,32 @@ std::unique_ptr<behavior::BehaviorNode> TwosBoxBehavior::CreateTree(behavior::Ex
   // How far away a target needs to be before we start varying our shots around the target.
   constexpr float kShotSpreadDistanceThreshold = 40.0f;
 
-  //  If an enemy is near us and we're low energy thor if below this value
+  //  If an enemy is near us and we're low energy attempt to pb thor target
   constexpr float kThorEnemyThreshold = 250.0f;
 
-  // How far away from a teammate before we regroup
-  constexpr float kTeamRange = 40.0f;
+  // Distance away from team before we regroup
+  constexpr float kTeamRange = 40.0f;       // Distance away from team member before we regroup
+  constexpr int kTeamRangeMemberIndex = 3;  // Use the 3rd furthest teammate as the base, otherwise the next furthest
 
-  constexpr float kAttachRange = 60.0f;
-  
-  //.Child<ReadConfigIntNode<u16>>("queue_command1", "command1")
-  //.Child<ReadConfigIntNode<u16>>("queue_command2", "command2")
-  //.Child<ReadConfigIntNode<u16>>("queue_command3", "command3")
-  //.Child<ChatMessageNode>(ChatMessageNode::PublicBlackboard("command1")) // Invert so this fails and freq is
-  //reevaluated. .Child<ChatMessageNode>(ChatMessageNode::PublicBlackboard("command2")) // Invert so this fails and freq
-  //is reevaluated. .Child<ChatMessageNode>(ChatMessageNode::PublicBlackboard("command3")) // Invert so this fails and
-  //freq is reevaluated.
+  // Leash Settings
+  constexpr float kLeashDistance = 30.0f;        // Used for low-energy retreating
+  constexpr float kLeashDistanceAttack = 20.0f;  // Used for default attack distance
+
+  // Misc
+  constexpr float kAvoidTeamDistance = 8.0f;    // Check to ensure we're not all stacked
+  constexpr float kAvoidEnemyDistance = 10.0f;  // Additional check when pathing to prevent enemies from sitting on us
+  constexpr float kMultiFireDistance = 35.0f;   // Use multifire for targets over this range
+  constexpr float kAvoidWallDistance = 3.0f;
+
   // clang-format off
   builder
     .Selector()
-        .InvertChild<PlayerSelfNode>("self")
+         .InvertChild<PlayerSelfNode>("self")
         .Sequence() //Join the queue first thing and auto join TODO: add command or checks to requeue if something goes wrong later such as recycled arena
             //.InvertChild<BlackboardSetQueryNode>("queued") //Check if we have already joined the queue, if not join
             .Child<TimerExpiredNode>("queue")
-            .Child<ChatMessageNode>(ChatMessageNode::Public("?next pairspub")) // Invert so this fails and freq is reevaluated.  //TODO replace this with a config var so we dont need 4 behaviors
-            .Child<ChatMessageNode>(ChatMessageNode::Public("?next -a")) // Invert so this fails and freq is reevaluated.
+            .Child<ChatMessageNode>(ChatMessageNode::Public("?next 3v3pub")) // Invert so this fails and freq is reevaluated.  //TODO replace this with a config var so we dont need 4 behaviors
+            .Child<ChatMessageNode>(ChatMessageNode::Public("?return")) // Invert so this fails and freq is reevaluated.  //TODO replace this with a config var so we dont need 4 behaviors
             .Child<TimerSetNode>("queue", 6000)
             //.Child<ScalarNode>(1.0f, "queued")  //was only joining queue on join then stopped working
             .End()
@@ -169,13 +210,6 @@ std::unique_ptr<behavior::BehaviorNode> TwosBoxBehavior::CreateTree(behavior::Ex
             .InvertChild<ShipQueryNode>("request_ship")
             .Child<ShipRequestNode>("request_ship")
             .End()
-         .Sequence()  // Fire 1 shot startup shot and set targets position to monitor for when they move so we can get out of the ready check loop
-            .InvertChild<TimerExpiredNode>("match_startup")      
-            .Child<TimerExpiredNode>("pre_fire")  // just needs to be longer than match_start
-            .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bullet)
-            .Child<InputActionNode>(InputAction::Bullet)
-            .Child<TimerSetNode>("pre_fire", 1500)
-            .End()
         .Sequence()  // Fire 1 shot startup shot and set targets position to monitor for when they move so we can get out of the ready check loop
             .InvertChild<TimerExpiredNode>("match_startup")      
             .Child<TimerExpiredNode>("pre_fire")  // just needs to be longer than match_start
@@ -183,44 +217,41 @@ std::unique_ptr<behavior::BehaviorNode> TwosBoxBehavior::CreateTree(behavior::Ex
             .Child<InputActionNode>(InputAction::Bullet)
             .Child<TimerSetNode>("pre_fire", 1500)
             .End()
-         .Sequence() 
+        .Sequence() //Attach if someone is safe and we have full energy
+            .Child<BlackboardSetQueryNode>("tchat_safe")
+            .InvertChild<TimerExpiredNode>("tchat_safe_timer")
             .Child<PlayerEnergyPercentThresholdNode>(1.0f)
             .Child<TimerExpiredNode>("attach_cooldown")
-            .Child<NearestTeammateNode>("nearest_teammate")   
-            .Child<PlayerPositionQueryNode>("nearest_teammate", "nearest_teammate_position")
-            .Child<DistanceThresholdNode>("nearest_teammate_position", kAttachRange) 
             .InvertChild<AttachedQueryNode>("self")
-            .Child<AttachNode>("nearest_teammate")
+            .Child<NearestTeammateNode>("nearest_teammate") 
+            .Child<PlayerPositionQueryNode>("nearest_teammate", "nearest_teammate_position")
+            .Child<DistanceThresholdNode>("nearest_teammate_position", kTeamRange) //If we're already near teammates dont run to them               
+            .Child<PlayerByNameNode>("tchat_safe", "tchat_safe_player")
+            .Child<AttachNode>("tchat_safe_player")
             .Child<TimerSetNode>("attach_cooldown", 100)
+            .Child<BlackboardEraseNode>("tchat_safe")
+            .Child<BlackboardEraseNode>("tchat_safe_timer")
             .End()
         .Sequence() // Detach if attached
             .Child<AttachedQueryNode>("self")
             .Child<DetachNode>()
             .End()
-      // .Sequence()  //If player shot at us cancel startup/ready check
-           // .InvertChild<TimerExpiredNode>("match_startup")      
-          //  .Child<ScalarThresholdNode<float>>("incoming_damage", "startup_damage_trigger")
-          //  .Child<BlackboardEraseNode>("match_startup")
-          //  .End()
-//       .Sequence() // Switch to own frequency when possible.
-//            .Child<ReadConfigIntNode<u16>>("Freq", "request_freq")
-//            .Child<PlayerFrequencyQueryNode>("self_freq")
-//            .InvertChild<EqualityNode<u16>>("self_freq", "request_freq")
-//            .Child<TimerExpiredNode>("next_freq_change_tick")
-//            .Child<TimerSetNode>("next_freq_change_tick", 300)
-//            .Child<PlayerChangeFrequencyNode>("request_freq")
- //           .End()
-          .Selector() // Choose to fight the player or follow waypoints.
+.Selector() // Choose to fight the player or follow waypoints.
             .Sequence() // Find nearest target and either path to them or seek them directly.              
                 .Sequence(CompositeDecorator::Success)
-                    .Child<PlayerPositionQueryNode>("self_position")    
-                    .Sequence() 
+                    .Child<PlayerPositionQueryNode>("self_position") //Always track self position
+                    .Child<NearestMemoryTargetNode>("nearest_enemy") //Always track nearest enemey
+                    .Child<PlayerPositionQueryNode>("nearest_enemy", "nearest_enemy_position") //Always track nearest enemy position so we can use it for some checks
+                    .Child<PlayerEnergyQueryNode>("nearest_enemy", "nearest_enemy_energy")
+                    .Child<AimNode>(WeaponType::Bullet, "nearest_enemy", "nearest_aimshot")
+                    .Sequence() // Default targert is nearest
                         .Child<NearestMemoryTargetNode>("target")
                         .Child<PlayerPositionQueryNode>("target", "target_position")
                         .Child<PlayerEnergyQueryNode>("target", "target_energy")
                         .Child<AimNode>(WeaponType::Bullet, "target", "aimshot")
                         .End()
-                     .Sequence() //If is someone low nearby override target 
+                     .Sequence() // If is someone low nearby override target instead of just using nearest
+                        .Child<TimerExpiredNode>("recharge_timer") //if we're recharging we should always be leashing to nearest enemy so ignore low health
                         .Child<LowestTargetNode>("lowest_target")
                         .Child<PlayerPositionQueryNode>("lowest_target", "lowest_target_position")
                         .Child<PlayerEnergyQueryNode>("lowest_target", "lowest_target_energy")
@@ -240,16 +271,31 @@ std::unique_ptr<behavior::BehaviorNode> TwosBoxBehavior::CreateTree(behavior::Ex
                 .Selector(CompositeDecorator::Success) // Enable multifire if ship supports it and it's disabled.
                     .Sequence()
                         .Child<ShipCapabilityQueryNode>(ShipCapability_Multifire)
-                        .Child<DistanceThresholdNode>("target_position", 35.0f) // If we are far from enemy, use multifire
+                        .Child<DistanceThresholdNode>("target_position", kMultiFireDistance) // If we are far from enemy, use multifire
                         .InvertChild<ShipMultifireQueryNode>()  //Check if multifire is off
                         .InvertChild<BlackboardSetQueryNode>("rushing") //dont multi if rushing
                         .Child<InputActionNode>(InputAction::Multifire) //Turn on multifire
                         .End()
                     .Sequence()
                         .Child<ShipCapabilityQueryNode>(ShipCapability_Multifire)
-                        .InvertChild<DistanceThresholdNode>("target_position", 35.0f) // If we are far from enemy, turn off multifire
+                        .InvertChild<DistanceThresholdNode>("target_position",kMultiFireDistance) // If we are far from enemy, turn off multifire
                         .Child<ShipMultifireQueryNode>()  //Check if multifire is on
                         .Child<InputActionNode>(InputAction::Multifire)  //Turn off multifire
+                        .End()
+                    .End()
+                .Selector(CompositeDecorator::Success) // Toggle antiwarp based on energy
+                    .Sequence() // Enable antiwarp if we are healthy
+                        .Child<TimerExpiredNode>("tchat_safe_timer")        
+                        .Child<ShipCapabilityQueryNode>(ShipCapability_Antiwarp)
+                        .Child<PlayerEnergyPercentThresholdNode>(0.75f)
+                        .InvertChild<PlayerStatusQueryNode>(Status_Antiwarp)
+                        .Child<InputActionNode>(InputAction::Antiwarp)
+                        .End()
+                    .Sequence() // Disable antiwarp if we aren't healthy
+                        .Child<ShipCapabilityQueryNode>(ShipCapability_Antiwarp)
+                        .InvertChild<PlayerEnergyPercentThresholdNode>(0.75f)
+                        .Child<PlayerStatusQueryNode>(Status_Antiwarp)
+                        .Child<InputActionNode>(InputAction::Antiwarp)
                         .End()
                     .End()
                 .Selector()
@@ -277,20 +323,46 @@ std::unique_ptr<behavior::BehaviorNode> TwosBoxBehavior::CreateTree(behavior::Ex
                             .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
                             .InvertChild<DistanceThresholdNode>("target_position", "self_position", kRushDistanceThreshold)
                             .End()
-                        .Child<DodgeIncomingDamage>(0.3f, 30.0f)
+                        .Sequence(CompositeDecorator::Invert)  // If we're moving fast increase dodge distance threshold
+                                .Child<PlayerVelocityQueryNode>("self_velocity")
+                                .Child<VectorDotNode>("self_velocity", "target_direction", "forward_velocity")
+                                .Child<ScalarThresholdNode<float>>("forward_velocity", kDodgeVelocityThreshold)
+                                .Child<DodgeIncomingDamage>(0.2f, kDodgeRangeFast)
+                                .End()
+                        .Child<DodgeIncomingDamage>(0.1f, kDodgeRangeSlow) //was .3 30
+                        .End()
+                    .Sequence()  //Keep enemy distance while reacharging, if within seek range face away from target to help dodging
+                        .InvertChild<TimerExpiredNode>("recharge_timer")
+                        .Child<SeekNode>("nearest_aimshot", kLeashDistance, SeekNode::DistanceResolveType::Dynamic)  
+                        .Sequence(CompositeDecorator::Success) // Face away from target when at leash range
+                            .InvertChild<DistanceThresholdNode>("nearest_enemy_position", kLeashDistance + 2.0f)  
+                            .Child<DistanceThresholdNode>("nearest_enemy_position", kLeashDistance - 2.0f)  
+                            .Child<PerpendicularNode>("nearest_enemy_position", "self_position", "away_dir", true)
+                            .Child<VectorSubtractNode>("nearest_enemy_position", "self_position", "target_direction", true)
+                            .Child<VectorAddNode>("away_dir", "target_direction", "away_dir", true)
+                            .Child<VectorAddNode>("self_position", "away_dir", "away_pos")
+                            .Child<VectorNode>("away_pos", "face_position")
+                            .Child<FaceNode>("face_position")
+                            .End()
                         .End()
                     .Sequence() // Path to teammate if far away
-                        .Child<NearestTeammateNode>("nearest_teammate", 2) //Make sure we have at least 1 teammate close, if more than one stay with the broader group
+                        .Child<NearestTeammateNode>("nearest_teammate", kTeamRangeMemberIndex) //Make sure we have at least 1 teammate close, if more than one stay with the broader group
                         .Child<PlayerPositionQueryNode>("nearest_teammate", "nearest_teammate_position")
                         .Child<DistanceThresholdNode>("nearest_teammate_position", kTeamRange) //If we're already near teammates dont run to them
                         .Child<ScalarThresholdNode<float>>("target_energy", kLowEnergyThreshold)  //If we're going for a kill or someone is diving dont run
                         .Child<GoToNode>("nearest_teammate_position")
+                        .Child<AvoidEnemyNode>(kAvoidEnemyDistance)
                         .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
                         .End()
                     .Sequence() // Path to target if they aren't immediately visible.
+                        .Child<TimerExpiredNode>("match_startup")
                         .InvertChild<VisibilityQueryNode>("target_position")
                         .Child<GoToNode>("target_position")
-                        .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
+                        .Parallel(CompositeDecorator::Success)
+                            .Child<AvoidTeamNode>(kAvoidTeamDistance) //Avoid team while pathing
+                            .Child<AvoidEnemyNode>(kAvoidEnemyDistance) //Prevent enemies from sitting on top of us if not the same as the target
+                            .End()
+                        .Child<RenderPathNode>(Vector3f(1.0f, 0.5f, 0.5f))
                         .End()
                     .Sequence() // Aim at target and shoot while seeking them.
                         .Child<TimerExpiredNode>("match_startup") 
@@ -300,14 +372,16 @@ std::unique_ptr<behavior::BehaviorNode> TwosBoxBehavior::CreateTree(behavior::Ex
                             .End()
                         .Parallel()     
                             .Child<FaceNode>("aimshot")
-                            .Child<BlackboardEraseNode>("rushing")                      
+                            .Child<BlackboardEraseNode>("rushing")
                             .Selector()
                                .Sequence() // If there is any low target with in this range prioritize
-                                    .Child<ShipItemCountThresholdNode>(ShipItemType::Repel) //dont rush if we have no reps
+                                    //.Child<ShipItemCountThresholdNode>(ShipItemType::Repel, kRushRepelThreshold) //dont rush if we have no reps
                                     .InvertChild<DistanceThresholdNode>("target_position", "self_position", kLowEnergyDistanceThreshold)
-                                    .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyRushThreshold)
+                                    .InvertChild<ScalarThresholdNode<float>>("target_energy", kLowEnergyThreshold)
+                                    .Child<ScalarThresholdNode<float>>("self_energy", "target_energy")
                                     .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Static)
                                     .Child<ScalarNode>(1.0f, "rushing")
+                                    .Child<BlackboardEraseNode>("recharge_timer")
                                     .Sequence(CompositeDecorator::Success) //Optionally rocket if the target is too far and we have decent energy
                                         .Child<ShipItemCountThresholdNode>(ShipItemType::Rocket)
                                         .Child<PlayerEnergyPercentThresholdNode>(0.6f)
@@ -316,15 +390,11 @@ std::unique_ptr<behavior::BehaviorNode> TwosBoxBehavior::CreateTree(behavior::Ex
                                         .Child<TimerExpiredNode>("rocket_timer")
                                         .Child<InputActionNode>(InputAction::Rocket)
                                         .Child<TimerSetNode>("rocket_timer", 2000)
-                                        .End()
-                                    .Child<BlackboardEraseNode>("recharge_timer")
-                                    .End()
-                                .Sequence()  //Keep enemy distance while reacharging
-                                    .InvertChild<TimerExpiredNode>("recharge_timer")
-                                    .Child<SeekNode>("aimshot", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
+                                        .End() 
                                     .End()
                                 .Sequence() 
                                     .InvertChild<PlayerEnergyPercentThresholdNode>(0.3f)
+                                    .InvertChild<BlackboardSetQueryNode>("rushing")
                                     .Child<TimerSetNode>("recharge_timer", 700)  
                                     .Sequence(CompositeDecorator::Success)
                                         .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Decoy)
@@ -333,12 +403,16 @@ std::unique_ptr<behavior::BehaviorNode> TwosBoxBehavior::CreateTree(behavior::Ex
                                         .Child<TimerSetNode>("decoy_timer", 1000)    
                                         .End()
                                     .End()
-                                .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
+                                .Sequence(CompositeDecorator::Success) 
+                                 //  .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
+                                   .Child<AvoidTeamNode>(kAvoidTeamDistance)
+                                   .Child<SeekNode>("nearest_aimshot", kLeashDistanceAttack, SeekNode::DistanceResolveType::Dynamic)  
+                                   .End()
                                 .End()
                             .Sequence(CompositeDecorator::Success) // Bomb fire check.
                                 .Child<TimerExpiredNode>("match_startup") 
                                 .Child<TimerExpiredNode>("recharge_timer") 
-                                .InvertChild<BurstAreaQueryNode>() //dont use bombs in areas with walls
+                                .InvertChild<SeekFromWallNode>(4.0f)
                                 .Child<PlayerEnergyPercentThresholdNode>(0.45f)
                                 .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Bomb)
                                 .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
@@ -346,16 +420,15 @@ std::unique_ptr<behavior::BehaviorNode> TwosBoxBehavior::CreateTree(behavior::Ex
                                 .Child<IncomingDamageQueryNode>("target", kRepelDistance * 2.5f, 2.75f, "outgoing_damage")
                                 .Child<ScalarThresholdNode<float>>("outgoing_damage", kBombRequiredDamageOverlap) // Check if we have enough bullets overlapping outgoing damage to fire a bomb into.
                                 .InvertChild<DistanceThresholdNode>("target_position", 50.0f)  //dont bomb from too far
-                                .Child<DistanceThresholdNode>("target_position", 12.0f)  //dont pb yourself
+                                .Child<DistanceThresholdNode>("nearest_enemy_position", 12.0f)  //check to ensure no enemies are on top of us
                                 .Child<ShotVelocityQueryNode>(WeaponType::Bomb, "bomb_fire_velocity")
                                 .Child<RayNode>("self_position", "bomb_fire_velocity", "bomb_fire_ray")
                                 .Child<DynamicPlayerBoundingBoxQueryNode>("target", "target_bounds", 4.0f)
                                 .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
                                 .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
-                                .Child<RenderRayNode>("world_camera", "bomb_fire_ray", 50.0f, Vector3f(1.0f, 1.0f, 0.0f))
+                                .Child<RenderRayNode>("world_camera", "bomb_fire_ray", 50.0f, Vector3f(1.0f, 0.0f, 0.0f))
                                 .Child<RayRectangleInterceptNode>("bomb_fire_ray", "target_bounds")
                                 .Child<InputActionNode>(InputAction::Bomb)
-                               // .InvertChild<TimerSetNode>("recharge_timer", "20")  //add slight backoff after firing a bomb
                                 .End()
                             .Sequence(CompositeDecorator::Success) // PB thor fire check.
                                 .Child<TimerExpiredNode>("match_startup")
@@ -369,8 +442,8 @@ std::unique_ptr<behavior::BehaviorNode> TwosBoxBehavior::CreateTree(behavior::Ex
                                 .Child<RayNode>("self_position", "thor_fire_velocity", "thor_fire_ray")
                                 .Child<DynamicPlayerBoundingBoxQueryNode>("target", "target_bounds", 4.0f)
                                 .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
-                                .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
-                                .Child<RenderRayNode>("world_camera", "thor_fire_ray", 50.0f, Vector3f(1.0f, 1.0f, 0.0f))
+                                .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(0.0f, 1.0f, 0.0f))
+                                .Child<RenderRayNode>("world_camera", "thor_fire_ray", 50.0f, Vector3f(0.0f, 1.0f, 0.0f))
                                 .Child<RayRectangleInterceptNode>("thor_fire_ray", "target_bounds")
                                 .Child<InputActionNode>(InputAction::Thor) //Thor
                                 .End()
@@ -379,7 +452,7 @@ std::unique_ptr<behavior::BehaviorNode> TwosBoxBehavior::CreateTree(behavior::Ex
                                 .Child<TimerExpiredNode>("recharge_timer") 
                                 .Child<DynamicPlayerBoundingBoxQueryNode>("target", "target_bounds", 4.0f)
                                 .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
-                                .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
+                                .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(0.0f, 0.0f, 1.0f))
                                 .Selector()
                                     .Child<BlackboardSetQueryNode>("rushing")
                                     .Child<PlayerEnergyPercentThresholdNode>(0.3f)
