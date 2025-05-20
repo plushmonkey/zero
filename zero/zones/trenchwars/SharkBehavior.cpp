@@ -196,7 +196,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateDefensiveTree() {
             .Child<InputActionNode>(InputAction::Repel)
             .Child<TimerSetNode>("defense_timer", 100)
             .End()
-        .Child<DodgeIncomingDamage>(0.1f, 20.0f)
+        .Child<DodgeIncomingDamage>(0.1f, 16.0f)
         .End();
   // clang-format on
 
@@ -308,7 +308,12 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
         .Sequence() // If there are no enemies above us, go mining
             .InvertChild<EnemiesAboveNode>()
             .InvertChild<DistanceThresholdNode>("tw_flag_position", kNearFlagroomDistance)
-            .Composite(CreateMineAreaBehavior())
+            .SuccessChild<svs::NearestMemoryTargetNode>("nearest_target")
+            .SuccessChild<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
+            .Selector(CompositeDecorator::Invert) // Invert twice here so the sequence fails and falls through in non-mine case.
+                .Child<InFlagroomNode>("nearest_target_position") // We don't want to mine when we have a target in fr, and we don't want this sequence to succeed.
+                .Composite(CreateMineAreaBehavior(), CompositeDecorator::Invert)
+                .End()
             .End()
         .Sequence()
             .Child<PlayerSelfNode>("self")

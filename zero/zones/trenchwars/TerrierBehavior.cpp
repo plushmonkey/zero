@@ -55,7 +55,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateDefensiveTree() {
             .Child<InputActionNode>(InputAction::Warp)
             .Child<TimerSetNode>("defense_timer", 100)
             .End()
-        .Child<DodgeIncomingDamage>(0.1f, 35.0f)
+        .Child<DodgeIncomingDamage>(0.1f, 20.0f)
         .End();
   // clang-format on
 
