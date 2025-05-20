@@ -9,6 +9,58 @@
 namespace zero {
 namespace tw {
 
+// Find an enemy in the base while traveling.
+// This will only find enemies that are within our direct view.
+struct FindBaseEnemyNode : public behavior::BehaviorNode {
+  FindBaseEnemyNode(const char* output_key) : output_key(output_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto& pm = ctx.bot->game->player_manager;
+    auto self = pm.GetSelf();
+
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    float radius = ctx.bot->game->connection.settings.ShipSettings[self->ship].GetRadius();
+
+    // We shouldn't fight enemies below this line because we will be wasting our time.
+    constexpr float kBaseStartY = 370;
+    // How far on each side of the center we should look for an enemy. We don't want to be running all over the base fighting people on the side.
+    constexpr float kSearchX = 40.0f;
+
+    Player* nearest_player = nullptr;
+    float best_dist_sq = 1024.0f * 1024.0f;
+
+    for (size_t i = 0; i < pm.player_count; ++i) {
+      Player* player = pm.players + i;
+
+      if (player->frequency == self->frequency) continue;
+      if (player->ship >= 8) continue;
+      if (player->position.y > kBaseStartY) continue;
+      if (fabsf(512.0f - player->position.x) > kSearchX) continue;
+      if (player->IsRespawning()) continue;
+      if (player->position == Vector2f(0, 0)) continue;
+      if (!pm.IsSynchronized(*player)) continue;
+
+      float dist_sq = self->position.DistanceSq(player->position);
+      if (dist_sq > best_dist_sq) continue;
+
+      CastResult result = ctx.bot->game->GetMap().CastShip(self, radius, player->position);
+      if (result.hit) continue;
+
+      nearest_player = player;
+      best_dist_sq = dist_sq;
+    }
+
+    if (nearest_player == nullptr) return behavior::ExecuteResult::Failure;
+
+    ctx.blackboard.Set<Player*>(output_key, nearest_player);
+
+    return behavior::ExecuteResult::Success;
+  }
+
+  const char* output_key = nullptr;
+};
+
 // This checks the top area and the vertical shaft for enemies.
 // TODO: Might need to check other pub maps to see if it's fine.
 // TODO: Could probably generate the rect sizes from the map data.

@@ -240,6 +240,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
     .Sequence()
         .Child<PlayerSelfNode>("self")
         .Child<PlayerPositionQueryNode>("self_position")
+        .SuccessChild<DodgeIncomingDamage>(0.3f, 16.0f)
         .Sequence(CompositeDecorator::Success) // Use afterburners to get to flagroom faster.
             .InvertChild<InFlagroomNode>("self_position")
             .Child<ExecuteNode>([](ExecuteContext& ctx) {

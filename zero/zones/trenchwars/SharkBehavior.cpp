@@ -202,7 +202,7 @@ std::unique_ptr<behavior::BehaviorNode> CreateSharkTree(behavior::ExecuteContext
                     .Child<InFlagroomNode>("nearest_target_position")
                     .Selector()
                         .Sequence()
-                            .InvertChild<VisibilityQueryNode>("nearest_target_position")
+                            .InvertChild<ShipTraverseQueryNode>("nearest_target_position")
                             .Child<GoToNode>("nearest_target_position")
                             .End()
                         .Composite(CreateOffensiveTree("nearest_target", "nearest_target_position"))
