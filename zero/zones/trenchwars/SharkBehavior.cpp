@@ -31,6 +31,151 @@
 namespace zero {
 namespace tw {
 
+static inline bool IsMine(Weapon& weapon) {
+  return weapon.data.alternate &&
+         (weapon.data.type == WeaponType::Bomb || weapon.data.type == WeaponType::ProximityBomb);
+}
+
+static inline bool IsMineNearby(const std::vector<Weapon*>& mines, Vector2f position) {
+  for (auto weapon : mines) {
+    if (weapon->position.DistanceSq(position) <= 0.5f) return true;
+  }
+  return false;
+}
+
+// Returns true if there are enemies with a lower Y value than us, so they are above us in the base.
+struct EnemiesAboveNode : public behavior::BehaviorNode {
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto& pm = ctx.bot->game->player_manager;
+    auto self = pm.GetSelf();
+    if (!self) return behavior::ExecuteResult::Failure;
+
+    for (size_t i = 0; i < pm.player_count; ++i) {
+      Player* player = pm.players + i;
+
+      if (player->frequency == self->frequency) continue;
+      if (player->IsRespawning()) continue;
+      if (player->position.y >= self->position.y) continue;
+      if (!pm.IsSynchronized(*player)) continue;
+      if (player->position == Vector2f(0, 0)) continue;
+
+      return behavior::ExecuteResult::Success;
+    }
+
+    return behavior::ExecuteResult::Failure;
+  }
+};
+
+// Get all of the mines and store them in the blackboard.
+// This is done to avoid expensive weapon iteration.
+struct QueryMinesNode : public behavior::BehaviorNode {
+  QueryMinesNode(const char* output_key) : output_key(output_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto& wm = ctx.bot->game->weapon_manager;
+
+    std::vector<Weapon*> mines;
+
+    for (size_t i = 0; i < wm.weapon_count; ++i) {
+      Weapon* weapon = wm.weapons + i;
+
+      if (!IsMine(*weapon)) continue;
+
+      mines.push_back(weapon);
+    }
+
+    ctx.blackboard.Set(output_key, mines);
+
+    return behavior::ExecuteResult::Success;
+  }
+
+  const char* output_key = nullptr;
+};
+
+// Requires the mines from QueryMinesNode
+struct FlagRequiresMinesNode : public behavior::BehaviorNode {
+  FlagRequiresMinesNode(const char* mines_key, float search_distance, size_t desired_mine_count)
+      : mines_key(mines_key),
+        search_distance_sq(search_distance * search_distance),
+        desired_mine_count(desired_mine_count) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto self = ctx.bot->game->player_manager.GetSelf();
+    if (!self) return behavior::ExecuteResult::Failure;
+
+    auto opt_mines = ctx.blackboard.Value<std::vector<Weapon*>>(mines_key);
+    if (!opt_mines) return behavior::ExecuteResult::Failure;
+
+    auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+    if (!opt_tw) return behavior::ExecuteResult::Failure;
+
+    TrenchWars* tw = *opt_tw;
+    std::vector<Weapon*> mines = *opt_mines;
+
+    size_t count = 0;
+
+    for (size_t i = 0; i < mines.size(); ++i) {
+      if (mines[i]->frequency != self->frequency) continue;
+      if (mines[i]->position.y > tw->flag_position.y) continue;  // Only count mines above flag
+      if (mines[i]->position.DistanceSq(tw->flag_position) > search_distance_sq) continue;
+
+      ++count;
+    }
+
+    return count < desired_mine_count ? behavior::ExecuteResult::Success : behavior::ExecuteResult::Failure;
+  }
+
+  const char* mines_key = nullptr;
+  float search_distance_sq = 0.0f;
+  size_t desired_mine_count = 3;
+};
+
+// Finds the best location to lay a mine around an area.
+// Requires the mines from QueryMinesNode
+struct FindBestMinePositionNode : public behavior::BehaviorNode {
+  FindBestMinePositionNode(float y_offset, const char* mines_key, const char* output_key)
+      : y_offset(y_offset), mines_key(mines_key), output_key(output_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto self = ctx.bot->game->player_manager.GetSelf();
+    if (!self) return behavior::ExecuteResult::Failure;
+
+    auto opt_mines = ctx.blackboard.Value<std::vector<Weapon*>>(mines_key);
+    if (!opt_mines) return behavior::ExecuteResult::Failure;
+
+    auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+    if (!opt_tw) return behavior::ExecuteResult::Failure;
+
+    TrenchWars* tw = *opt_tw;
+    const std::vector<Weapon*>& mines = *opt_mines;
+
+    Vector2f center = tw->flag_position + Vector2f(0, y_offset);
+    Vector2f left = center + Vector2f(-2, 0);
+    Vector2f right = center + Vector2f(2, 0);
+
+    if (!IsMineNearby(mines, left)) {
+      ctx.blackboard.Set(output_key, left);
+      return behavior::ExecuteResult::Success;
+    }
+
+    if (!IsMineNearby(mines, center)) {
+      ctx.blackboard.Set(output_key, center);
+      return behavior::ExecuteResult::Success;
+    }
+
+    if (!IsMineNearby(mines, right)) {
+      ctx.blackboard.Set(output_key, right);
+      return behavior::ExecuteResult::Success;
+    }
+
+    return behavior::ExecuteResult::Success;
+  }
+
+  float y_offset = 0.0f;
+  const char* mines_key = nullptr;
+  const char* output_key = nullptr;
+};
+
 static std::unique_ptr<behavior::BehaviorNode> CreateDefensiveTree() {
   using namespace behavior;
 
@@ -100,9 +245,54 @@ static std::unique_ptr<behavior::BehaviorNode> CreateOffensiveTree(const char* n
 }
 
 // Lay mines in important areas such as entrance and on top of flags.
-// TODO: Implement
 static std::unique_ptr<behavior::BehaviorNode> CreateMineAreaBehavior() {
-  return nullptr;
+  using namespace behavior;
+
+  BehaviorBuilder builder;
+
+  constexpr float kFlagMineDistance = 4.0f;
+  constexpr size_t kFlagDesiredMineCount = 3;
+
+  // clang-format off
+  builder
+    .Sequence()
+        .Child<ShipMineCapableQueryNode>() // Check if we can currently lay a mine
+        .Child<QueryMinesNode>("mines")
+        .Sequence(CompositeDecorator::Success) // Make sure we are detached when we want to go find a place to lay a mine.
+            .Child<AttachedQueryNode>()
+            .Child<TimerExpiredNode>("attach_cooldown")
+            .Child<DetachNode>()
+            .Child<TimerSetNode>("attach_cooldown", 100)
+            .End()
+        .Selector()
+            .Sequence() // Try to lay a node near flags
+                .Child<FlagRequiresMinesNode>("mines", kFlagMineDistance, kFlagDesiredMineCount)
+                .Child<FindBestMinePositionNode>(-1.5f, "mines", "mine_position")
+                .End()
+            .Sequence() // Try to lay a mine in the fr lower entrance
+                .Child<FindBestMinePositionNode>(18.0f, "mines", "mine_position")
+                .End()
+            .Sequence() // Try to lay a mine in the fr upper entrance
+                .Child<FindBestMinePositionNode>(6.0f, "mines", "mine_position")
+                .End()
+            .End()
+        .Selector() // We have a mine location, so go lay it there.
+            .Sequence()
+                .InvertChild<ShipTraverseQueryNode>("mine_position")
+                .Child<GoToNode>("mine_position")
+                .End()
+            .Sequence()
+                .Child<ArriveNode>("mine_position", 1.25f)
+                .Sequence(CompositeDecorator::Success)
+                    .InvertChild<DistanceThresholdNode>("mine_position", 0.5f)
+                    .Child<InputActionNode>(InputAction::Mine)
+                    .End()
+                .End()
+            .End()
+        .End();
+  // clang-format on
+
+  return builder.Build();
 }
 
 static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
@@ -114,66 +304,73 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
 
   // clang-format off
   builder
-    .Sequence()
-        .Child<PlayerSelfNode>("self")
-        .Child<PlayerPositionQueryNode>("self_position")
-        .Sequence(CompositeDecorator::Success) // Use afterburners to get to flagroom faster.
-            .InvertChild<InFlagroomNode>("self_position")
-            .Child<ExecuteNode>([](ExecuteContext& ctx) {
-              auto self = ctx.bot->game->player_manager.GetSelf();
-              if (!self || self->ship >= 8) return ExecuteResult::Failure;
-
-              float max_energy = (float)ctx.bot->game->ship_controller.ship.energy;
-
-              auto& input = *ctx.bot->bot_controller->input;
-              auto& last_input = ctx.bot->bot_controller->last_input;
-
-              // Keep using afterburners above 50%. Disable until full energy, then enable again.
-              if (last_input.IsDown(InputAction::Afterburner)) {
-                input.SetAction(InputAction::Afterburner, self->energy > max_energy * 0.5f);
-              } else if (self->energy >= max_energy) {
-                input.SetAction(InputAction::Afterburner, true);
-              }
-
-              return ExecuteResult::Success;
-            })
+    .Selector()
+        .Sequence() // If there are no enemies above us, go mining
+            .InvertChild<EnemiesAboveNode>()
+            .InvertChild<DistanceThresholdNode>("tw_flag_position", kNearFlagroomDistance)
+            .Composite(CreateMineAreaBehavior())
             .End()
-        .Selector()
-            .Sequence() // Attach to teammate if possible
-                .InvertChild<AttachedQueryNode>("self")
-                .Child<DistanceThresholdNode>("tw_flag_position", kNearFlagroomDistance)
-                .Child<TimerExpiredNode>("attach_cooldown")
-                .Child<BestAttachQueryNode>("best_attach_player")
-                .Child<AttachNode>("best_attach_player")
-                .Child<TimerSetNode>("attach_cooldown", 100)
-                .End()
-            .Sequence() // Detach when near flag room
-                .Child<AttachedQueryNode>("self")
-                .InvertChild<DistanceThresholdNode>("tw_flag_position", kNearFlagroomDistance)
-                .Child<TimerExpiredNode>("attach_cooldown")
-                .Child<DetachNode>()
-                .Child<TimerSetNode>("attach_cooldown", 100)
-                .End()
-            .Sequence() // Go directly to the flag room if we aren't there.
+        .Sequence()
+            .Child<PlayerSelfNode>("self")
+            .Child<PlayerPositionQueryNode>("self_position")
+            .Sequence(CompositeDecorator::Success) // Use afterburners to get to flagroom faster.
                 .InvertChild<InFlagroomNode>("self_position")
-                .Child<GoToNode>("tw_flag_position")
-                .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
+                .Child<ExecuteNode>([](ExecuteContext& ctx) {
+                  auto self = ctx.bot->game->player_manager.GetSelf();
+                  if (!self || self->ship >= 8) return ExecuteResult::Failure;
+
+                  float max_energy = (float)ctx.bot->game->ship_controller.ship.energy;
+
+                  auto& input = *ctx.bot->bot_controller->input;
+                  auto& last_input = ctx.bot->bot_controller->last_input;
+
+                  // Keep using afterburners above 50%. Disable until full energy, then enable again.
+                  if (last_input.IsDown(InputAction::Afterburner)) {
+                    input.SetAction(InputAction::Afterburner, self->energy > max_energy * 0.5f);
+                  } else if (self->energy >= max_energy) {
+                    input.SetAction(InputAction::Afterburner, true);
+                  }
+
+                  return ExecuteResult::Success;
+                })
                 .End()
-#if 0 // TODO: Enable this once a smarter version is created. As it is, sharks will just circle around it not attacking each other.
-            .Sequence() // If we are the closest player to the unclaimed flag, touch it.
-                .Child<InFlagroomNode>("self_position")
-                .Child<NearestFlagNode>(NearestFlagNode::Type::Unclaimed, "nearest_flag")
-                .Child<FlagPositionQueryNode>("nearest_flag", "nearest_flag_position")
-                .Child<BestFlagClaimerNode>()
-                .Selector()
-                    .Sequence()
-                        .InvertChild<ShipTraverseQueryNode>("nearest_flag_position")
-                        .Child<GoToNode>("nearest_flag_position")
-                        .End()
-                    .Child<ArriveNode>("nearest_flag_position", 1.25f)
+            .Selector()
+                .Sequence() // Attach to teammate if possible
+                    .InvertChild<AttachedQueryNode>("self")
+                    .Child<DistanceThresholdNode>("tw_flag_position", kNearFlagroomDistance)
+                    .Child<TimerExpiredNode>("attach_cooldown")
+                    .Child<BestAttachQueryNode>("best_attach_player")
+                    .Child<AttachNode>("best_attach_player")
+                    .Child<TimerSetNode>("attach_cooldown", 100)
                     .End()
+                .Sequence() // Detach when near flag room
+                    .Child<AttachedQueryNode>("self")
+                    .InvertChild<DistanceThresholdNode>("tw_flag_position", kNearFlagroomDistance)
+                    .Child<TimerExpiredNode>("attach_cooldown")
+                    .Child<DetachNode>()
+                    .Child<TimerSetNode>("attach_cooldown", 100)
+                    .End()
+                .Sequence() // Go directly to the flag room if we aren't there.
+                    .InvertChild<InFlagroomNode>("self_position")
+                    .Child<GoToNode>("tw_flag_position")
+                    .Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
+                    .End()
+    #if 0 // TODO: Enable this once a smarter version is created. As it is, sharks will just circle around it not attacking each other.
+                .Sequence() // If we are the closest player to the unclaimed flag, touch it.
+                    .Child<InFlagroomNode>("self_position")
+                    .Child<NearestFlagNode>(NearestFlagNode::Type::Unclaimed, "nearest_flag")
+                    .Child<FlagPositionQueryNode>("nearest_flag", "nearest_flag_position")
+                    .Child<BestFlagClaimerNode>()
+                    .Selector()
+                        .Sequence()
+                            .InvertChild<ShipTraverseQueryNode>("nearest_flag_position")
+                            .Child<GoToNode>("nearest_flag_position")
+                            .End()
+                        .Child<ArriveNode>("nearest_flag_position", 1.25f)
+                        .End()
+                    .End()
+    #endif
                 .End()
-#endif
             .End()
         .End();
   // clang-format on
@@ -208,6 +405,7 @@ std::unique_ptr<behavior::BehaviorNode> CreateSharkTree(behavior::ExecuteContext
                         .Composite(CreateOffensiveTree("nearest_target", "nearest_target_position"))
                         .End()
                     .End()
+                .Composite(CreateMineAreaBehavior()) // No enemy, so mine areas if possible
                 .End()
             .End()
         .End();

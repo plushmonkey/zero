@@ -209,7 +209,10 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
                         .Child<NearestFlagNode>(NearestFlagNode::Type::Unclaimed, "nearest_flag")
                         .Child<FlagPositionQueryNode>("nearest_flag", "nearest_flag_position")
                         .Child<BestFlagClaimerNode>()
-                        .Composite(CreateShootTree("nearest_target"), CompositeDecorator::Success) // Shoot weapons while collecting flag so we don't ride on top of each other
+                        .Sequence(CompositeDecorator::Success)
+                            .Child<svs::NearestMemoryTargetNode>("nearest_target")
+                            .Composite(CreateShootTree("nearest_target")) // Shoot weapons while collecting flag so we don't ride on top of each other
+                            .End()
                         .Selector()
                             .Sequence()
                                 .InvertChild<ShipTraverseQueryNode>("nearest_flag_position")
