@@ -26,7 +26,7 @@
 #include <zero/zones/svs/nodes/NearbyEnemyWeaponQueryNode.h>
 #include <zero/zones/trenchwars/TrenchWars.h>
 #include <zero/zones/trenchwars/nodes/AttachNode.h>
-#include <zero/zones/trenchwars/nodes/FlagNode.h>
+#include <zero/zones/trenchwars/nodes/BaseNode.h>
 
 namespace zero {
 namespace tw {

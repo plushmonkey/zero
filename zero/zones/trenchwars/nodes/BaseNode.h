@@ -24,7 +24,8 @@ struct FindBaseEnemyNode : public behavior::BehaviorNode {
 
     // We shouldn't fight enemies below this line because we will be wasting our time.
     constexpr float kBaseStartY = 370;
-    // How far on each side of the center we should look for an enemy. We don't want to be running all over the base fighting people on the side.
+    // How far on each side of the center we should look for an enemy. We don't want to be running all over the base
+    // fighting people on the side.
     constexpr float kSearchX = 40.0f;
 
     Player* nearest_player = nullptr;
@@ -257,6 +258,181 @@ struct SelectBestEntranceSideNode : public behavior::BehaviorNode {
 
     return 0;
   }
+};
+
+struct InFlagroomNode : public behavior::BehaviorNode {
+  InFlagroomNode(const char* position_key) : position_key(position_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+    if (!opt_tw) return behavior::ExecuteResult::Failure;
+
+    auto opt_position = ctx.blackboard.Value<Vector2f>(position_key);
+    if (!opt_position) return behavior::ExecuteResult::Failure;
+
+    bool in_fr = (*opt_tw)->fr_bitset.Test(*opt_position);
+
+    return in_fr ? behavior::ExecuteResult::Success : behavior::ExecuteResult::Failure;
+  }
+
+  const char* position_key = nullptr;
+};
+
+// Returns success if the target player has some number of teammates within the flag room, including self.
+struct FlagroomPresenceNode : public behavior::BehaviorNode {
+  FlagroomPresenceNode(u32 count) : count_check(count) {}
+  FlagroomPresenceNode(const char* count_key) : count_key(count_key) {}
+  FlagroomPresenceNode(const char* count_key, const char* player_key) : count_key(count_key), player_key(player_key) {}
+  FlagroomPresenceNode(u32 count, const char* player_key) : count_check(count), player_key(player_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto& pm = ctx.bot->game->player_manager;
+    auto player = pm.GetSelf();
+
+    if (player_key) {
+      auto opt_player = ctx.blackboard.Value<Player*>(player_key);
+      if (!opt_player) return behavior::ExecuteResult::Failure;
+
+      player = *opt_player;
+    }
+
+    if (!player) return behavior::ExecuteResult::Failure;
+
+    u32 count = 0;
+    u32 count_threshold = count_check;
+
+    if (count_key) {
+      auto opt_count_threshold = ctx.blackboard.Value<u32>(count_key);
+      if (!opt_count_threshold) return behavior::ExecuteResult::Failure;
+
+      count_threshold = *opt_count_threshold;
+    }
+
+    auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+    if (!opt_tw) return behavior::ExecuteResult::Failure;
+
+    const auto& bitset = (*opt_tw)->fr_bitset;
+
+    for (size_t i = 0; i < pm.player_count; ++i) {
+      Player* check_player = pm.players + i;
+
+      if (check_player->ship >= 8) continue;
+      if (check_player->frequency != player->frequency) continue;
+      if (check_player->enter_delay > 0.0f) continue;
+      if (!bitset.Test(check_player->position)) continue;
+
+      if (++count > count_threshold) {
+        return behavior::ExecuteResult::Success;
+      }
+    }
+
+    return behavior::ExecuteResult::Failure;
+  }
+
+  u32 count_check = 0;
+  const char* player_key = nullptr;
+  const char* count_key = nullptr;
+};
+
+// Returns success if our team fully controls the flagroom or it's empty.
+struct SafeFlagroomNode : public behavior::BehaviorNode {
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto& pm = ctx.bot->game->player_manager;
+    auto self = pm.GetSelf();
+
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+    if (!opt_tw) return behavior::ExecuteResult::Failure;
+    TrenchWars* tw = *opt_tw;
+
+    for (size_t i = 0; i < pm.player_count; ++i) {
+      Player* player = pm.players + i;
+
+      if (player->ship >= 8) continue;
+      if (player->frequency != self->frequency) continue;
+
+      if (tw->fr_bitset.Test(player->position)) {
+        return behavior::ExecuteResult::Failure;
+      }
+    }
+
+    return behavior::ExecuteResult::Success;
+  }
+};
+
+enum class FlagroomQuadrantRegion { NorthEast, NorthWest, SouthWest, SouthEast };
+
+struct FlagroomQuadrant {
+  u16 enemy_count;
+  u16 team_count;
+};
+struct FlagroomPartition {
+  FlagroomQuadrant quadrants[4];
+
+  inline FlagroomQuadrant& GetQuadrant(FlagroomQuadrantRegion region) { return quadrants[(size_t)region]; }
+  inline const FlagroomQuadrant& GetQuadrant(FlagroomQuadrantRegion region) const { return quadrants[(size_t)region]; }
+};
+
+// Determine the flagroom quadrant of a position based on the center.
+inline FlagroomQuadrantRegion GetQuadrantRegion(Vector2f center, Vector2f position) {
+  Vector2f offset = position - center;
+  FlagroomQuadrantRegion region = FlagroomQuadrantRegion::NorthEast;
+
+  if (offset.x >= 0 && offset.y <= 0) {
+    region = FlagroomQuadrantRegion::NorthEast;
+  } else if (offset.x < 0 && offset.y <= 0) {
+    region = FlagroomQuadrantRegion::NorthWest;
+  } else if (offset.x < 0 && offset.y > 0) {
+    region = FlagroomQuadrantRegion::SouthWest;
+  } else if (offset.x >= 0 && offset.y > 0) {
+    region = FlagroomQuadrantRegion::SouthEast;
+  }
+
+  return region;
+}
+
+// Divides up the flagroom into quadrants and stores the data in output_key.
+struct FlagroomPartitionNode : public behavior::BehaviorNode {
+  FlagroomPartitionNode(const char* output_key) : output_key(output_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto& pm = ctx.bot->game->player_manager;
+
+    auto self = pm.GetSelf();
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+    if (!opt_tw) return behavior::ExecuteResult::Failure;
+
+    TrenchWars* tw = *opt_tw;
+
+    FlagroomPartition partition = {};
+
+    for (size_t i = 0; i < pm.player_count; ++i) {
+      Player* player = pm.players + i;
+
+      if (player->ship >= 8) continue;
+      if (player->IsRespawning()) continue;
+      if (!pm.IsSynchronized(*player)) continue;
+      if (!tw->fr_bitset.Test(player->position)) continue;
+
+      FlagroomQuadrantRegion region = GetQuadrantRegion(tw->flag_position, player->position);
+      FlagroomQuadrant& quad = partition.GetQuadrant(region);
+
+      if (player->frequency == self->frequency) {
+        ++quad.team_count;
+      } else {
+        ++quad.enemy_count;
+      }
+    }
+
+    ctx.blackboard.Set(output_key, partition);
+
+    return behavior::ExecuteResult::Success;
+  }
+
+  const char* output_key = nullptr;
 };
 
 }  // namespace tw
