@@ -77,7 +77,7 @@ struct DodgeIncomingDamage : public behavior::BehaviorNode {
 
     // If we won't die then we should let the rest of the behavior tree run and apply only a small amount of force.
     if (damage_percent < damage_percent_threshold && new_energy > 0) {
-      force = damage_percent * 10.0f;
+      force = 2.0f + damage_percent * 10.0f;
       result = behavior::ExecuteResult::Failure;
     }
 
