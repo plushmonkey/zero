@@ -22,12 +22,14 @@ struct IncomingDamageReport {
 };
 
 struct DodgeIncomingDamage : public behavior::BehaviorNode {
-  DodgeIncomingDamage(float damage_percent_threshold, float distance)
-      : damage_percent_threshold(damage_percent_threshold), distance(distance) {}
-  DodgeIncomingDamage(float damage_percent_threshold, const char* distance_key)
-      : damage_percent_threshold(damage_percent_threshold), distance_key(distance_key) {}
-  DodgeIncomingDamage(const char* damage_percent_threshold_key, const char* distance_key)
-      : damage_percent_threshold_key(damage_percent_threshold_key), distance_key(distance_key) {}
+  DodgeIncomingDamage(float damage_percent_threshold, float distance, float minimum_force = 2.0f)
+      : damage_percent_threshold(damage_percent_threshold), distance(distance), minimum_force(minimum_force) {}
+  DodgeIncomingDamage(float damage_percent_threshold, const char* distance_key, float minimum_force = 2.0f)
+      : damage_percent_threshold(damage_percent_threshold), distance_key(distance_key), minimum_force(minimum_force) {}
+  DodgeIncomingDamage(const char* damage_percent_threshold_key, const char* distance_key, float minimum_force = 2.0f)
+      : damage_percent_threshold_key(damage_percent_threshold_key),
+        distance_key(distance_key),
+        minimum_force(minimum_force) {}
 
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
     Player* self = ctx.bot->game->player_manager.GetSelf();
@@ -77,7 +79,7 @@ struct DodgeIncomingDamage : public behavior::BehaviorNode {
 
     // If we won't die then we should let the rest of the behavior tree run and apply only a small amount of force.
     if (damage_percent < damage_percent_threshold && new_energy > 0) {
-      force = 2.0f + damage_percent * 10.0f;
+      force = minimum_force + damage_percent * 10.0f;
       result = behavior::ExecuteResult::Failure;
     }
 
@@ -178,6 +180,7 @@ struct DodgeIncomingDamage : public behavior::BehaviorNode {
 
   float damage_percent_threshold = 0.0f;
   float distance = 0.0f;
+  float minimum_force = 2.0f;
   const char* distance_key = nullptr;
   const char* damage_percent_threshold_key = nullptr;
 };
