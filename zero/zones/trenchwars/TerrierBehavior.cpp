@@ -33,6 +33,195 @@ namespace tw {
 
 constexpr float kTerrierLeashDistance = 30.0f;
 
+// This node is a hacky way to get the terrier to move away from bomb explosions.
+// It will project bombs forward to see if any explosions will kill us. If they will,
+// it will read the flagroom partition and override the enemy count to be very high, so we want to move to a new
+// quadrant.
+struct EscapeBombExplodeQuadrantNode : behavior::BehaviorNode {
+  EscapeBombExplodeQuadrantNode(const char* partition_key) : partition_key(partition_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto& pm = ctx.bot->game->player_manager;
+
+    auto self = pm.GetSelf();
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+    if (!opt_tw) return behavior::ExecuteResult::Failure;
+
+    auto opt_partition = ctx.blackboard.Value<FlagroomPartition>(partition_key);
+    if (!opt_partition) return behavior::ExecuteResult::Failure;
+
+    TrenchWars* tw = *opt_tw;
+    FlagroomPartition partition = *opt_partition;
+
+    float danger_damage = ctx.bot->game->ship_controller.ship.energy * 0.3f;
+    if (danger_damage > self->energy) {
+      danger_damage = self->energy;
+    }
+
+    if (InDangerousPosition(ctx, danger_damage)) {
+      FlagroomQuadrantRegion region = GetQuadrantRegion(tw->flag_position, self->position);
+      partition.GetQuadrant(region).enemy_count = 10000;
+
+      ctx.blackboard.Set(partition_key, partition);
+
+      return behavior::ExecuteResult::Success;
+    }
+
+    return behavior::ExecuteResult::Failure;
+  }
+
+  bool InDangerousPosition(behavior::ExecuteContext& ctx, float damage_amount) {
+    auto& pm = ctx.bot->game->player_manager;
+    auto self = pm.GetSelf();
+
+    // Store the nearby teammate positions so we can quickly see if a bomb will explode on them.
+    std::vector<Vector2f> nearby_teammates;
+    nearby_teammates.reserve(32);
+
+    constexpr float kNearbyDistance = 20.0f;
+
+    for (size_t i = 0; i < pm.player_count; ++i) {
+      Player* player = pm.players + i;
+
+      if (player->ship >= 8) continue;
+      if (player->frequency != self->frequency) continue;
+      if (player->IsRespawning()) continue;
+      if (!pm.IsSynchronized(*player)) continue;
+      if (player->position.DistanceSq(self->position) > kNearbyDistance) continue;
+
+      nearby_teammates.push_back(player->position);
+    }
+
+    auto& settings = ctx.bot->game->connection.settings;
+
+    float total_damage = 0.0f;
+
+    for (size_t i = 0; i < ctx.bot->game->weapon_manager.weapon_count; ++i) {
+      Weapon* weapon = ctx.bot->game->weapon_manager.weapons + i;
+
+      if (weapon->data.type != WeaponType::Bomb && weapon->data.type != WeaponType::ProximityBomb) continue;
+      if (weapon->data.alternate) continue;
+      if (weapon->position.DistanceSq(self->position) > kNearbyDistance) continue;
+
+      auto opt_explosion = GetBombExplosion(ctx, *weapon, nearby_teammates, weapon->frequency == self->frequency);
+      if (!opt_explosion) continue;
+
+      int bomb_dmg = ctx.bot->game->connection.settings.BombDamageLevel;
+      int level = weapon->data.level;
+
+      if (weapon->data.type == WeaponType::Thor) {
+        // Weapon level should always be 0 for thor in normal gameplay, I believe, but this is how it's done
+        bomb_dmg = bomb_dmg + bomb_dmg * weapon->data.level * weapon->data.level;
+        level = 3 + weapon->data.level;
+      }
+
+      bomb_dmg = bomb_dmg / 1000;
+
+      if (weapon->flags & WEAPON_FLAG_EMP) {
+        bomb_dmg = (int)(bomb_dmg * (settings.EBombDamagePercent / 1000.0f));
+      }
+
+      float explode_pixels = (float)(settings.BombExplodePixels + settings.BombExplodePixels * weapon->data.level);
+
+      float constexpr kBombSize = 2.0f;
+      Vector2f delta = Absolute(*opt_explosion - self->position) * 16.0f;
+      float distance = delta.Length() - kBombSize;
+      // Skipping bounce damage and close-bomb damage
+      float damage = (float)((explode_pixels - distance) * (bomb_dmg / explode_pixels));
+
+      total_damage += damage;
+
+      if (total_damage >= damage_amount) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // Project a bomb forward to see where it will explode.
+  std::optional<Vector2f> GetBombExplosion(behavior::ExecuteContext& ctx, Weapon weapon,
+                                           const std::vector<Vector2f>& nearby_teammates, bool team_weapon) {
+    constexpr u32 kMaxSimTicks = 750;
+    const Map& map = ctx.bot->game->GetMap();
+
+    float ship_radius = ctx.bot->game->connection.settings.ShipSettings[0].GetRadius();
+    Vector2f player_r(ship_radius, ship_radius);
+
+    for (u32 i = 0; i < kMaxSimTicks; ++i) {
+      Tick tick = MAKE_TICK(weapon.last_tick + i);
+
+      bool x_collide = SimulateAxis(map, weapon, 1.0f / 100.0f, 0);
+      bool y_collide = SimulateAxis(map, weapon, 1.0f / 100.0f, 1);
+
+      if (TICK_GTE(tick, weapon.end_tick)) break;
+
+      if (x_collide || y_collide) {
+        if (weapon.bounces_remaining == 0) {
+          // Wall explosion
+          return weapon.position;
+        } else {
+          --weapon.bounces_remaining;
+        }
+      }
+
+      if (team_weapon) continue;
+
+      Rectangle weapon_collider = GetBombCollider(weapon, ctx.bot->game->connection.settings.ProximityDistance);
+
+      for (const auto& pos : nearby_teammates) {
+        if (BoxBoxOverlap(pos - player_r, pos + player_r, weapon_collider.min, weapon_collider.max)) {
+          return weapon.position;
+        }
+      }
+    }
+
+    return std::nullopt;
+  }
+
+  bool SimulateAxis(const Map& map, Weapon& weapon, float dt, int axis) {
+    float previous = weapon.position[axis];
+
+    weapon.position[axis] += weapon.velocity[axis] * dt;
+
+    if (weapon.data.type == WeaponType::Thor) return false;
+
+    if (map.IsSolid((u16)floorf(weapon.position.x), (u16)floorf(weapon.position.y), weapon.frequency)) {
+      weapon.position[axis] = previous;
+      weapon.velocity[axis] = -weapon.velocity[axis];
+
+      return true;
+    }
+
+    return false;
+  }
+
+  Rectangle GetBombCollider(const Weapon& weapon, u16 proximity_distance) {
+    float weapon_radius = 18.0f;
+
+    if (weapon.data.type == WeaponType::ProximityBomb) {
+      float prox = (float)(proximity_distance + weapon.data.level);
+
+      if (weapon.data.type == WeaponType::Thor) {
+        prox += 3;
+      }
+
+      weapon_radius = prox * 18.0f;
+    }
+
+    weapon_radius = (weapon_radius - 14.0f) / 16.0f;
+
+    Vector2f min_w = weapon.position.PixelRounded() - Vector2f(weapon_radius, weapon_radius);
+    Vector2f max_w = weapon.position.PixelRounded() + Vector2f(weapon_radius, weapon_radius);
+
+    return Rectangle(min_w, max_w);
+  }
+
+  const char* partition_key = nullptr;
+};
+
 // Returns success if we want to travel to a new partition. The Vector2f of the center of the quadrant will be put in
 // the output_key.
 struct FindNewSafePositionNode : behavior::BehaviorNode {
@@ -124,7 +313,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateDefensiveTree() {
             .Child<InputActionNode>(InputAction::Warp)
             .Child<TimerSetNode>("defense_timer", 100)
             .End()
-        .Child<DodgeIncomingDamage>(0.1f, 16.0f)
+        .Child<DodgeIncomingDamage>(0.1f, 16.0f, 0.0f)
         .End();
   // clang-format on
 
@@ -208,7 +397,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateEntranceBehavior() {
         .Child<NearEntranceNode>(kNearEntranceDistance)
         .Child<InfluenceMapPopulateWeapons>()
         .Child<InfluenceMapPopulateEnemies>(3.0f, 5000.0f, false)
-        .SuccessChild<DodgeIncomingDamage>(0.1f, 15.0f)
+        .SuccessChild<DodgeIncomingDamage>(0.1f, 15.0f, 0.0f)
         .Composite(CreateBurstSequence())
         .Selector()
             .Sequence()
@@ -290,7 +479,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBelowEntranceBehavior() {
                 .End()
             .Sequence(CompositeDecorator::Success) // Above area is not yet safe, sit still and dodge. TODO: Move into safe area.
                 .Child<SeekNode>("self_position", 0.0f, SeekNode::DistanceResolveType::Zero)
-                .Child<DodgeIncomingDamage>(0.1f, 15.0f)
+                .Child<DodgeIncomingDamage>(0.1f, 15.0f, 0.0f)
                 .End()
             .End()
         .End();
@@ -309,7 +498,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
     .Sequence()
         .Child<PlayerSelfNode>("self")
         .Child<PlayerPositionQueryNode>("self_position")
-        .SuccessChild<DodgeIncomingDamage>(0.3f, 16.0f)
+        .SuccessChild<DodgeIncomingDamage>(0.3f, 16.0f, 0.0f)
         .Sequence(CompositeDecorator::Success) // Use afterburners to get to flagroom faster.
             .InvertChild<InFlagroomNode>("self_position")
             .Child<ExecuteNode>([](ExecuteContext& ctx) {
@@ -351,14 +540,22 @@ static std::unique_ptr<behavior::BehaviorNode> CreateSafeFlagroomPositionTree() 
   BehaviorBuilder builder;
 
   // TODO: Find safest area within our safe quadrant.
-  // TODO: Move away from bombs.
 
   // clang-format off
   builder
-    .Sequence() // Split up the fr into quadrants and travel to the safest one
-        .Child<FlagroomPartitionNode>("partition") // Returns false if we are in the safest quadrant
-        .Child<FindNewSafePositionNode>("partition", "new_quad_position")
-        .Child<GoToNode>("new_quad_position")
+    .Sequence()
+        .Child<FlagroomPartitionNode>("partition")
+        .Selector()
+            .Sequence() // Try to move to a new quadrant if we are overran by enemies.
+                .Child<FindNewSafePositionNode>("partition", "new_quad_position") // Returns false if we are in the safest quadrant
+                .Child<GoToNode>("new_quad_position")
+                .End()
+            .Sequence() // Begin moving to a new quadrant when we are near an incoming bomb explosion. This might end early and stay in the current quadrant when we escape bomb area.
+                .Child<EscapeBombExplodeQuadrantNode>("partition")
+                .Child<FindNewSafePositionNode>("partition", "new_quad_position") // This will find a new quadrant if we are near a bomb explosion
+                .Child<GoToNode>("new_quad_position")
+                .End()
+            .End()
         .End();
   // clang-format on
 

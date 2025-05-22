@@ -57,7 +57,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateDefensiveTree() {
             .InvertChild<ScalarThresholdNode<float>>("nearest_target_energy", kLowEnergyThreshold)
             .InvertChild<DistanceThresholdNode>("nearest_target_position", "self_position", kNearbyEnemyThreshold)
             .End()
-        .Child<DodgeIncomingDamage>(0.4f, 16.0f)
+        .Child<DodgeIncomingDamage>(0.4f, 16.0f, 0.0f)
         .End();
   // clang-format on
 
