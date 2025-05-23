@@ -305,6 +305,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
   // clang-format off
   builder
     .Selector()
+        .Composite(CreateDefensiveTree()) // Use repels to defend ourselves and terrier.
         .Sequence() // If there are no enemies above us, go mining
             .InvertChild<EnemiesAboveNode>()
             .InvertChild<DistanceThresholdNode>("tw_flag_position", kNearFlagroomDistance)
