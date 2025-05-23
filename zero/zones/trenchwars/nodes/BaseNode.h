@@ -85,6 +85,7 @@ struct EmptyEntranceNode : public behavior::BehaviorNode {
       Player* player = pm.players + i;
 
       if (player->ship >= 8) continue;
+      if (player->IsRespawning()) continue;
       if (player->frequency == self->frequency) continue;
       if (player->enter_delay > 0.0f) continue;
 

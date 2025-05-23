@@ -33,6 +33,34 @@ namespace tw {
 
 constexpr float kTerrierLeashDistance = 30.0f;
 
+// This checks all of the enemy weapons to make sure none are in the provided rect.
+// Returns success if it is safe.
+struct SafeRectNode : behavior::BehaviorNode {
+  SafeRectNode(Rectangle rect) : rect(rect) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto self = ctx.bot->game->player_manager.GetSelf();
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    auto& wm = ctx.bot->game->weapon_manager;
+
+    for (size_t i = 0; i < wm.weapon_count; ++i) {
+      Weapon* weapon = wm.weapons + i;
+      WeaponType type = weapon->data.type;
+
+      if (type == WeaponType::Repel || type == WeaponType::Decoy) continue;
+      if (weapon->frequency == self->frequency) continue;
+      if (!rect.Contains(weapon->position)) continue;
+
+      return behavior::ExecuteResult::Failure;
+    }
+
+    return behavior::ExecuteResult::Success;
+  }
+
+  Rectangle rect;
+};
+
 // This node is a hacky way to get the terrier to move away from bomb explosions.
 // It will project bombs forward to see if any explosions will kill us. If they will,
 // it will read the flagroom partition and override the enemy count to be very high, so we want to move to a new
@@ -391,9 +419,13 @@ static std::unique_ptr<behavior::BehaviorNode> CreateEntranceBehavior() {
 
   constexpr float kNearEntranceDistance = 15.0f;
 
+  const Rectangle kCheckRect(Vector2f(504, 271), Vector2f(520, 285));
+
   // clang-format off
   builder
     .Sequence()
+        .Child<PlayerPositionQueryNode>("self_position")
+        .Child<RectangleContainsNode>(kCheckRect, "self_position")
         .Child<NearEntranceNode>(kNearEntranceDistance)
         .Child<InfluenceMapPopulateWeapons>()
         .Child<InfluenceMapPopulateEnemies>(3.0f, 5000.0f, false)
@@ -440,9 +472,11 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBelowEntranceBehavior() {
 
   BehaviorBuilder builder;
 
-  constexpr float kEntranceNearbyDistance = 15.0f;
+  constexpr float kEntranceNearbyDistance = 24.0f;
   // How many teammates must be in the flagroom before we start moving up including self.
   constexpr u32 kFlagroomPresenceRequirement = 2;
+
+  const Rectangle kEntranceBottomShaftRect(Vector2f(509, 277), Vector2f(516, 293));
 
   // clang-format off
   builder
@@ -475,11 +509,12 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBelowEntranceBehavior() {
                         .End()
                     .End()
                 .Child<EmptyEntranceNode>()
+                .Child<SafeRectNode>(kEntranceBottomShaftRect)
                 .Child<GoToNode>("tw_entrance_position") // Move into entrance area so other tree takes over.
                 .End()
-            .Sequence(CompositeDecorator::Success) // Above area is not yet safe, sit still and dodge. TODO: Move into safe area.
-                .Child<SeekNode>("self_position", 0.0f, SeekNode::DistanceResolveType::Zero)
+            .Selector(CompositeDecorator::Success) // Above area is not yet safe, sit still and dodge. TODO: Move into safe area.
                 .Child<DodgeIncomingDamage>(0.1f, 15.0f, 0.0f)
+                .Child<SeekZeroNode>()
                 .End()
             .End()
         .End();
@@ -498,6 +533,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
     .Sequence()
         .Child<PlayerSelfNode>("self")
         .Child<PlayerPositionQueryNode>("self_position")
+        .InvertChild<InFlagroomNode>("self_position")
         .SuccessChild<DodgeIncomingDamage>(0.3f, 16.0f, 0.0f)
         .Sequence(CompositeDecorator::Success) // Use afterburners to get to flagroom faster.
             .InvertChild<InFlagroomNode>("self_position")
@@ -520,13 +556,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
               return ExecuteResult::Success;
             })
             .End()
-        .Selector()
-            .Sequence() // Go directly to the flag room if we aren't there.
-                .InvertChild<InFlagroomNode>("self_position")
-                .Child<GoToNode>("tw_flag_position")
-                //.Child<RenderPathNode>(Vector3f(0.0f, 1.0f, 0.5f))
-                .End()
-            .End()
+        .Child<GoToNode>("tw_flag_position")
         .End();
   // clang-format on
 
@@ -609,8 +639,8 @@ std::unique_ptr<behavior::BehaviorNode> CreateTerrierTree(behavior::ExecuteConte
   // clang-format off
   builder
     .Selector()
-        .Composite(CreateBelowEntranceBehavior())
         .Composite(CreateEntranceBehavior())
+        .Composite(CreateBelowEntranceBehavior())
         .Composite(CreateFlagroomTravelBehavior())
         .Composite(CreateFlagroomBehavior())
         .End();
