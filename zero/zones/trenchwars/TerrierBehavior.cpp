@@ -108,7 +108,7 @@ struct EscapeBombExplodeQuadrantNode : behavior::BehaviorNode {
     std::vector<Vector2f> nearby_teammates;
     nearby_teammates.reserve(32);
 
-    constexpr float kNearbyDistance = 20.0f;
+    constexpr float kNearbyDistanceSq = 20.0f * 20.0f;
 
     for (size_t i = 0; i < pm.player_count; ++i) {
       Player* player = pm.players + i;
@@ -117,7 +117,7 @@ struct EscapeBombExplodeQuadrantNode : behavior::BehaviorNode {
       if (player->frequency != self->frequency) continue;
       if (player->IsRespawning()) continue;
       if (!pm.IsSynchronized(*player)) continue;
-      if (player->position.DistanceSq(self->position) > kNearbyDistance) continue;
+      if (player->position.DistanceSq(self->position) > kNearbyDistanceSq) continue;
 
       nearby_teammates.push_back(player->position);
     }
@@ -131,7 +131,7 @@ struct EscapeBombExplodeQuadrantNode : behavior::BehaviorNode {
 
       if (weapon->data.type != WeaponType::Bomb && weapon->data.type != WeaponType::ProximityBomb) continue;
       if (weapon->data.alternate) continue;
-      if (weapon->position.DistanceSq(self->position) > kNearbyDistance) continue;
+      if (weapon->position.DistanceSq(self->position) > kNearbyDistanceSq) continue;
 
       auto opt_explosion = GetBombExplosion(ctx, *weapon, nearby_teammates, weapon->frequency == self->frequency);
       if (!opt_explosion) continue;
@@ -172,7 +172,7 @@ struct EscapeBombExplodeQuadrantNode : behavior::BehaviorNode {
   // Project a bomb forward to see where it will explode.
   std::optional<Vector2f> GetBombExplosion(behavior::ExecuteContext& ctx, Weapon weapon,
                                            const std::vector<Vector2f>& nearby_teammates, bool team_weapon) {
-    constexpr u32 kMaxSimTicks = 750;
+    constexpr u32 kMaxSimTicks = 500;
     const Map& map = ctx.bot->game->GetMap();
 
     float ship_radius = ctx.bot->game->connection.settings.ShipSettings[0].GetRadius();
