@@ -631,6 +631,26 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomBehavior() {
   return builder.Build();
 }
 
+// This is the behavior that is ran when we fully control the flagroom so we don't fall back to the waypoint behavior.
+static std::unique_ptr<behavior::BehaviorNode> CreateIdleBehavior() {
+  using namespace behavior;
+
+  BehaviorBuilder builder;
+
+  // TODO: Find safe area / Forward position for holding entrance.
+
+  // clang-format off
+  builder
+    .Selector()
+        .Composite(CreateDefensiveTree()) // Portal away when in danger and dodge incoming weapons
+        .Composite(CreateSafeFlagroomPositionTree()) // Escape any incoming bombs
+        .Child<SeekZeroNode>()
+        .End();
+  // clang-format on
+
+  return builder.Build();
+}
+
 std::unique_ptr<behavior::BehaviorNode> CreateTerrierTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
@@ -643,6 +663,7 @@ std::unique_ptr<behavior::BehaviorNode> CreateTerrierTree(behavior::ExecuteConte
         .Composite(CreateBelowEntranceBehavior())
         .Composite(CreateFlagroomTravelBehavior())
         .Composite(CreateFlagroomBehavior())
+        .Composite(CreateIdleBehavior())
         .End();
   // clang-format on
 
