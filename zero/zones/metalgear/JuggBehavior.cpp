@@ -91,6 +91,34 @@ struct SeekFromWallNode : public behavior::BehaviorNode {
   float search_distance = 0.0f;
 };
 
+static std::unique_ptr<behavior::BehaviorNode> CreateDefensiveTree(behavior::ExecuteContext& ctx) {
+  using namespace behavior;
+
+  BehaviorBuilder builder;
+
+  constexpr float kRepelDistance = 4.0f;
+
+  // clang-format off
+  builder
+    .Sequence()
+        .Sequence(CompositeDecorator::Success) // Always check incoming damage so we can use it in repel and portal sequences.
+            .Child<svs::IncomingDamageQueryNode>(kRepelDistance, "incoming_damage")
+            .Child<PlayerCurrentEnergyQueryNode>("self_energy")
+            .End()
+        .Sequence(CompositeDecorator::Success) // Use repel when in danger.
+            .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Repel)
+            .Child<TimerExpiredNode>("defense_timer")
+            .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
+            .Child<InputActionNode>(InputAction::Repel)
+            .Child<TimerSetNode>("defense_timer", 100)
+            .End()
+        .Child<DodgeIncomingDamage>(0.6f, 35.0f)
+        .End();
+  // clang-format on
+
+  return builder.Build();
+}
+
 std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
@@ -116,6 +144,7 @@ std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::Execu
             .InvertChild<RegionContainQueryNode>(center)
             .Child<WarpNode>()
             .End()
+        .Composite(CreateDefensiveTree(ctx))
         .Selector() // Choose to fight the player or follow waypoints.
             .Sequence() // Find nearest target and either path to them or seek them directly.
                 .Sequence()
@@ -124,9 +153,6 @@ std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::Execu
                     .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
                     .End()
                 .Selector()
-                    .Sequence()
-                        .Child<DodgeIncomingDamage>(0.6f, 35.0f)
-                        .End()
                     .Sequence() // Path to target if they aren't immediately visible.
                         .InvertChild<ShipTraverseQueryNode>("nearest_target_position")
                         .Child<GoToNode>("nearest_target_position")
@@ -147,18 +173,6 @@ std::unique_ptr<behavior::BehaviorNode> JuggBehavior::CreateTree(behavior::Execu
                                         .End()
                                     .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
                                     .End()
-                                .End()
-                            .Sequence(CompositeDecorator::Success) // Always check incoming damage so we can use it in repel and portal sequences.
-                                .Child<RepelDistanceQueryNode>("repel_distance")
-                                .Child<svs::IncomingDamageQueryNode>("repel_distance", "incoming_damage")
-                                .Child<PlayerCurrentEnergyQueryNode>("self_energy")
-                                .End()
-                            .Sequence(CompositeDecorator::Success) // Use repel when in danger.
-                                .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Repel)
-                                .Child<TimerExpiredNode>("defense_timer")
-                                .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
-                                .Child<InputActionNode>(InputAction::Repel)
-                                .Child<TimerSetNode>("defense_timer", 100)
                                 .End()
                             .Sequence(CompositeDecorator::Success) // Fire bomb
                                 .InvertChild<TileQueryNode>(kTileIdSafe)
