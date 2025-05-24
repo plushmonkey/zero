@@ -1,21 +1,20 @@
-#include "BasingBehavior.h"
+#include "SoloBehavior.h"
 
 #include <zero/behavior/BehaviorBuilder.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/behavior/nodes/MapNode.h>
+#include <zero/behavior/nodes/MathNode.h>
 #include <zero/behavior/nodes/MoveNode.h>
-#include <zero/behavior/nodes/RenderNode.h>
+#include <zero/behavior/nodes/PlayerNode.h>
 #include <zero/behavior/nodes/ShipNode.h>
+#include <zero/behavior/nodes/TimerNode.h>
 #include <zero/behavior/nodes/WaypointNode.h>
-#include <zero/zones/trenchwars/SharkBehavior.h>
-#include <zero/zones/trenchwars/SpiderBehavior.h>
-#include <zero/zones/trenchwars/TerrierBehavior.h>
-#include <zero/zones/trenchwars/TrenchWars.h>
+#include <zero/zones/trenchwars/solo/SoloWarbirdBehavior.h>
 
 namespace zero {
 namespace tw {
 
-std::unique_ptr<behavior::BehaviorNode> BasingBehavior::CreateTree(behavior::ExecuteContext& ctx) {
+std::unique_ptr<behavior::BehaviorNode> SoloBehavior::CreateTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
   BehaviorBuilder builder;
@@ -27,40 +26,49 @@ std::unique_ptr<behavior::BehaviorNode> BasingBehavior::CreateTree(behavior::Exe
             .InvertChild<ShipQueryNode>("request_ship")
             .Child<ShipRequestNode>("request_ship")
             .End()
-        .Sequence() // TODO: Warbird
-            .Child<ShipQueryNode>(0)
-            .Composite(CreateSpiderTree(ctx))
-            .End()
-        .Sequence() // TODO: Jav
-            .Child<ShipQueryNode>(1)
-            .Composite(CreateSpiderTree(ctx))
-            .End()
-        .Sequence() // Spider
-            .Child<ShipQueryNode>(2)
-            .Composite(CreateSpiderTree(ctx))
-            .End()
-        .Sequence() // TODO: Levi
-            .Child<ShipQueryNode>(3)
-            .Composite(CreateSharkTree(ctx))
-            .End()
-        .Sequence() // Terrier
-            .Child<ShipQueryNode>(4)
-            .Composite(CreateTerrierTree(ctx))
-            .End()
-        .Sequence() // TODO: Weasel
-            .Child<ShipQueryNode>(5)
-            .Composite(CreateSpiderTree(ctx))
-            .End()
-        .Sequence() // Lancaster
-            .Child<ShipQueryNode>(6)
-            .Composite(CreateSpiderTree(ctx))
-            .End()
-        .Sequence() // Shark
-            .Child<ShipQueryNode>(7)
-            .Composite(CreateSharkTree(ctx))
+        .Sequence() // Switch to own frequency when possible.
+            .Child<PlayerFrequencyCountQueryNode>("self_freq_count")
+            .Child<ScalarThresholdNode<size_t>>("self_freq_count", 2)
+            .Child<PlayerEnergyPercentThresholdNode>(1.0f)
+            .Child<TimerExpiredNode>("next_freq_change_tick")
+            .Child<TimerSetNode>("next_freq_change_tick", 300)
+            .Child<RandomIntNode<u16>>(100, 9000, "random_freq")
+            .Child<PlayerChangeFrequencyNode>("random_freq")
             .End()
         .Sequence() // If we are in spec, do nothing
             .Child<ShipQueryNode>(8)
+            .End()
+        .Sequence()
+            .Child<ShipQueryNode>(0)
+            .Composite(CreateSoloWarbirdTree(ctx))
+            .End()
+        .Sequence() // TODO: Jav
+            .Child<ShipQueryNode>(1)
+            .Composite(CreateSoloWarbirdTree(ctx))
+            .End()
+        .Sequence() // TODO: Spider
+            .Child<ShipQueryNode>(2)
+            .Composite(CreateSoloWarbirdTree(ctx))
+            .End()
+        .Sequence() // TODO: Levi
+            .Child<ShipQueryNode>(3)
+            .Composite(CreateSoloWarbirdTree(ctx))
+            .End()
+        .Sequence() // TODO: Terrier
+            .Child<ShipQueryNode>(4)
+            .Composite(CreateSoloWarbirdTree(ctx))
+            .End()
+        .Sequence() // TODO: Weasel
+            .Child<ShipQueryNode>(5)
+            .Composite(CreateSoloWarbirdTree(ctx))
+            .End()
+        .Sequence() // TODO: Lancaster
+            .Child<ShipQueryNode>(6)
+            .Composite(CreateSoloWarbirdTree(ctx))
+            .End()
+        .Sequence() // TODO: Shark
+            .Child<ShipQueryNode>(7)
+            .Composite(CreateSoloWarbirdTree(ctx))
             .End()
         .Sequence() // Follow set waypoints.
             .Child<WaypointNode>("waypoints", "waypoint_index", "waypoint_position", 15.0f)
@@ -68,7 +76,6 @@ std::unique_ptr<behavior::BehaviorNode> BasingBehavior::CreateTree(behavior::Exe
                 .Sequence()
                     .InvertChild<ShipTraverseQueryNode>("waypoint_position")
                     .Child<GoToNode>("waypoint_position")
-                    .Child<RenderPathNode>(Vector3f(0.0f, 0.5f, 1.0f))
                     .End()
                 .Parallel()
                     .Child<FaceNode>("waypoint_position")

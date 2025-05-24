@@ -117,10 +117,12 @@
     <ClCompile Include="zero\zones\svs\TerrierBehavior.cpp" />
     <ClCompile Include="zero\zones\svs\WarbirdBehavior.cpp" />
     <ClCompile Include="zero\zones\svs\WarzoneBehavior.cpp" />
-    <ClCompile Include="zero\zones\trenchwars\BasingBehavior.cpp" />
-    <ClCompile Include="zero\zones\trenchwars\SharkBehavior.cpp" />
-    <ClCompile Include="zero\zones\trenchwars\SpiderBehavior.cpp" />
-    <ClCompile Include="zero\zones\trenchwars\TerrierBehavior.cpp" />
+    <ClCompile Include="zero\zones\trenchwars\basing\BasingBehavior.cpp" />
+    <ClCompile Include="zero\zones\trenchwars\basing\SharkBehavior.cpp" />
+    <ClCompile Include="zero\zones\trenchwars\basing\SpiderBehavior.cpp" />
+    <ClCompile Include="zero\zones\trenchwars\basing\TerrierBehavior.cpp" />
+    <ClCompile Include="zero\zones\trenchwars\solo\SoloBehavior.cpp" />
+    <ClCompile Include="zero\zones\trenchwars\solo\SoloWarbirdBehavior.cpp" />
     <ClCompile Include="zero\zones\trenchwars\TrenchWars.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -265,13 +267,16 @@
     <ClInclude Include="zero\zones\svs\TerrierBehavior.h" />
     <ClInclude Include="zero\zones\svs\WarbirdBehavior.h" />
     <ClInclude Include="zero\zones\svs\WarzoneBehavior.h" />
-    <ClInclude Include="zero\zones\trenchwars\BasingBehavior.h" />
+    <ClInclude Include="zero\zones\trenchwars\basing\BasingBehavior.h" />
     <ClInclude Include="zero\zones\trenchwars\nodes\AttachNode.h" />
     <ClInclude Include="zero\zones\trenchwars\nodes\BaseNode.h" />
     <ClInclude Include="zero\zones\trenchwars\nodes\FlagNode.h" />
-    <ClInclude Include="zero\zones\trenchwars\SharkBehavior.h" />
-    <ClInclude Include="zero\zones\trenchwars\SpiderBehavior.h" />
-    <ClInclude Include="zero\zones\trenchwars\TerrierBehavior.h" />
+    <ClInclude Include="zero\zones\trenchwars\basing\SharkBehavior.h" />
+    <ClInclude Include="zero\zones\trenchwars\basing\SpiderBehavior.h" />
+    <ClInclude Include="zero\zones\trenchwars\basing\TerrierBehavior.h" />
+    <ClInclude Include="zero\zones\trenchwars\nodes\MoveNode.h" />
+    <ClInclude Include="zero\zones\trenchwars\solo\SoloBehavior.h" />
+    <ClInclude Include="zero\zones\trenchwars\solo\SoloWarbirdBehavior.h" />
     <ClInclude Include="zero\zones\trenchwars\TrenchWars.h" />
     <ClInclude Include="zero\zones\ZoneController.h" />
   </ItemGroup>

@@ -27,6 +27,7 @@
 #include <zero/zones/trenchwars/TrenchWars.h>
 #include <zero/zones/trenchwars/nodes/AttachNode.h>
 #include <zero/zones/trenchwars/nodes/BaseNode.h>
+#include <zero/zones/trenchwars/nodes/MoveNode.h>
 
 namespace zero {
 namespace tw {
@@ -321,24 +322,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
             .Child<PlayerPositionQueryNode>("self_position")
             .Sequence(CompositeDecorator::Success) // Use afterburners to get to flagroom faster.
                 .InvertChild<InFlagroomNode>("self_position")
-                .Child<ExecuteNode>([](ExecuteContext& ctx) {
-                  auto self = ctx.bot->game->player_manager.GetSelf();
-                  if (!self || self->ship >= 8) return ExecuteResult::Failure;
-
-                  float max_energy = (float)ctx.bot->game->ship_controller.ship.energy;
-
-                  auto& input = *ctx.bot->bot_controller->input;
-                  auto& last_input = ctx.bot->bot_controller->last_input;
-
-                  // Keep using afterburners above 50%. Disable until full energy, then enable again.
-                  if (last_input.IsDown(InputAction::Afterburner)) {
-                    input.SetAction(InputAction::Afterburner, self->energy > max_energy * 0.5f);
-                  } else if (self->energy >= max_energy) {
-                    input.SetAction(InputAction::Afterburner, true);
-                  }
-
-                  return ExecuteResult::Success;
-                })
+                .Child<AfterburnerThresholdNode>()
                 .End()
             .Selector()
                 .Sequence() // Attach to teammate if possible

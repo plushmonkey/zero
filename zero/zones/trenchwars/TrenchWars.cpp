@@ -8,7 +8,8 @@
 #include <zero/game/GameEvent.h>
 #include <zero/game/Logger.h>
 #include <zero/zones/ZoneController.h>
-#include <zero/zones/trenchwars/BasingBehavior.h>
+#include <zero/zones/trenchwars/basing/BasingBehavior.h>
+#include <zero/zones/trenchwars/solo/SoloBehavior.h>
 
 #include <bitset>
 #include <deque>
@@ -46,6 +47,7 @@ void TwController::CreateBehaviors(const char* arena_name) {
   auto& repo = bot->bot_controller->behaviors;
 
   repo.Add("basing", std::make_unique<BasingBehavior>());
+  repo.Add("solo", std::make_unique<SoloBehavior>());
 
   SetBehavior("basing");
 }
