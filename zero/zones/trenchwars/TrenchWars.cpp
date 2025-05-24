@@ -10,6 +10,7 @@
 #include <zero/zones/ZoneController.h>
 #include <zero/zones/trenchwars/basing/BasingBehavior.h>
 #include <zero/zones/trenchwars/solo/SoloBehavior.h>
+#include <zero/zones/trenchwars/turret/TurretBehavior.h>
 
 #include <bitset>
 #include <deque>
@@ -48,6 +49,7 @@ void TwController::CreateBehaviors(const char* arena_name) {
 
   repo.Add("basing", std::make_unique<BasingBehavior>());
   repo.Add("solo", std::make_unique<SoloBehavior>());
+  repo.Add("turret", std::make_unique<TurretBehavior>());
 
   SetBehavior("basing");
 }

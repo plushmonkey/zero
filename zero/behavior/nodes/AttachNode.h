@@ -2,8 +2,8 @@
 
 #include <zero/ZeroBot.h>
 #include <zero/behavior/BehaviorTree.h>
-#include <zero/game/Game.h>
 #include <zero/behavior/nodes/AimNode.h>
+#include <zero/game/Game.h>
 
 namespace zero {
 namespace behavior {
@@ -71,6 +71,48 @@ struct DetachNode : public BehaviorNode {
 
     return ExecuteResult::Success;
   }
+};
+
+// Returns the number of players attached to the carrier including the carrier.
+// This can be used on any of the children to get the same result.
+struct TurretCountQueryNode : behavior::BehaviorNode {
+  TurretCountQueryNode(const char* output_key) : output_key(output_key) {}
+  TurretCountQueryNode(const char* player_key, const char* output_key)
+      : player_key(player_key), output_key(output_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    Player* player = ctx.bot->game->player_manager.GetSelf();
+
+    if (player_key) {
+      auto opt_player = ctx.blackboard.Value<Player*>(player_key);
+      if (!opt_player) return behavior::ExecuteResult::Failure;
+      player = *opt_player;
+    }
+
+    if (!player || player->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    size_t count = 1;
+    Player* carrier = player;
+
+    if (player->attach_parent != kInvalidPlayerId) {
+      carrier = ctx.bot->game->player_manager.GetPlayerById(player->attach_parent);
+    }
+
+    if (!carrier || carrier->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    AttachInfo* attach_info = carrier->children;
+    while (attach_info) {
+      ++count;
+      attach_info = attach_info->next;
+    }
+
+    ctx.blackboard.Set<size_t>(output_key, count);
+
+    return behavior::ExecuteResult::Success;
+  }
+
+  const char* player_key = nullptr;
+  const char* output_key = nullptr;
 };
 
 }  // namespace behavior

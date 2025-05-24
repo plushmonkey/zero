@@ -124,6 +124,10 @@
     <ClCompile Include="zero\zones\trenchwars\solo\SoloBehavior.cpp" />
     <ClCompile Include="zero\zones\trenchwars\solo\SoloWarbirdBehavior.cpp" />
     <ClCompile Include="zero\zones\trenchwars\TrenchWars.cpp" />
+    <ClCompile Include="zero\zones\trenchwars\turret\TurretBehavior.cpp" />
+    <ClCompile Include="zero\zones\trenchwars\turret\TurretBomberBehavior.cpp" />
+    <ClCompile Include="zero\zones\trenchwars\turret\TurretCarrierBehavior.cpp" />
+    <ClCompile Include="zero\zones\trenchwars\turret\TurretGunnerBehavior.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="zero\Actuator.h" />
@@ -278,6 +282,7 @@
     <ClInclude Include="zero\zones\trenchwars\solo\SoloBehavior.h" />
     <ClInclude Include="zero\zones\trenchwars\solo\SoloWarbirdBehavior.h" />
     <ClInclude Include="zero\zones\trenchwars\TrenchWars.h" />
+    <ClInclude Include="zero\zones\trenchwars\turret\TurretBehavior.h" />
     <ClInclude Include="zero\zones\ZoneController.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
