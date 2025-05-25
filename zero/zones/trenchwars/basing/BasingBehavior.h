@@ -10,7 +10,13 @@ namespace tw {
 struct BasingBehavior : public behavior::Behavior {
   virtual void OnInitialize(behavior::ExecuteContext& ctx) override {
     // Setup blackboard here for this specific behavior
-    ctx.blackboard.Set("request_ship", 2);
+
+    // Only set request ship if we don't already have one.
+    // This lets us retain our ship when switching between behaviors.
+    if (!ctx.blackboard.Has("request_ship")) {
+      ctx.blackboard.Set("request_ship", 2);
+    }
+
     ctx.blackboard.Set("leash_distance", 35.0f);
 
     std::vector<Vector2f> waypoints{

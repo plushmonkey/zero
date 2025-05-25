@@ -30,12 +30,17 @@ std::unique_ptr<behavior::BehaviorNode> TurretBehavior::CreateTree(behavior::Exe
         .Sequence() // Attach to terrier if we can
             .InvertChild<ShipQueryNode>(4)
             .InvertChild<AttachedQueryNode>()
-            .Child<TimerExpiredNode>("attach_cooldown")
-            .Child<BestAttachQueryNode>(false, "best_attach_player")
-            .Child<PlayerEnergyQueryNode>("best_attach_player", "best_attach_player_energy")
-            .Child<ScalarThresholdNode<float>>("best_attach_player_energy", 0.0f)
-            .Child<AttachNode>("best_attach_player")
-            .Child<TimerSetNode>("attach_cooldown", 100)
+            .Selector() // Make the parent sequence return true when we are waiting for full energy.
+                .InvertChild<PlayerEnergyPercentThresholdNode>(1.0f) // This is inverted so the parent sequence halts while waiting.
+                .Sequence() // Try to attach once we have full energy.
+                    .Child<TimerExpiredNode>("attach_cooldown")
+                    .Child<BestAttachQueryNode>(false, "best_attach_player")
+                    .Child<PlayerEnergyQueryNode>("best_attach_player", "best_attach_player_energy")
+                    .Child<ScalarThresholdNode<float>>("best_attach_player_energy", 0.0f)
+                    .Child<AttachNode>("best_attach_player")
+                    .Child<TimerSetNode>("attach_cooldown", 100)
+                    .End()
+                .End()
             .End()
         .Sequence() // If we are in spec, do nothing
             .Child<ShipQueryNode>(8)

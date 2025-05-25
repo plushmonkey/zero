@@ -29,7 +29,7 @@ enum {
 
   // The common communication channels that we should respond from.
   CommandAccess_Standard = (CommandAccess_Public | CommandAccess_PublicMacro | CommandAccess_Team |
-                            CommandAccess_Private | CommandAccess_RemotePrivate),
+                            CommandAccess_OtherTeam | CommandAccess_Private | CommandAccess_RemotePrivate),
 
   CommandAccess_All = (CommandAccess_PublicMacro | CommandAccess_Public | CommandAccess_Team | CommandAccess_OtherTeam |
                        CommandAccess_Private | CommandAccess_RemotePrivate | CommandAccess_Chat),
