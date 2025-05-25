@@ -310,7 +310,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
         .Sequence() // If there are no enemies above us, go mining
             .InvertChild<EnemiesAboveNode>()
             .InvertChild<DistanceThresholdNode>("tw_flag_position", kNearFlagroomDistance)
-            .SuccessChild<svs::NearestMemoryTargetNode>("nearest_target")
+            .SuccessChild<svs::NearestMemoryTargetNode>("nearest_target", true)
             .SuccessChild<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
             .Selector(CompositeDecorator::Invert) // Invert twice here so the sequence fails and falls through in non-mine case.
                 .Child<InFlagroomNode>("nearest_target_position") // We don't want to mine when we have a target in fr, and we don't want this sequence to succeed.
@@ -380,7 +380,7 @@ std::unique_ptr<behavior::BehaviorNode> CreateSharkTree(behavior::ExecuteContext
         .Sequence() // Find nearest target and either path to them or seek them directly.
             .Sequence() // Find an enemy
                 .Child<PlayerPositionQueryNode>("self_position")
-                .Child<svs::NearestMemoryTargetNode>("nearest_target")
+                .Child<svs::NearestMemoryTargetNode>("nearest_target", true)
                 .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
                 .End()
             .Selector()

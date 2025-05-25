@@ -69,7 +69,7 @@ std::unique_ptr<behavior::BehaviorNode> CreateTurretBomberBehavior(behavior::Exe
             .End()
         .Sequence() // Fight player or follow path to them.
             .Child<PlayerPositionQueryNode>("self_position")
-            .Child<NearestTargetNode>("nearest_target")
+            .Child<NearestTargetNode>("nearest_target", true)
             .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
             .Selector()
                 .Composite(CreateAimTree(ctx))

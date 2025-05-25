@@ -591,7 +591,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomBehavior() {
     .Sequence()
         .Sequence() // Find an enemy
             .Child<PlayerPositionQueryNode>("self_position")
-            .Child<svs::NearestMemoryTargetNode>("nearest_target")
+            .Child<svs::NearestMemoryTargetNode>("nearest_target", true)
             .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
             .End()
         .Sequence(CompositeDecorator::Success) // If we have a portal but no location, lay one down.

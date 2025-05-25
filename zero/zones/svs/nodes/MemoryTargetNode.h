@@ -4,13 +4,17 @@
 #include <zero/RegionRegistry.h>
 #include <zero/ZeroBot.h>
 #include <zero/behavior/BehaviorTree.h>
+#include <zero/behavior/nodes/TargetNode.h>
 #include <zero/game/Game.h>
 
 namespace zero {
 namespace svs {
 
+// If obey_stealth is true, then we will ignore players that we can't see.
+// This is a specialized version of NearestTargetNode where it might choose to go back to the last place it saw someone.
 struct NearestMemoryTargetNode : public behavior::BehaviorNode {
-  NearestMemoryTargetNode(const char* player_key) : player_key(player_key) {}
+  NearestMemoryTargetNode(const char* player_key, bool obey_stealth = false)
+      : player_key(player_key), obey_stealth(obey_stealth) {}
 
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
     Player* self = ctx.bot->game->player_manager.GetSelf();
@@ -43,6 +47,8 @@ struct NearestMemoryTargetNode : public behavior::BehaviorNode {
       bool in_safe = game.connection.map.GetTileId(player->position) == kTileIdSafe;
       if (in_safe) continue;
 
+      if (obey_stealth && !behavior::NearestTargetNode::IsVisible(game.connection.settings, self, *player)) continue;
+
       float dist_sq = player->position.DistanceSq(self.position);
       if (dist_sq < closest_dist_sq) {
         closest_dist_sq = dist_sq;
@@ -64,6 +70,7 @@ struct NearestMemoryTargetNode : public behavior::BehaviorNode {
     return true;
   }
 
+  bool obey_stealth = false;
   const char* player_key;
 };
 

@@ -57,8 +57,10 @@ struct HeadingDirectionViewNode : public behavior::BehaviorNode {
   float view_radians;
 };
 
+// If obey_stealth is true, then we will ignore players that we can't see.
 struct NearestTargetNode : public behavior::BehaviorNode {
-  NearestTargetNode(const char* player_key) : player_key(player_key) {}
+  NearestTargetNode(const char* player_key, bool obey_stealth = false)
+      : player_key(player_key), obey_stealth(obey_stealth) {}
 
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
     Player* self = ctx.bot->game->player_manager.GetSelf();
@@ -74,6 +76,30 @@ struct NearestTargetNode : public behavior::BehaviorNode {
     ctx.blackboard.Set(player_key, nearest);
 
     return behavior::ExecuteResult::Success;
+  }
+
+  inline static bool IsVisible(ArenaSettings& settings, const Player& self, const Player& target) {
+    constexpr Vector2f kViewDim(1920.0f, 1080.0f);
+
+    // XRadar can see no matter what.
+    if (self.togglables & Status_XRadar) return true;
+
+    // We can always see them if they don't have stealth on.
+    if (!(target.togglables & Status_Stealth)) return true;
+
+    const Vector2f half_view_dim = kViewDim * 0.5f;
+
+    Rectangle view_rect(self.position - half_view_dim, self.position + half_view_dim);
+    Rectangle target_rect =
+        Rectangle::FromPositionRadius(target.position, settings.ShipSettings[target.ship].GetRadius());
+
+    // Target has stealth on and is off screen. We cannot see them.
+    if (!BoxBoxIntersect(view_rect.min, view_rect.max, target_rect.min, target_rect.max)) {
+      return false;
+    }
+
+    // We can see them if they don't have cloak on since they are on our screen.
+    return !(target.togglables & Status_Cloak);
   }
 
  private:
@@ -97,6 +123,8 @@ struct NearestTargetNode : public behavior::BehaviorNode {
       bool in_safe = game.connection.map.GetTileId(player->position) == kTileIdSafe;
       if (in_safe) continue;
 
+      if (obey_stealth && !IsVisible(ctx.bot->game->connection.settings, self, *player)) continue;
+
       float dist_sq = player->position.DistanceSq(self.position);
       if (dist_sq < closest_dist_sq) {
         closest_dist_sq = dist_sq;
@@ -107,6 +135,7 @@ struct NearestTargetNode : public behavior::BehaviorNode {
     return best_target;
   }
 
+  bool obey_stealth = false;
   const char* player_key;
 };
 
