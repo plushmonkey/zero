@@ -338,7 +338,6 @@ void TrenchWars::HandleEvent(const DoorToggleEvent&) {
 
   bool is_closed = doormode & (1 << kDoorIndex);
 
-  Log(LogLevel::Debug, "TrenchWars: Is closed: %d.", (s32)is_closed);
   for (MapCoord coord : this->roof_fr_set) {
     fr_bitset.Set(coord.x, coord.y, is_closed);
   }

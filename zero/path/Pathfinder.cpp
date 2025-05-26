@@ -271,7 +271,11 @@ static void CalculateTraversables(std::vector<NodePoint>& dynamic_points, const 
         }
 
         TileId tile_id = map.GetTileId(x, y);
-        if (tile_id >= kTileIdFirstDoor && tile_id <= kTileIdLastDoor) continue;
+        if (tile_id >= kTileIdFirstDoor && tile_id <= kTileIdLastDoor) {
+          node->flags |= NodeFlag_DynamicEmpty;
+          dynamic_points.push_back(node_point);
+          continue;
+        }
 
         // Loop over empty spaces that aren't doors, but might be surrounded by doors.
         // We want to mark these as dynamic so they can be updated when doors change.
