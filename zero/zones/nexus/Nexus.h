@@ -7,8 +7,6 @@
 #include <memory>
 #include <vector>
 
-#define TW_RENDER_FR 0
-
 namespace zero {
 namespace nexus {
 
@@ -45,9 +43,6 @@ struct Nexus {
   path::Path right_entrance_path;
 
   std::vector<Vector2f> corridors;
-#if TW_RENDER_FR
-  std::vector<Vector2f> fr_positions;
-#endif
 };
 
 }  // namespace nexus

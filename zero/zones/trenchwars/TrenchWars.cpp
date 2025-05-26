@@ -40,7 +40,7 @@ void TwController::CreateBehaviors(const char* arena_name) {
   Log(LogLevel::Info, "Registering Trench Wars behaviors.");
 
   bot->bot_controller->energy_tracker.estimate_type = EnergyHeuristicType::Maximum;
-  trench_wars = std::make_unique<TrenchWars>();
+  trench_wars = std::make_unique<TrenchWars>(*bot);
   bot->execute_ctx.blackboard.Set("tw", trench_wars.get());
 
   CreateFlagroomBitset();
@@ -224,13 +224,17 @@ void TwController::CreateFlagroomBitset() {
 
     stack.pop_front();
 
+    s32 door_traverse_count = current.door_traverse_count;
+
+    // Add the top part of the flagroom to the roof set so we can dynamically update it.
+    if (door_traverse_count > 0 && fabsf((float)coord.x - (float)flag_x) < 20) {
+      tw->roof_fr_set.push_back(coord);
+    }
+
     // Cap the side entrances so they aren't included in the flag room tiles.
     if (current.corridor_count >= 4) continue;
     if (current.depth >= kMaxFloodDistance) continue;
     if (map.IsSolidEmptyDoors(coord.x, coord.y, 0xFFFF)) continue;
-
-    s32 door_traverse_count = current.door_traverse_count;
-
     if (map.IsDoor(coord.x, coord.y)) ++door_traverse_count;
 
     // Create the top curve
@@ -317,6 +321,40 @@ void TwController::CreateFlagroomBitset() {
   }
 
   Log(LogLevel::Debug, "TrenchWars: Done building flag room.");
+
+  // Fake a door update so we get the right flagroom.
+  tw->HandleEvent(DoorToggleEvent());
+}
+
+void TrenchWars::HandleEvent(const DoorToggleEvent&) {
+  if (roof_fr_set.empty()) return;
+
+  Log(LogLevel::Debug, "TrenchWars: Updating roof flagroom set.");
+
+  // This is the door index for the door that determines the state of the top area.
+  constexpr u8 kDoorIndex = 168 - 162;
+
+  u8 doormode = (u8)bot.game->connection.settings.DoorMode;
+
+  bool is_closed = doormode & (1 << kDoorIndex);
+
+  Log(LogLevel::Debug, "TrenchWars: Is closed: %d.", (s32)is_closed);
+  for (MapCoord coord : this->roof_fr_set) {
+    fr_bitset.Set(coord.x, coord.y, is_closed);
+  }
+
+  // If we are rendering the fr, then manually update the positions since they may have changed.
+#if TW_RENDER_FR
+  this->fr_positions.clear();
+
+  for (u16 y = 0; y < 1024; ++y) {
+    for (u16 x = 0; x < 1024; ++x) {
+      if (fr_bitset.Test(x, y)) {
+        fr_positions.emplace_back((float)x, (float)y);
+      }
+    }
+  }
+#endif
 }
 
 }  // namespace tw

@@ -15,6 +15,7 @@
 #include <zero/behavior/nodes/RegionNode.h>
 #include <zero/behavior/nodes/RenderNode.h>
 #include <zero/behavior/nodes/ShipNode.h>
+#include <zero/behavior/nodes/TargetNode.h>
 #include <zero/behavior/nodes/ThreatNode.h>
 #include <zero/behavior/nodes/TimerNode.h>
 #include <zero/behavior/nodes/WaypointNode.h>
@@ -22,7 +23,6 @@
 #include <zero/zones/svs/nodes/DynamicPlayerBoundingBoxQueryNode.h>
 #include <zero/zones/svs/nodes/FindNearestGreenNode.h>
 #include <zero/zones/svs/nodes/IncomingDamageQueryNode.h>
-#include <zero/zones/svs/nodes/MemoryTargetNode.h>
 #include <zero/zones/svs/nodes/NearbyEnemyWeaponQueryNode.h>
 #include <zero/zones/trenchwars/TrenchWars.h>
 #include <zero/zones/trenchwars/nodes/BaseNode.h>
@@ -541,6 +541,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
             .Child<AfterburnerThresholdNode>()
             .End()
         .Child<GoToNode>("tw_flag_position")
+        .Child<RenderPathNode>(Vector3f(1, 0, 0))
         .End();
   // clang-format on
 
@@ -591,7 +592,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomBehavior() {
     .Sequence()
         .Sequence() // Find an enemy
             .Child<PlayerPositionQueryNode>("self_position")
-            .Child<svs::NearestMemoryTargetNode>("nearest_target", true)
+            .Child<NearestTargetNode>("nearest_target", true)
             .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
             .End()
         .Sequence(CompositeDecorator::Success) // If we have a portal but no location, lay one down.

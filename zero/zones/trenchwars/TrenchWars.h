@@ -1,6 +1,8 @@
 #pragma once
 
 #include <zero/Math.h>
+#include <zero/RegionRegistry.h>
+#include <zero/game/GameEvent.h>
 #include <zero/path/Path.h>
 
 #include <bitset>
@@ -10,6 +12,9 @@
 #define TW_RENDER_FR 0
 
 namespace zero {
+
+struct ZeroBot;
+
 namespace tw {
 
 struct RegionBitset {
@@ -32,7 +37,9 @@ struct RegionBitset {
   inline void Clear() { data.reset(); }
 };
 
-struct TrenchWars {
+struct TrenchWars : EventHandler<DoorToggleEvent> {
+  ZeroBot& bot;
+
   // Bitset representing every tile that is considered part of the flagroom.
   RegionBitset fr_bitset;
   // The average position of the flags, which should be the middle flag.
@@ -45,9 +52,19 @@ struct TrenchWars {
   path::Path right_entrance_path;
 
   std::vector<Vector2f> corridors;
+
+  // This is the list of tiles that are above the flagroom.
+  // These tiles depend on the doorstate to determine if they are part of flagroom or roof.
+  // This is used to update the fr_bitset when doors change.
+  std::vector<MapCoord> roof_fr_set;
+
 #if TW_RENDER_FR
   std::vector<Vector2f> fr_positions;
 #endif
+
+  TrenchWars(ZeroBot& bot) : bot(bot) {}
+
+  void HandleEvent(const DoorToggleEvent&) override;
 };
 
 }  // namespace tw

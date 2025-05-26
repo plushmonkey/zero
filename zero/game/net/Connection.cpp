@@ -600,14 +600,14 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
 
         this->settings = *settings;
 
-        if (old_door_mode != this->settings.DoorMode) {
-          Event::Dispatch(DoorToggleEvent());
-        }
-
         if (settings->DoorMode >= 0) {
           // Force update
           map.last_seed_tick = GetCurrentTick() - settings->DoorDelay;
           map.UpdateDoors(*settings);
+        }
+
+        if (old_door_mode != this->settings.DoorMode) {
+          Event::Dispatch(DoorToggleEvent());
         }
 
         u8* weights = (u8*)&settings->PrizeWeights;

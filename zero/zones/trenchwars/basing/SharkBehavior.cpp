@@ -15,6 +15,7 @@
 #include <zero/behavior/nodes/RegionNode.h>
 #include <zero/behavior/nodes/RenderNode.h>
 #include <zero/behavior/nodes/ShipNode.h>
+#include <zero/behavior/nodes/TargetNode.h>
 #include <zero/behavior/nodes/ThreatNode.h>
 #include <zero/behavior/nodes/TimerNode.h>
 #include <zero/behavior/nodes/WaypointNode.h>
@@ -22,7 +23,6 @@
 #include <zero/zones/svs/nodes/DynamicPlayerBoundingBoxQueryNode.h>
 #include <zero/zones/svs/nodes/FindNearestGreenNode.h>
 #include <zero/zones/svs/nodes/IncomingDamageQueryNode.h>
-#include <zero/zones/svs/nodes/MemoryTargetNode.h>
 #include <zero/zones/svs/nodes/NearbyEnemyWeaponQueryNode.h>
 #include <zero/zones/trenchwars/TrenchWars.h>
 #include <zero/zones/trenchwars/nodes/AttachNode.h>
@@ -310,7 +310,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
         .Sequence() // If there are no enemies above us, go mining
             .InvertChild<EnemiesAboveNode>()
             .InvertChild<DistanceThresholdNode>("tw_flag_position", kNearFlagroomDistance)
-            .SuccessChild<svs::NearestMemoryTargetNode>("nearest_target", true)
+            .SuccessChild<NearestTargetNode>("nearest_target", true)
             .SuccessChild<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
             .Selector(CompositeDecorator::Invert) // Invert twice here so the sequence fails and falls through in non-mine case.
                 .Child<InFlagroomNode>("nearest_target_position") // We don't want to mine when we have a target in fr, and we don't want this sequence to succeed.
@@ -380,7 +380,7 @@ std::unique_ptr<behavior::BehaviorNode> CreateSharkTree(behavior::ExecuteContext
         .Sequence() // Find nearest target and either path to them or seek them directly.
             .Sequence() // Find an enemy
                 .Child<PlayerPositionQueryNode>("self_position")
-                .Child<svs::NearestMemoryTargetNode>("nearest_target", true)
+                .Child<NearestTargetNode>("nearest_target", true)
                 .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
                 .End()
             .Selector()

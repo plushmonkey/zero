@@ -15,6 +15,7 @@
 #include <zero/behavior/nodes/RegionNode.h>
 #include <zero/behavior/nodes/RenderNode.h>
 #include <zero/behavior/nodes/ShipNode.h>
+#include <zero/behavior/nodes/TargetNode.h>
 #include <zero/behavior/nodes/ThreatNode.h>
 #include <zero/behavior/nodes/TimerNode.h>
 #include <zero/behavior/nodes/WaypointNode.h>
@@ -22,7 +23,6 @@
 #include <zero/zones/svs/nodes/DynamicPlayerBoundingBoxQueryNode.h>
 #include <zero/zones/svs/nodes/FindNearestGreenNode.h>
 #include <zero/zones/svs/nodes/IncomingDamageQueryNode.h>
-#include <zero/zones/svs/nodes/MemoryTargetNode.h>
 #include <zero/zones/svs/nodes/NearbyEnemyWeaponQueryNode.h>
 #include <zero/zones/trenchwars/TrenchWars.h>
 #include <zero/zones/trenchwars/nodes/AttachNode.h>
@@ -194,7 +194,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
                         .Child<FlagPositionQueryNode>("nearest_flag", "nearest_flag_position")
                         .Child<BestFlagClaimerNode>()
                         .Sequence(CompositeDecorator::Success)
-                            .Child<svs::NearestMemoryTargetNode>("nearest_target", true)
+                            .Child<NearestTargetNode>("nearest_target", true)
                             .Composite(CreateShootTree("nearest_target")) // Shoot weapons while collecting flag so we don't ride on top of each other
                             .End()
                         .Selector()
@@ -244,7 +244,7 @@ std::unique_ptr<behavior::BehaviorNode> CreateSpiderTree(behavior::ExecuteContex
         .Sequence() // Find nearest target and either path to them or seek them directly.
             .Sequence() // Find an enemy
                 .Child<PlayerPositionQueryNode>("self_position")
-                .Child<svs::NearestMemoryTargetNode>("nearest_target", true)
+                .Child<NearestTargetNode>("nearest_target", true)
                 .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
                 .End()
             .Selector()
