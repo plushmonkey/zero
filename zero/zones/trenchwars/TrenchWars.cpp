@@ -196,6 +196,19 @@ void TwController::CreateFlagroomBitset() {
 
   visit(stack.front().coord);
 
+  // Mark unreachable tiles near the flag as part of the flagroom.
+  // This will stop weasels from hiding in there and not being considered occupying flagroom.
+  const MapCoord kSpecialTiles[] = {
+      MapCoord(507, 269),
+      MapCoord(507, 270),
+      MapCoord(517, 269),
+      MapCoord(517, 270),
+  };
+
+  for (auto coord : kSpecialTiles) {
+    visit(coord);
+  }
+
   constexpr float kShipRadius = 0.85f;
   constexpr s32 kMaxFloodDistance = 100;
   constexpr s32 kMaxFlagroomDoorTraverse = 2;
@@ -219,7 +232,15 @@ void TwController::CreateFlagroomBitset() {
     s32 door_traverse_count = current.door_traverse_count;
 
     if (map.IsDoor(coord.x, coord.y)) ++door_traverse_count;
-    if (door_traverse_count > 0 && flag_y - coord.y > 16) continue;
+
+    // Create the top curve
+    if (door_traverse_count > 0 && coord.y < flag_y - 15) {
+      s32 x_offset = (s32)fabsf((float)flag_x - (float)coord.x);
+      s32 max_y_offset = 19 - ((x_offset * x_offset) / 60);
+
+      if (flag_y - coord.y > max_y_offset) continue;
+    }
+
     if (door_traverse_count > kMaxFlagroomDoorTraverse) continue;
 
     bool in_corridor_area = coord.y - flag_y > 0 && (s32)fabsf(coord.x - (float)flag_x) < 3;
