@@ -1390,6 +1390,7 @@ void PlayerManager::AttachPlayer(Player& requester, Player& destination) {
   // Fetch or allocate new AttachInfo and append it to destination's children list
   if (!attach_free) {
     attach_free = memory_arena_push_type(&perm_arena, AttachInfo);
+    attach_free->next = nullptr;
   }
 
   AttachInfo* info = attach_free;
