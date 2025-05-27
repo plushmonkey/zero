@@ -34,6 +34,7 @@ namespace zero {
 namespace tw {
 
 constexpr float kSpiderLeashDistance = 30.0f;
+constexpr float kAvoidTeamDistance = 2.0f;
 
 static std::unique_ptr<behavior::BehaviorNode> CreateDefensiveTree() {
   using namespace behavior;
@@ -129,6 +130,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateOffensiveTree(const char* n
                     .End()
                 .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
                 .End()
+            .Child<AvoidTeamNode>(kAvoidTeamDistance)
             .Composite(CreateShootTree(nearest_target_key))
             .End()
         .End();
@@ -142,7 +144,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
 
   BehaviorBuilder builder;
 
-  constexpr float kNearFlagroomDistance = 45.0f;
+  constexpr float kNearFlagroomDistance = 50.0f;
 
   // clang-format off
   builder
@@ -160,6 +162,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
                     .Child<DetachNode>()
                     .Child<TimerSetNode>("attach_cooldown", 100)
                     .End()
+                .Child<AvoidTeamNode>(kAvoidTeamDistance)
                 .Composite(CreateOffensiveTree("nearest_target", "nearest_target_position"))
                 .End()
             .Sequence() // Travel to the flag room

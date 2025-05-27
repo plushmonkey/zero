@@ -301,7 +301,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
 
   BehaviorBuilder builder;
 
-  constexpr float kNearFlagroomDistance = 45.0f;
+  constexpr float kNearFlagroomDistance = 50.0f;
 
   // clang-format off
   builder
