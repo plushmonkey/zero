@@ -78,6 +78,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateAimTree(behavior::ExecuteCo
   BehaviorBuilder builder;
 
   constexpr float kBulletEnergyCost = 0.9f;
+  constexpr float kNearDistance = 20.0f;
 
   // clang-format off
   builder
@@ -92,6 +93,11 @@ static std::unique_ptr<behavior::BehaviorNode> CreateAimTree(behavior::ExecuteCo
                     .Child<PlayerEnergyQueryNode>("nearest_target", "nearest_target_energy")
                     .Child<ScalarThresholdNode<float>>("self_energy", "nearest_target_energy")
                     .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
+                    .End()
+                .Sequence() // If enemy is very close to us, ab away fast.
+                    .InvertChild<DistanceThresholdNode>("nearest_target_position", kNearDistance)
+                    .Child<InputActionNode>(InputAction::Afterburner)
+                    .Child<SeekNode>("nearest_target_position", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
                     .End()
                 .Child<SeekNode>("nearest_target_position", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
                 .End()
