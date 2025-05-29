@@ -217,6 +217,35 @@ class InfoCommand : public CommandExecutor {
   std::string GetDescription() override { return "Displays current state of bot."; }
 };
 
+class SetFreqCommand : public CommandExecutor {
+  void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
+    int parsed_ship_num = 0;
+
+    auto args = Tokenize(arg, ' ');
+
+    if (args.size() != 1 || args[0].empty()) {
+      SendUsage(bot, sender.data());
+      return;
+    }
+
+    int frequency = atoi(args[0].data());
+    if (frequency < 0 || frequency > 9999) {
+      SendUsage(bot, sender.data());
+      return;
+    }
+
+    bot.game->connection.SendFrequencyChange((u16)frequency);
+  }
+
+  void SendUsage(ZeroBot& bot, const char* player) {
+    Event::Dispatch(ChatQueueEvent::Private(player, "Usage: !setfreq [freq]"));
+  }
+
+  CommandAccessFlags GetAccess() override { return CommandAccess_Standard; }
+  std::vector<std::string> GetAliases() override { return { "setfreq", "sf"}; }
+  std::string GetDescription() override { return "Sets the frequency."; }
+};
+
 class SetShipCommand : public CommandExecutor {
  public:
   void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
@@ -398,6 +427,7 @@ CommandSystem::CommandSystem(ZeroBot& bot, PacketDispatcher& dispatcher) : bot(b
   default_commands_.emplace_back(std::make_shared<HelpCommand>());
   default_commands_.emplace_back(std::make_shared<CommandsCommand>());
   default_commands_.emplace_back(std::make_shared<SetShipCommand>());
+  default_commands_.emplace_back(std::make_shared<SetFreqCommand>());
   default_commands_.emplace_back(std::make_shared<InfoCommand>());
   default_commands_.emplace_back(std::make_shared<SayCommand>());
   default_commands_.emplace_back(std::make_shared<GoCommand>());
@@ -561,6 +591,7 @@ void CommandSystem::SetDefaultSecurityLevels() {
   SetCommandSecurityLevel("go", 5);
   SetCommandSecurityLevel("info", 0);
   SetCommandSecurityLevel("setship", 1);
+  SetCommandSecurityLevel("setfreq", 1);
   SetCommandSecurityLevel("help", 0);
   SetCommandSecurityLevel("commands", 0);
   SetCommandSecurityLevel("quit", 10);
