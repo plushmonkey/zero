@@ -83,6 +83,11 @@ class NodeProcessor {
   Node* GetNode(NodePoint point);
   bool IsSolid(u16 x, u16 y) { return map_.IsSolid(x, y, 0xFFFF); }
 
+  // This will recompute traversability for the provided node and set the new flags.
+  // This will also recompute the EdgeSet.
+  // This is not thread-safe.
+  bool UpdateDynamicNode(Node* node, float ship_radius, u16 frequency);
+
   void SetEdgeSet(u16 x, u16 y, EdgeSet set) {
     size_t index = (size_t)y * 1024 + x;
     edges_[index] = set;

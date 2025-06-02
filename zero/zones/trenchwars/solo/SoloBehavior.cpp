@@ -20,6 +20,67 @@ std::unique_ptr<behavior::BehaviorNode> SoloBehavior::CreateTree(behavior::Execu
   BehaviorBuilder builder;
 
   // clang-format off
+
+  // Render traversability grid for testing.
+#if 0
+  builder
+    .Selector()
+        .Sequence() // Enter the specified ship if not already in it.
+            .InvertChild<ShipQueryNode>("request_ship")
+            .Child<ShipRequestNode>("request_ship")
+            .End()
+        .Child<ExecuteNode>([](ExecuteContext& ctx) {
+            auto self = ctx.bot->game->player_manager.GetSelf();
+            if (!self || self->ship >= 8) return ExecuteResult::Failure;
+
+            auto& game = *ctx.bot->game;
+            auto& pathfinder = *ctx.bot->bot_controller->pathfinder;
+            auto& processor = pathfinder.GetProcessor();
+            
+            auto pos = self->position;
+            const float kShipRadius = 14.0f / 16.0f;
+            const u16 radius = 30;
+
+            //processor.SetDoorSolidMethod(path::DoorSolidMethod::AlwaysSolid);
+
+            for (u16 y = pos.y - radius; y < pos.y + radius; ++y) {
+              for (u16 x = pos.x - radius; x < pos.x + radius; ++x) {
+                auto node = processor.GetNode(path::NodePoint(x, y));
+                path::EdgeSet set = processor.FindEdges(node, kShipRadius);
+
+                //processor.UpdateDynamicNode(node, kShipRadius, 0xFFFF);
+                Vector2f start(x + 0.5f, y + 0.5f);
+                Vector3f color(0, 1, 0);
+
+                for (size_t i = 0; i < 4; ++i) {
+                  path::CoordOffset offset = path::CoordOffset::FromIndex(i);
+                  auto other_node = processor.GetNode(path::NodePoint(x + offset.x, y + offset.y));
+                  path::EdgeSet other_set = processor.FindEdges(other_node, kShipRadius);
+
+                  processor.UpdateDynamicNode(other_node, kShipRadius, 0xFFFF);
+
+                  size_t opposite_i = i ^ 1;
+
+                  //if (set.IsSet(i) && other_set.IsSet(opposite_i)) {
+                  if (set.IsSet(i)) {
+                    Vector2f end = start + Vector2f(offset.x, offset.y);
+
+                    game.line_renderer.PushLine(start, color, end, color);
+                  }
+                }
+              }
+            }
+
+            self->position = Vector2f(512, 269);
+
+            game.line_renderer.Render(game.camera);
+
+            return ExecuteResult::Success;
+        })
+        .End();
+  return builder.Build();
+#endif
+
   builder
     .Selector()
         .Sequence() // Enter the specified ship if not already in it.

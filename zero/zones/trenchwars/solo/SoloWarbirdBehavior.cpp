@@ -10,6 +10,7 @@
 #include <zero/behavior/nodes/MoveNode.h>
 #include <zero/behavior/nodes/PlayerNode.h>
 #include <zero/behavior/nodes/RegionNode.h>
+#include <zero/behavior/nodes/RenderNode.h>
 #include <zero/behavior/nodes/ShipNode.h>
 #include <zero/behavior/nodes/TargetNode.h>
 #include <zero/behavior/nodes/ThreatNode.h>
@@ -65,6 +66,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateChaseTree(behavior::Execute
         .Sequence() // Path to target if they aren't immediately visible.
             .InvertChild<ShipTraverseQueryNode>("nearest_target_position")
             .Child<GoToNode>("nearest_target_position")
+            .Child<RenderPathNode>(Vector3f(1, 0, 0))
             .End()
         .End();
   // clang-format on

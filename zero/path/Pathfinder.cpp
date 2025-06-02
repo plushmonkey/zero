@@ -123,33 +123,11 @@ Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& 
 
       // This edge is dynamically empty and dirty. We should update its traversability.
       if (edge->flags & NodeFlag_DynamicEmpty) {
-        auto& arena = this->processor_->GetGame().temp_arena;
-        MemoryRevert reverter = arena.GetReverter();
+        bool traversable = processor_->UpdateDynamicNode(edge, radius, frequency);
 
-        OccupiedRect* rects = memory_arena_push_type_count(&arena, OccupiedRect, 256);
-
-        size_t rect_count =
-            map.GetAllOccupiedRects(Vector2f((float)edge_point.x, (float)edge_point.y), radius, frequency, rects, true);
-
-        edge->flags &= ~(NodeFlag_DynamicEmpty | NodeFlag_Traversable);
-        Vector2f node_position((float)node_point.x, (float)node_point.y);
-
-        // If there's only two and the two are offset from each other, then we must be on a diagonal tile and should not
-        // proceed.
-        if (rect_count == 2 && rects[0].start_x != rects[1].start_x && rects[0].start_y != rects[1].start_y) {
+        if (!traversable) {
           continue;
         }
-
-        for (size_t i = 0; i < rect_count; ++i) {
-          OccupiedRect* rect = rects + i;
-
-          if (rect->Contains(node_position)) {
-            edge->flags |= NodeFlag_Traversable;
-            break;
-          }
-        }
-
-        if (!(edge->flags & NodeFlag_Traversable)) continue;
       }
 
       touched_.push_back(edge);
