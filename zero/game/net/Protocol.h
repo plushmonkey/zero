@@ -133,6 +133,7 @@ enum class ProtocolS2C {
   BatchedSmallPosition,
   BatchedLargePosition,
   Redirect = 0x3B,
+  SelectBox = 0x3C,
 
   Count
 };
