@@ -636,6 +636,36 @@ static std::unique_ptr<behavior::BehaviorNode> CreateIdleBehavior() {
   return builder.Build();
 }
 
+static std::unique_ptr<behavior::BehaviorNode> CreateXRadarBehavior() {
+  using namespace behavior;
+
+  BehaviorBuilder builder;
+
+  // X-radar gets enabled when above this energy percent.
+  constexpr float kXRadarEnergyThreshold = 0.65f;
+
+  // clang-format off
+  builder
+    .Sequence()
+        .Child<ShipCapabilityQueryNode>(ShipCapability_XRadar)
+        .Selector() // Toggle x-radar on/off depending on energy.
+            .Sequence() // If x-radar is off and we are high energy, enable it.
+                .InvertChild<PlayerStatusQueryNode>(Status_XRadar)
+                .Child<PlayerEnergyPercentThresholdNode>(kXRadarEnergyThreshold)
+                .Child<InputActionNode>(InputAction::XRadar)
+                .End()
+            .Sequence() // If x-radar is on and we are low energy, disable it.
+                .Child<PlayerStatusQueryNode>(Status_XRadar)
+                .InvertChild<PlayerEnergyPercentThresholdNode>(kXRadarEnergyThreshold)
+                .Child<InputActionNode>(InputAction::XRadar)
+                .End()
+            .End()
+        .End();
+  // clang-format on
+
+  return builder.Build();
+}
+
 std::unique_ptr<behavior::BehaviorNode> CreateTerrierTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
@@ -643,12 +673,15 @@ std::unique_ptr<behavior::BehaviorNode> CreateTerrierTree(behavior::ExecuteConte
 
   // clang-format off
   builder
-    .Selector()
-        .Composite(CreateEntranceBehavior())
-        .Composite(CreateBelowEntranceBehavior())
-        .Composite(CreateFlagroomTravelBehavior())
-        .Composite(CreateFlagroomBehavior())
-        .Composite(CreateIdleBehavior())
+    .Sequence()
+        .Composite(CreateXRadarBehavior(), CompositeDecorator::Success)
+        .Selector() // Handle main behavior based on base position
+            .Composite(CreateEntranceBehavior())
+            .Composite(CreateBelowEntranceBehavior())
+            .Composite(CreateFlagroomTravelBehavior())
+            .Composite(CreateFlagroomBehavior())
+            .Composite(CreateIdleBehavior())
+            .End()
         .End();
   // clang-format on
 
