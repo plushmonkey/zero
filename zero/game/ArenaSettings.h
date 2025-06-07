@@ -35,7 +35,7 @@ struct ShipSettings {
   // i.e. L2 = LandmineFireEnergy + LandmineFireEnergyUpgrade
   uint16_t LandmineFireEnergyUpgrade;
   // How fast bullets travel (Pixels / second / 10)
-  uint16_t BulletSpeed;
+  int16_t BulletSpeed;
   // How fast bombs travel
   uint16_t BombSpeed;
   struct {

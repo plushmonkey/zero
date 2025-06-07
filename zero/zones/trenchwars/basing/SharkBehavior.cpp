@@ -1,5 +1,3 @@
-#include "SharkBehavior.h"
-
 #include <zero/behavior/BehaviorBuilder.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/behavior/nodes/AimNode.h>
@@ -368,7 +366,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
   return builder.Build();
 }
 
-std::unique_ptr<behavior::BehaviorNode> CreateSharkTree(behavior::ExecuteContext& ctx) {
+std::unique_ptr<behavior::BehaviorNode> CreateSharkBasingTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
   BehaviorBuilder builder;

@@ -31,17 +31,13 @@
 namespace zero {
 namespace tw {
 
-constexpr float kSpiderLeashDistance = 30.0f;
+constexpr float kJavLeashDistance = 35.0f;
 constexpr float kAvoidTeamDistance = 2.0f;
 
 static std::unique_ptr<behavior::BehaviorNode> CreateDefensiveTree() {
   using namespace behavior;
 
   constexpr float kRepelDistance = 16.0f;
-  constexpr float kLowEnergyThreshold = 450.0f;
-  // This is how far away to check for enemies that are rushing at us with low energy.
-  // We will stop dodging and try to finish them off if they are within this distance and low energy.
-  constexpr float kNearbyEnemyThreshold = 20.0f;
 
   BehaviorBuilder builder;
 
@@ -52,11 +48,6 @@ static std::unique_ptr<behavior::BehaviorNode> CreateDefensiveTree() {
             .Child<svs::IncomingDamageQueryNode>(kRepelDistance, "incoming_damage")
             .Child<PlayerCurrentEnergyQueryNode>("self_energy")
             .End()
-        .Sequence(CompositeDecorator::Invert) // Check if enemy is very low energy and close to use. Don't bother dodging if they are rushing us with low energy.
-            .Child<PlayerEnergyQueryNode>("nearest_target", "nearest_target_energy")
-            .InvertChild<ScalarThresholdNode<float>>("nearest_target_energy", kLowEnergyThreshold)
-            .InvertChild<DistanceThresholdNode>("nearest_target_position", "self_position", kNearbyEnemyThreshold)
-            .End()
         .Child<DodgeIncomingDamage>(0.4f, 16.0f, 0.0f)
         .End();
   // clang-format on
@@ -64,7 +55,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateDefensiveTree() {
   return builder.Build();
 }
 
-static std::unique_ptr<behavior::BehaviorNode> CreateShootTree(const char* nearest_target_key) {
+static std::unique_ptr<behavior::BehaviorNode> CreateBulletShootTree(const char* nearest_target_key) {
   using namespace behavior;
 
   BehaviorBuilder builder;
@@ -72,15 +63,11 @@ static std::unique_ptr<behavior::BehaviorNode> CreateShootTree(const char* neare
   // clang-format off
   builder
     .Sequence()
-        .Sequence(CompositeDecorator::Success) // Determine if a shot should be fired by using weapon trajectory and bounding boxes.
+        .Sequence() // Determine if a shot should be fired by using weapon trajectory and bounding boxes.
             .Child<AimNode>(WeaponType::Bullet, nearest_target_key, "aimshot")
             .Child<svs::DynamicPlayerBoundingBoxQueryNode>(nearest_target_key, "target_bounds", 4.0f)
             .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
             .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
-            .Selector()
-                .Child<BlackboardSetQueryNode>("rushing")
-                .Child<PlayerEnergyPercentThresholdNode>(0.3f)
-                .End()
             .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bullet)
             .InvertChild<TileQueryNode>(kTileIdSafe)
             .Child<ShotVelocityQueryNode>(WeaponType::Bullet, "bullet_fire_velocity")
@@ -96,40 +83,53 @@ static std::unique_ptr<behavior::BehaviorNode> CreateShootTree(const char* neare
   return builder.Build();
 }
 
-static std::unique_ptr<behavior::BehaviorNode> CreateOffensiveTree(const char* nearest_target_key,
-                                                                   const char* nearest_target_position_key) {
+static std::unique_ptr<behavior::BehaviorNode> CreateBombShootTree(const char* nearest_target_key) {
   using namespace behavior;
-
-  constexpr float kRepelDistance = 16.0f;
-  constexpr float kLowEnergyThreshold = 450.0f;
-  // This is how far away to check for enemies that are rushing at us with low energy.
-  // We will stop dodging and try to finish them off if they are within this distance and low energy.
-  constexpr float kNearbyEnemyThreshold = 20.0f;
 
   BehaviorBuilder builder;
 
   // clang-format off
   builder
+    .Sequence()
+        .Sequence() // Determine if a shot should be fired by using weapon trajectory and bounding boxes.
+            .Child<AimNode>(WeaponType::Bomb, nearest_target_key, "aimshot")
+            .Child<svs::DynamicPlayerBoundingBoxQueryNode>(nearest_target_key, "target_bounds", 4.0f)
+            .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
+            .Child<RenderRectNode>("world_camera", "target_bounds", Vector3f(1.0f, 0.0f, 0.0f))
+            .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
+            .InvertChild<TileQueryNode>(kTileIdSafe)
+            .Child<ShotVelocityQueryNode>(WeaponType::Bomb, "bomb_fire_velocity")
+            .Child<RayNode>("self_position", "bomb_fire_velocity", "bomb_fire_ray")
+            .Child<svs::DynamicPlayerBoundingBoxQueryNode>(nearest_target_key, "target_bounds", 4.0f)
+            .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
+            .Child<RayRectangleInterceptNode>("bomb_fire_ray", "target_bounds")
+            .Child<InputActionNode>(InputAction::Bomb)
+            .End()
+        .End();
+  // clang-format on
+
+  return builder.Build();
+}
+
+static std::unique_ptr<behavior::BehaviorNode> CreateOffensiveTree(const char* nearest_target_key,
+                                                                   const char* nearest_target_position_key) {
+  using namespace behavior;
+
+  constexpr float kRepelDistance = 16.0f;
+  
+  BehaviorBuilder builder;
+
+  // clang-format off
+  builder
     .Sequence() // Aim at target and shoot while seeking them.
-        .Child<AimNode>(WeaponType::Bullet, nearest_target_key, "aimshot")
+        .Child<AimNode>(WeaponType::Bomb, nearest_target_key, "aimshot")
         .Parallel()
             .Child<FaceNode>("aimshot")
-            .Child<BlackboardEraseNode>("rushing")
-            .Selector()
-                .Sequence() // If our target is very low energy, rush at them
-                    .Child<PlayerEnergyQueryNode>(nearest_target_key, "nearest_target_energy")
-                    .InvertChild<ScalarThresholdNode<float>>("nearest_target_energy", kLowEnergyThreshold)
-                    .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Static)
-                    .Child<ScalarNode>(1.0f, "rushing")
-                    .End()
-                .Sequence() // Begin moving away if our energy is low.
-                    .InvertChild<PlayerEnergyPercentThresholdNode>(0.3f)
-                    .Child<SeekNode>("aimshot", kSpiderLeashDistance, SeekNode::DistanceResolveType::Dynamic)
-                    .End()
-                .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
+            .Child<SeekNode>("aimshot", kJavLeashDistance, SeekNode::DistanceResolveType::Dynamic)
+            .Selector(CompositeDecorator::Success)
+                .Composite(CreateBombShootTree(nearest_target_key))
+                .Composite(CreateBulletShootTree(nearest_target_key))
                 .End()
-            .Child<AvoidTeamNode>(kAvoidTeamDistance)
-            .Composite(CreateShootTree(nearest_target_key))
             .End()
         .End();
   // clang-format on
@@ -193,10 +193,11 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
                         .Child<InFlagroomNode>("self_position")
                         .Child<NearestFlagNode>(NearestFlagNode::Type::Unclaimed, "nearest_flag")
                         .Child<FlagPositionQueryNode>("nearest_flag", "nearest_flag_position")
+                        .InvertChild<DistanceThresholdNode>("nearest_flag_position", 12.0f) // Only go claim it if we are already close
                         .Child<BestFlagClaimerNode>()
                         .Sequence(CompositeDecorator::Success)
                             .Child<NearestTargetNode>("nearest_target", true)
-                            .Composite(CreateShootTree("nearest_target")) // Shoot weapons while collecting flag so we don't ride on top of each other
+                            .Composite(CreateBulletShootTree("nearest_target")) // Shoot weapons while collecting flag so we don't ride on top of each other
                             .End()
                         .Selector()
                             .Sequence()
@@ -215,29 +216,10 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
   return builder.Build();
 }
 
-std::unique_ptr<behavior::BehaviorNode> CreateSpiderBasingTree(behavior::ExecuteContext& ctx) {
+std::unique_ptr<behavior::BehaviorNode> CreateJavelinBasingTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
   BehaviorBuilder builder;
-
-#if TW_RENDER_FR
-  // clang-format off
-  builder.
-    Sequence()
-        .Child<ExecuteNode>([](ExecuteContext& ctx) {
-          auto self = ctx.bot->game->player_manager.GetSelf();
-          if (self) {
-            self->position = Vector2f(512, 269);
-          }
-          return ExecuteResult::Success;
-        })
-        .Child<RenderFlagroomNode>()
-        .End();
-  // clang-format on
-
-  return builder.Build();
-#endif
-
   // clang-format off
   builder
     .Selector()

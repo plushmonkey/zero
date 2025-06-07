@@ -8,9 +8,6 @@
 #include <zero/behavior/nodes/ShipNode.h>
 #include <zero/behavior/nodes/WaypointNode.h>
 #include <zero/zones/trenchwars/TrenchWars.h>
-#include <zero/zones/trenchwars/basing/SharkBehavior.h>
-#include <zero/zones/trenchwars/basing/SpiderBehavior.h>
-#include <zero/zones/trenchwars/basing/TerrierBehavior.h>
 
 namespace zero {
 namespace tw {
@@ -29,35 +26,35 @@ std::unique_ptr<behavior::BehaviorNode> BasingBehavior::CreateTree(behavior::Exe
             .End()
         .Sequence() // TODO: Warbird
             .Child<ShipQueryNode>(0)
-            .Composite(CreateSpiderTree(ctx))
+            .Composite(CreateSpiderBasingTree(ctx))
             .End()
         .Sequence() // TODO: Jav
             .Child<ShipQueryNode>(1)
-            .Composite(CreateSpiderTree(ctx))
+            .Composite(CreateJavelinBasingTree(ctx))
             .End()
         .Sequence() // Spider
             .Child<ShipQueryNode>(2)
-            .Composite(CreateSpiderTree(ctx))
+            .Composite(CreateSpiderBasingTree(ctx))
             .End()
         .Sequence() // TODO: Levi
             .Child<ShipQueryNode>(3)
-            .Composite(CreateSharkTree(ctx))
+            .Composite(CreateSharkBasingTree(ctx))
             .End()
         .Sequence() // Terrier
             .Child<ShipQueryNode>(4)
-            .Composite(CreateTerrierTree(ctx))
+            .Composite(CreateTerrierBasingTree(ctx))
             .End()
         .Sequence() // TODO: Weasel
             .Child<ShipQueryNode>(5)
-            .Composite(CreateSpiderTree(ctx))
+            .Composite(CreateSpiderBasingTree(ctx))
             .End()
         .Sequence() // Lancaster
             .Child<ShipQueryNode>(6)
-            .Composite(CreateSpiderTree(ctx))
+            .Composite(CreateSpiderBasingTree(ctx))
             .End()
         .Sequence() // Shark
             .Child<ShipQueryNode>(7)
-            .Composite(CreateSharkTree(ctx))
+            .Composite(CreateSharkBasingTree(ctx))
             .End()
         .Sequence() // If we are in spec, do nothing
             .Child<ShipQueryNode>(8)

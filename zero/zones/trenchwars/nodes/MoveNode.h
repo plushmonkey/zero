@@ -37,7 +37,7 @@ struct AfterburnerThresholdNode : public behavior::BehaviorNode {
   }
 
   float off_percent = 0.5f;
-  float on_percent = 0.95f;
+  float on_percent = 1.0f;
 };
 
 }  // namespace tw

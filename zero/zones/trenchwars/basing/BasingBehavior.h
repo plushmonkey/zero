@@ -32,5 +32,10 @@ struct BasingBehavior : public behavior::Behavior {
   std::unique_ptr<behavior::BehaviorNode> CreateTree(behavior::ExecuteContext& ctx) override;
 };
 
+std::unique_ptr<behavior::BehaviorNode> CreateJavelinBasingTree(behavior::ExecuteContext& ctx);
+std::unique_ptr<behavior::BehaviorNode> CreateSpiderBasingTree(behavior::ExecuteContext& ctx);
+std::unique_ptr<behavior::BehaviorNode> CreateTerrierBasingTree(behavior::ExecuteContext& ctx);
+std::unique_ptr<behavior::BehaviorNode> CreateSharkBasingTree(behavior::ExecuteContext& ctx);
+
 }  // namespace tw
 }  // namespace zero

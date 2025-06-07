@@ -1,5 +1,3 @@
-#include "TerrierBehavior.h"
-
 #include <zero/behavior/BehaviorBuilder.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/behavior/nodes/AimNode.h>
@@ -538,7 +536,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
         .SuccessChild<DodgeIncomingDamage>(0.3f, 16.0f, 0.0f)
         .Sequence(CompositeDecorator::Success) // Use afterburners to get to flagroom faster.
             .InvertChild<InFlagroomNode>("self_position")
-            .Child<AfterburnerThresholdNode>()
+            .Child<AfterburnerThresholdNode>(0.5f, 0.95f)
             .End()
         .Child<GoToNode>("tw_flag_position")
         .Child<RenderPathNode>(Vector3f(1, 0, 0))
@@ -666,7 +664,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateXRadarBehavior() {
   return builder.Build();
 }
 
-std::unique_ptr<behavior::BehaviorNode> CreateTerrierTree(behavior::ExecuteContext& ctx) {
+std::unique_ptr<behavior::BehaviorNode> CreateTerrierBasingTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
   BehaviorBuilder builder;
