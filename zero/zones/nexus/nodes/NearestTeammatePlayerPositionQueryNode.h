@@ -32,10 +32,10 @@ struct NearestTeammatePlayerPositionQueryNode : public behavior::BehaviorNode {
 
     Player* nearest_teammate =
         GetNearestTeammateToPlayer(*ctx.bot->game, *self, *ctx.bot->bot_controller->region_registry, *subject);
-    ctx.blackboard.Set(position_key, nearest_teammate->position);
+    
+    if (nearest_teammate) ctx.blackboard.Set(position_key, nearest_teammate->position);
 
     return behavior::ExecuteResult::Success;
-
 
   }
 
