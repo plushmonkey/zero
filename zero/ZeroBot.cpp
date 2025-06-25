@@ -140,6 +140,8 @@ void ZeroBot::Run() {
   using ms_float = std::chrono::duration<float, std::milli>;
   float frame_time = 0.0f;
 
+  execute_ctx.bot = this;
+
   while (true) {
     auto start = std::chrono::high_resolution_clock::now();
 
