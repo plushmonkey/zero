@@ -124,6 +124,7 @@
     <ClCompile Include="zero\zones\trenchwars\basing\TerrierBehavior.cpp" />
     <ClCompile Include="zero\zones\trenchwars\solo\SoloBehavior.cpp" />
     <ClCompile Include="zero\zones\trenchwars\solo\SoloWarbirdBehavior.cpp" />
+    <ClCompile Include="zero\zones\trenchwars\team\TeamBehavior.cpp" />
     <ClCompile Include="zero\zones\trenchwars\TrenchWars.cpp" />
     <ClCompile Include="zero\zones\trenchwars\turret\TurretBehavior.cpp" />
     <ClCompile Include="zero\zones\trenchwars\turret\TurretBomberBehavior.cpp" />
@@ -280,6 +281,7 @@
     <ClInclude Include="zero\zones\trenchwars\nodes\MoveNode.h" />
     <ClInclude Include="zero\zones\trenchwars\solo\SoloBehavior.h" />
     <ClInclude Include="zero\zones\trenchwars\solo\SoloWarbirdBehavior.h" />
+    <ClInclude Include="zero\zones\trenchwars\team\TeamBehavior.h" />
     <ClInclude Include="zero\zones\trenchwars\TrenchWars.h" />
     <ClInclude Include="zero\zones\trenchwars\turret\TurretBehavior.h" />
     <ClInclude Include="zero\zones\ZoneController.h" />
