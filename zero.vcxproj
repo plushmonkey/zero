@@ -56,6 +56,7 @@
     <ClCompile Include="zero\game\render\SpriteRenderer.cpp" />
     <ClCompile Include="zero\game\render\TileRenderer.cpp" />
     <ClCompile Include="zero\HeuristicEnergyTracker.cpp" />
+    <ClCompile Include="zero\MapBase.cpp" />
     <ClCompile Include="zero\ZeroBot.cpp" />
     <ClCompile Include="zero\game\BrickManager.cpp" />
     <ClCompile Include="zero\game\Buffer.cpp" />
@@ -89,6 +90,7 @@
     <ClCompile Include="zero\zones\devastation\center\CenterBehavior.cpp" />
     <ClCompile Include="zero\zones\devastation\Devastation.cpp" />
     <ClCompile Include="zero\zones\devastation\FrogRaceBehavior.cpp" />
+    <ClCompile Include="zero\zones\extremegames\BaseBehavior.cpp" />
     <ClCompile Include="zero\zones\nexus\FoursBehavior.cpp" />
     <ClCompile Include="zero\zones\nexus\TwosBoxBehavior.cpp" />
     <ClCompile Include="zero\zones\nexus\TwosBehavior.cpp" />
@@ -180,6 +182,7 @@
     <ClInclude Include="zero\game\render\SpriteRenderer.h" />
     <ClInclude Include="zero\game\render\TextureMap.h" />
     <ClInclude Include="zero\game\render\TileRenderer.h" />
+    <ClInclude Include="zero\MapBase.h" />
     <ClInclude Include="zero\path\Path.h" />
     <ClInclude Include="zero\RenderContext.h" />
     <ClInclude Include="zero\Utility.h" />
@@ -233,6 +236,8 @@
     <ClInclude Include="zero\zones\devastation\nodes\GetAttachTargetNode.h" />
     <ClInclude Include="zero\zones\devastation\nodes\GetSpawnNode.h" />
     <ClInclude Include="zero\zones\devastation\nodes\CombatRoleNode.h" />
+    <ClInclude Include="zero\zones\extremegames\BaseBehavior.h" />
+    <ClInclude Include="zero\zones\extremegames\ExtremeGames.h" />
     <ClInclude Include="zero\zones\nexus\FoursBehavior.h" />
     <ClInclude Include="zero\zones\nexus\nodes\NearestTeammatePlayerPositionQueryNode.h" />
     <ClInclude Include="zero\zones\nexus\TwosBoxBehavior.h" />
