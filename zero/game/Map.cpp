@@ -513,9 +513,7 @@ size_t Map::GetAllOccupiedRects(Vector2f position, float radius, u32 frequency, 
       rects->end_x = (u16)position.x;
       rects->end_y = (u16)position.y;
 
-      TileId id = GetTileId(start_x, start_y);
-
-      rects->contains_door = id >= kTileIdFirstDoor && id <= kTileIdLastDoor;
+      rects->contains_door = IsDoor(start_x, start_y);
     }
 
     return !solid;
@@ -552,8 +550,7 @@ size_t Map::GetAllOccupiedRects(Vector2f position, float radius, u32 frequency, 
             break;
           }
 
-          TileId id = GetTileId(x, y);
-          if (id >= kTileIdFirstDoor && id <= kTileIdLastDoor) {
+          if (IsDoor(x, y)) {
             contains_door = true;
           }
         }

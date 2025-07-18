@@ -248,8 +248,7 @@ static void CalculateTraversables(std::vector<NodePoint>& dynamic_points, const 
           }
         }
 
-        TileId tile_id = map.GetTileId(x, y);
-        if (tile_id >= kTileIdFirstDoor && tile_id <= kTileIdLastDoor) {
+        if (map.IsDoor(x, y)) {
           node->flags |= NodeFlag_DynamicEmpty;
           dynamic_points.push_back(node_point);
           continue;
