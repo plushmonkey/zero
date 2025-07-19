@@ -1968,7 +1968,7 @@ void ShipController::OnWeaponHit(Weapon& weapon) {
         bomb_dmg = (int)(bomb_dmg * (connection.settings.BBombDamagePercent / 1000.0f));
       }
 
-      Vector2f delta = Absolute(weapon.position - self->position) * 16.0f;
+      Vector2f delta = Absolute(weapon.GetPosition() - self->position) * 16.0f;
 
       float explode_pixels =
           (float)(connection.settings.BombExplodePixels + connection.settings.BombExplodePixels * level);
@@ -1981,7 +1981,7 @@ void ShipController::OnWeaponHit(Weapon& weapon) {
         damage = (int)((explode_pixels - distance) * (bomb_dmg / explode_pixels));
 
         if (self->id != shooter->id) {
-          Vector2f shooter_delta = Absolute(weapon.position - shooter->position) * 16;
+          Vector2f shooter_delta = Absolute(weapon.GetPosition() - shooter->position) * 16;
           float shooter_distance = shooter_delta.Length();
 
           if (shooter_distance < explode_pixels) {

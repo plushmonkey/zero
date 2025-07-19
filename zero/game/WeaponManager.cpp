@@ -70,8 +70,6 @@ void WeaponManager::Update(float dt) {
         weapons[i--] = weapons[--weapon_count];
         break;
       }
-
-      DropTrail(*weapon);
     }
   }
 
@@ -104,32 +102,6 @@ void WeaponManager::Update(float dt) {
   }
 }
 
-void WeaponManager::DropTrail(Weapon& weapon) {
-  constexpr s32 kBulletTrailInterval = 1;
-  constexpr s32 kBombTrailInterval = 5;
-
-  if (weapon.data.type == WeaponType::Bullet || weapon.data.type == WeaponType::BouncingBullet) {
-    if (TICK_DIFF(weapon.last_tick, weapon.last_trail_tick) >= kBulletTrailInterval) {
-      SpriteRenderable& frame = Graphics::anim_bullet_trails[weapon.data.level].frames[0];
-      Vector2f offset = Vector2f(0.5f / 16.0f, 0.5f / 16.0f);
-      Vector2f position = (weapon.position - weapon.velocity * (1.0f / 100.0f) - offset).PixelRounded();
-
-      animation.AddAnimation(Graphics::anim_bullet_trails[weapon.data.level], position)->layer = Layer::AfterTiles;
-      weapon.last_trail_tick = weapon.last_tick + kBulletTrailInterval;
-    }
-  } else if ((weapon.data.type == WeaponType::Bomb || weapon.data.type == WeaponType::ProximityBomb) &&
-             !weapon.data.alternate) {
-    if (TICK_DIFF(weapon.last_tick, weapon.last_trail_tick) >= kBombTrailInterval) {
-      SpriteRenderable& frame = Graphics::anim_bomb_trails[weapon.data.level].frames[0];
-      Vector2f offset = (frame.dimensions * (0.5f / 16.0f));
-      Vector2f position = (weapon.position - weapon.velocity * (1.0f / 100.0f) - offset).PixelRounded();
-
-      animation.AddAnimation(Graphics::anim_bomb_trails[weapon.data.level], position)->layer = Layer::AfterTiles;
-      weapon.last_trail_tick += kBombTrailInterval;
-    }
-  }
-}
-
 bool WeaponManager::SimulateWormholeGravity(Weapon& weapon) {
   AnimatedTileSet& wormholes = connection.map.GetAnimatedTileSet(AnimatedTile::Wormhole);
 
@@ -156,9 +128,11 @@ bool WeaponManager::SimulateWormholeGravity(Weapon& weapon) {
         Vector2f position((float)wormholes.tiles[i].x, (float)wormholes.tiles[i].y);
         Vector2f direction = Normalize(position - weapon.position);
 
-        float per_second = (gravity_thrust * 10.0f / 16.0f);
+        float per_second = (gravity_thrust * 1.0f);
 
-        weapon.velocity += direction * (per_second / 100.0f);
+        weapon.velocity_x += (s32)(direction.x * per_second);
+        weapon.velocity_y += (s32)(direction.y * per_second);
+        weapon.UpdatePosition();
         affected = true;
       }
     }
@@ -185,14 +159,10 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon, u32 current_tick) {
     gravity_effect = SimulateWormholeGravity(weapon);
   }
 
-  Vector2f previous_position = weapon.position;
+  u16 prev_x = weapon.x;
+  u16 prev_y = weapon.y;
 
   WeaponSimulateResult position_result = SimulatePosition(weapon);
-
-  if (gravity_effect) {
-    weapon.last_event_position = weapon.position;
-    weapon.last_event_time = GetMicrosecondTick();
-  }
 
   if (position_result != WeaponSimulateResult::Continue) {
     return position_result;
@@ -212,8 +182,8 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon, u32 current_tick) {
       return WeaponSimulateResult::PlayerExplosion;
     }
 
-    float dx = abs(weapon.position.x - hit_player->position.x);
-    float dy = abs(weapon.position.y - hit_player->position.y);
+    float dx = abs(weapon.x / 16000.0f - hit_player->position.x);
+    float dy = abs(weapon.y / 16000.0f - hit_player->position.y);
 
     float highest = dx > dy ? dx : dy;
 
@@ -224,7 +194,9 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon, u32 current_tick) {
 
       Event::Dispatch(WeaponHitEvent(weapon, hit_player));
 
-      weapon.position = previous_position;
+      weapon.x = prev_x;
+      weapon.y = prev_y;
+      weapon.UpdatePosition();
 
       return WeaponSimulateResult::PlayerExplosion;
     } else {
@@ -273,13 +245,15 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon, u32 current_tick) {
   KDCollection players = {};
   KDNode* node = nullptr;
 
+  Vector2f weapon_position = weapon.GetPosition();
+
   if (player_manager.kdtree) {
     // Range search is L2 distance, so max distance should be multiplied by sqrt(2) to handle box corner cases.
     constexpr float sqrt2 = 1.5f;
     // Add some buffer room for rounding errors
     max_distance += 1.0f;
 
-    node = player_manager.kdtree->RangeSearch(weapon.position, max_distance * sqrt2);
+    node = player_manager.kdtree->RangeSearch(weapon_position, max_distance * sqrt2);
   }
 
   if (node) {
@@ -298,8 +272,8 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon, u32 current_tick) {
     Vector2f player_r(radius, radius);
     Vector2f pos = player->position.PixelRounded();
 
-    Vector2f min_w = weapon.position.PixelRounded() - Vector2f(weapon_radius, weapon_radius);
-    Vector2f max_w = weapon.position.PixelRounded() + Vector2f(weapon_radius, weapon_radius);
+    Vector2f min_w = weapon_position.PixelRounded() - Vector2f(weapon_radius, weapon_radius);
+    Vector2f max_w = weapon_position.PixelRounded() + Vector2f(weapon_radius, weapon_radius);
 
     if (BoxBoxOverlap(pos - player_r, pos + player_r, min_w, max_w)) {
       bool hit = true;
@@ -314,8 +288,8 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon, u32 current_tick) {
             weapon.sensor_end_tick = weapon.last_tick;
           }
 
-          float dx = abs(weapon.position.x - player->position.x);
-          float dy = abs(weapon.position.y - player->position.y);
+          float dx = abs(weapon_position.x - player->position.x);
+          float dy = abs(weapon_position.y - player->position.y);
 
           if (dx > dy) {
             weapon.prox_highest_offset = dx;
@@ -326,8 +300,8 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon, u32 current_tick) {
 
         weapon_radius = 4.0f / 16.0f;
 
-        min_w = weapon.position.PixelRounded() - Vector2f(weapon_radius, weapon_radius);
-        max_w = weapon.position.PixelRounded() + Vector2f(weapon_radius, weapon_radius);
+        min_w = weapon_position.PixelRounded() - Vector2f(weapon_radius, weapon_radius);
+        max_w = weapon_position.PixelRounded() + Vector2f(weapon_radius, weapon_radius);
 
         // Fully trigger the bomb if it hits the player's normal radius check
         hit = BoxBoxOverlap(pos - player_r, pos + player_r, min_w, max_w);
@@ -347,7 +321,9 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon, u32 current_tick) {
 
       // Move the position back so shrap spawns correctly
       if (type == WeaponType::Bomb || type == WeaponType::ProximityBomb) {
-        weapon.position = previous_position;
+        weapon.x = prev_x;
+        weapon.y = prev_y;
+        weapon.UpdatePosition();
       }
 
       result = WeaponSimulateResult::PlayerExplosion;
@@ -361,8 +337,10 @@ WeaponSimulateResult WeaponManager::SimulateRepel(Weapon& weapon) {
   float effect_radius = connection.settings.RepelDistance / 16.0f;
   float speed = connection.settings.RepelSpeed / 16.0f / 10.0f;
 
-  Vector2f rect_min = weapon.position - Vector2f(effect_radius, effect_radius);
-  Vector2f rect_max = weapon.position + Vector2f(effect_radius, effect_radius);
+  Vector2f weapon_position = weapon.GetPosition();
+
+  Vector2f rect_min = weapon_position - Vector2f(effect_radius, effect_radius);
+  Vector2f rect_max = weapon_position + Vector2f(effect_radius, effect_radius);
 
   for (size_t i = 0; i < weapon_count; ++i) {
     Weapon& other = weapons[i];
@@ -370,12 +348,13 @@ WeaponSimulateResult WeaponManager::SimulateRepel(Weapon& weapon) {
     if (other.frequency == weapon.frequency) continue;
     if (other.data.type == WeaponType::Repel) continue;
 
-    if (PointInsideBox(rect_min, rect_max, other.position)) {
-      Vector2f direction = Normalize(other.position - weapon.position);
+    if (PointInsideBox(rect_min, rect_max, other.GetPosition())) {
+      Vector2f direction = Normalize(other.GetPosition() - weapon.GetPosition());
 
-      other.velocity = direction * speed;
-      other.last_event_time = GetMicrosecondTick();
-      other.last_event_position = other.position;
+      other.velocity_x = (s32)(direction.x * speed * 160.0f);
+      other.velocity_y = (s32)(direction.y * speed * 160.0f);
+
+      other.UpdatePosition();
 
       WeaponType type = other.data.type;
 
@@ -401,7 +380,7 @@ WeaponSimulateResult WeaponManager::SimulateRepel(Weapon& weapon) {
         player.last_repel_timestamp = GetCurrentTick();
 
         if (player.id == player_manager.player_id) {
-          Vector2f direction = Normalize(player.position - weapon.position);
+          Vector2f direction = Normalize(player.position - weapon.GetPosition());
           player.velocity = direction * speed;
           player.repel_time = connection.settings.RepelTime / 100.0f;
         }
@@ -412,18 +391,21 @@ WeaponSimulateResult WeaponManager::SimulateRepel(Weapon& weapon) {
   return WeaponSimulateResult::Continue;
 }
 
-bool WeaponManager::SimulateAxis(Weapon& weapon, float dt, int axis) {
-  float previous = weapon.position[axis];
+bool WeaponManager::SimulateAxis(Weapon& weapon, int axis) {
+  u32* pos = axis == 0 ? &weapon.x : &weapon.y;
+  s32* vel = axis == 0 ? &weapon.velocity_x : &weapon.velocity_y;
+
+  u32 previous = *pos;
   Map& map = connection.map;
 
-  weapon.position[axis] += weapon.velocity[axis] * dt;
+  *pos += *vel;
 
   if (weapon.data.type == WeaponType::Thor) return false;
 
   // TODO: Handle other special tiles here
-  if (map.IsSolid((u16)floorf(weapon.position.x), (u16)floorf(weapon.position.y), weapon.frequency)) {
-    weapon.position[axis] = previous;
-    weapon.velocity[axis] = -weapon.velocity[axis];
+  if (map.IsSolid(weapon.x / 16000, weapon.y / 16000, weapon.frequency)) {
+    *pos = previous;
+    *vel = -*vel;
 
     return true;
   }
@@ -435,13 +417,12 @@ WeaponSimulateResult WeaponManager::SimulatePosition(Weapon& weapon) {
   WeaponType type = weapon.data.type;
 
   // This collision method deviates from Continuum when using variable update rate, so it updates by one tick at a time
-  bool x_collide = SimulateAxis(weapon, 1.0f / 100.0f, 0);
-  bool y_collide = SimulateAxis(weapon, 1.0f / 100.0f, 1);
+  bool x_collide = SimulateAxis(weapon, 0);
+  bool y_collide = SimulateAxis(weapon, 1);
+
+  weapon.UpdatePosition();
 
   if (x_collide || y_collide) {
-    weapon.last_event_time = GetMicrosecondTick();
-    weapon.last_event_position = weapon.position;
-
     if ((type == WeaponType::Bullet || type == WeaponType::BouncingBullet) && weapon.data.shrap > 0) {
       s32 remaining = weapon.end_tick - GetCurrentTick();
       s32 duration = connection.settings.BulletAliveTime - remaining;
@@ -470,7 +451,7 @@ WeaponSimulateResult WeaponManager::SimulatePosition(Weapon& weapon) {
     }
   }
 
-  TileId tile_id = this->connection.map.GetTileId(weapon.position);
+  TileId tile_id = this->connection.map.GetTileId(weapon.GetPosition());
   if (tile_id == kTileIdWormhole) {
     return WeaponSimulateResult::TimedOut;
   }
@@ -515,6 +496,7 @@ void WeaponManager::AddLinkRemoval(u32 link_id, WeaponSimulateResult result) {
 
 void WeaponManager::CreateExplosion(Weapon& weapon) {
   WeaponType type = weapon.data.type;
+  Vector2f position(weapon.x / 16000.0f, weapon.y / 16000.0f);
 
   switch (type) {
     case WeaponType::Bomb:
@@ -523,15 +505,15 @@ void WeaponManager::CreateExplosion(Weapon& weapon) {
       if (weapon.flags & WEAPON_FLAG_EMP) {
         Vector2f offset = Graphics::anim_emp_explode.frames[0].dimensions * (0.5f / 16.0f);
 
-        animation.AddAnimation(Graphics::anim_emp_explode, weapon.position - offset)->layer = Layer::Explosions;
+        animation.AddAnimation(Graphics::anim_emp_explode, position - offset)->layer = Layer::Explosions;
       } else {
         Vector2f offset = Graphics::anim_bomb_explode.frames[0].dimensions * (0.5f / 16.0f);
 
-        animation.AddAnimation(Graphics::anim_bomb_explode, weapon.position - offset)->layer = Layer::Explosions;
+        animation.AddAnimation(Graphics::anim_bomb_explode, position - offset)->layer = Layer::Explosions;
       }
 
       constexpr u32 kExplosionIndicatorTicks = 125;
-      radar->AddTemporaryIndicator(weapon.position, GetCurrentTick() + kExplosionIndicatorTicks, Vector2f(2, 2),
+      radar->AddTemporaryIndicator(position, GetCurrentTick() + kExplosionIndicatorTicks, Vector2f(2, 2),
                                    ColorType::RadarExplosion);
 
       s32 count = weapon.data.shrap;
@@ -569,19 +551,20 @@ void WeaponManager::CreateExplosion(Weapon& weapon) {
         shrap->frequency = weapon.frequency;
         shrap->link_id = 0xFFFFFFFF;
         shrap->player_id = weapon.player_id;
-        shrap->velocity = Normalize(direction) * speed;
-        shrap->position = weapon.position;
+        shrap->velocity_x = (s32)(direction.x * speed * 160.0f);
+        shrap->velocity_y = (s32)(direction.y * speed * 160.0f);
+        shrap->x = weapon.x;
+        shrap->y = weapon.y;
         shrap->last_tick = GetCurrentTick();
         shrap->end_tick = shrap->last_tick + connection.settings.BulletAliveTime;
-        shrap->last_event_position = shrap->position;
-        shrap->last_event_time = GetMicrosecondTick();
+        shrap->UpdatePosition();
 
         Player* player = player_manager.GetPlayerById(weapon.player_id);
         if (player) {
           Event::Dispatch(WeaponSpawnEvent(*shrap, *player));
         }
 
-        if (connection.map.IsSolid((u16)shrap->position.x, (u16)shrap->position.y, shrap->frequency)) {
+        if (connection.map.IsSolid((u16)(shrap->x / 16000.0f), (u16)(shrap->y / 16000.0f), shrap->frequency)) {
           Event::Dispatch(WeaponDestroyEvent(*shrap));
           --weapon_count;
         }
@@ -593,7 +576,7 @@ void WeaponManager::CreateExplosion(Weapon& weapon) {
     case WeaponType::Bullet: {
       Vector2f offset = Graphics::anim_bullet_explode.frames[0].dimensions * (0.5f / 16.0f);
       // Render the tiny explosions below the bomb explosions so they don't look weird
-      animation.AddAnimation(Graphics::anim_bullet_explode, weapon.position - offset)->layer = Layer::AfterShips;
+      animation.AddAnimation(Graphics::anim_bullet_explode, position - offset)->layer = Layer::AfterShips;
     } break;
     default: {
     } break;
@@ -620,6 +603,7 @@ void WeaponManager::Render(Camera& camera, Camera& ui_camera, SpriteRenderer& re
 
   for (size_t i = 0; i < weapon_count; ++i) {
     Weapon* weapon = weapons + i;
+    Vector2f weapon_position(weapon->x / 16000.0f, weapon->y / 16000.0f);
 
     if (weapon->animation.sprite) {
       weapon->animation.t += dt;
@@ -641,15 +625,13 @@ void WeaponManager::Render(Camera& camera, Camera& ui_camera, SpriteRenderer& re
       }
 
       if (add_indicator) {
-        radar->AddTemporaryIndicator(weapon->position, 0, Vector2f(2, 2), ColorType::RadarBomb);
+        radar->AddTemporaryIndicator(weapon_position, 0, Vector2f(2, 2), ColorType::RadarBomb);
       }
     }
 
-    Vector2f extrapolated_pos = GetExtrapolatedPos(*weapon);
-
     if (weapon->animation.IsAnimating()) {
       SpriteRenderable& frame = weapon->animation.GetFrame();
-      Vector2f position = extrapolated_pos - frame.dimensions * (0.5f / 16.0f);
+      Vector2f position = weapon_position - frame.dimensions * (0.5f / 16.0f);
 
       renderer.Draw(camera, frame, position.PixelRounded(), Layer::Weapons);
     } else if (weapon->data.type == WeaponType::Decoy) {
@@ -669,18 +651,18 @@ void WeaponManager::Render(Camera& camera, Camera& ui_camera, SpriteRenderer& re
 
         size_t index = player->ship * 40 + direction;
         SpriteRenderable& frame = Graphics::ship_sprites[index];
-        Vector2f position = extrapolated_pos - frame.dimensions * (0.5f / 16.0f);
+        Vector2f position = weapon_position - frame.dimensions * (0.5f / 16.0f);
 
         renderer.Draw(camera, frame, position.PixelRounded(), Layer::Ships);
 
         if (self && player->id != self->id) {
-          player_manager.RenderPlayerName(camera, renderer, *self, *player, extrapolated_pos, true);
+          player_manager.RenderPlayerName(camera, renderer, *self, *player, weapon_position, true);
         }
 
         // Push them on here to minimize draw calls
         DecoyRenderRequest* request = memory_arena_push_type(&temp_arena, DecoyRenderRequest);
         request->player = player;
-        request->position = weapon->position;
+        request->position = weapon_position;
 
         ++decoy_count;
       }
@@ -700,32 +682,6 @@ void WeaponManager::Render(Camera& camera, Camera& ui_camera, SpriteRenderer& re
   }
 
   temp_arena.Revert(snapshot);
-}
-
-Vector2f WeaponManager::GetExtrapolatedPos(Weapon& weapon) {
-  u64 microtick = GetMicrosecondTick();
-  float elapsed_seconds = (microtick - weapon.last_event_time) / 1000000.0f;
-  Vector2f travel_ray = elapsed_seconds * weapon.velocity;
-  Vector2f extrapolated_pos;
-
-  if (weapon.data.type != WeaponType::Thor) {
-    CastResult cast =
-        connection.map.Cast(weapon.last_event_position, Normalize(travel_ray), travel_ray.Length(), weapon.frequency);
-    extrapolated_pos = cast.position;
-
-    float desync_threshold = weapon.velocity.Length() * (4.0f / 100.0f);
-
-    // Resync render position when deviating too much from projected path
-    if (extrapolated_pos.DistanceSq(weapon.position) > desync_threshold * desync_threshold) {
-      extrapolated_pos = weapon.position;
-      weapon.last_event_position = weapon.position;
-      weapon.last_event_time = microtick;
-    }
-  } else {
-    extrapolated_pos = weapon.last_event_position + travel_ray;
-  }
-
-  return extrapolated_pos;
 }
 
 u32 WeaponManager::CalculateRngSeed(u32 x, u32 y, u32 vel_x, u32 vel_y, u16 shrap_count, u16 weapon_level,
@@ -896,7 +852,8 @@ WeaponSimulateResult WeaponManager::GenerateWeapon(u16 player_id, WeaponData wea
 
   weapon->data = weapon_data;
   weapon->player_id = player_id;
-  weapon->position = Vector2f(pos_x / 16.0f, pos_y / 16.0f);
+  weapon->x = pos_x * 1000;
+  weapon->y = pos_y * 1000;
   weapon->bounces_remaining = 0;
   weapon->flags = WEAPON_FLAG_INITIAL_SIM;
   weapon->link_id = link_id;
@@ -943,10 +900,14 @@ WeaponSimulateResult WeaponManager::GenerateWeapon(u16 player_id, WeaponData wea
   bool is_mine = (type == WeaponType::Bomb || type == WeaponType::ProximityBomb) && weapon->data.alternate;
 
   if (type != WeaponType::Repel && !is_mine) {
-    weapon->velocity = Vector2f(vel_x / 16.0f / 10.0f, vel_y / 16.0f / 10.0f) + heading * (speed / 16.0f / 10.0f);
+    weapon->velocity_x = vel_x + (s16)(heading.x * speed);
+    weapon->velocity_y = vel_y + (s16)(heading.y * speed);
   } else {
-    weapon->velocity = Vector2f(0, 0);
+    weapon->velocity_x = 0;
+    weapon->velocity_y = 0;
   }
+
+  weapon->UpdatePosition();
 
   weapon->animation.t = 0.0f;
   weapon->animation.sprite = nullptr;
@@ -968,8 +929,9 @@ WeaponSimulateResult WeaponManager::GenerateWeapon(u16 player_id, WeaponData wea
         // Create an animation even if the repel was instant.
         Vector2f offset = Graphics::anim_repel.frames[0].dimensions * (0.5f / 16.0f);
 
+        Vector2f weapon_position(weapon->x / 16000.0f, weapon->y / 16000.0f);
         Animation* anim =
-            animation.AddAnimation(Graphics::anim_repel, weapon->position.PixelRounded() - offset.PixelRounded());
+            animation.AddAnimation(Graphics::anim_repel, weapon_position.PixelRounded() - offset.PixelRounded());
         anim->layer = Layer::AfterShips;
         anim->repeat = false;
       }
@@ -981,14 +943,8 @@ WeaponSimulateResult WeaponManager::GenerateWeapon(u16 player_id, WeaponData wea
     }
   }
 
-  weapon->last_event_position = weapon->position;
-  weapon->last_event_time = GetMicrosecondTick();
-
-  vel_x = (s32)(weapon->velocity.x * 16.0f * 10.0f);
-  vel_y = (s32)(weapon->velocity.y * 16.0f * 10.0f);
-
-  weapon->rng_seed =
-      CalculateRngSeed(pos_x, pos_y, vel_x, vel_y, weapon_data.shrap, weapon_data.level, player->frequency);
+  weapon->rng_seed = CalculateRngSeed(pos_x, pos_y, weapon->velocity_x, weapon->velocity_y, weapon_data.shrap,
+                                      weapon_data.level, player->frequency);
 
   weapon->last_trail_tick = weapon->last_tick;
 
@@ -1003,6 +959,8 @@ WeaponSimulateResult WeaponManager::GenerateWeapon(u16 player_id, WeaponData wea
 
 void WeaponManager::SetWeaponSprite(Player& player, Weapon& weapon) {
   WeaponType type = weapon.data.type;
+
+  Vector2f weapon_position(weapon.x / 16000.0f, weapon.y / 16000.0f);
 
   switch (type) {
     case WeaponType::Bullet: {
@@ -1042,7 +1000,7 @@ void WeaponManager::SetWeaponSprite(Player& player, Weapon& weapon) {
       Vector2f offset = Graphics::anim_repel.frames[0].dimensions * (0.5f / 16.0f);
 
       Animation* anim =
-          animation.AddAnimation(Graphics::anim_repel, weapon.position.PixelRounded() - offset.PixelRounded());
+          animation.AddAnimation(Graphics::anim_repel, weapon_position.PixelRounded() - offset.PixelRounded());
       anim->layer = Layer::AfterShips;
       anim->repeat = false;
 
@@ -1098,6 +1056,9 @@ void WeaponManager::GetMineCounts(Player& player, const Vector2f& check, size_t*
   *team_count = 0;
   *has_check_mine = false;
 
+  u32 check_x = (u32)check.x * 16;
+  u32 check_y = (u32)check.y * 16;
+
   for (size_t i = 0; i < weapon_count; ++i) {
     Weapon* weapon = weapons + i;
     WeaponType type = weapon->data.type;
@@ -1111,7 +1072,7 @@ void WeaponManager::GetMineCounts(Player& player, const Vector2f& check, size_t*
         (*team_count)++;
       }
 
-      if (weapon->position == check) {
+      if (check_x == weapon->x / 1000 && check_y == weapon->y / 1000) {
         *has_check_mine = true;
       }
     }

@@ -16,11 +16,14 @@ constexpr u32 kInvalidLink = 0xFFFFFFFF;
 // TODO: This weapon struct is pretty large. It could be broken into multiple pieces to increase iteration speed if
 // performance is ever a concern.
 struct Weapon {
+  u32 x;
+  u32 y;
+
+  s32 velocity_x;
+  s32 velocity_y;
+
   Vector2f position;
   Vector2f velocity;
-
-  Vector2f last_event_position;
-  u64 last_event_time;
 
   u32 last_tick;
   u32 end_tick;
@@ -53,6 +56,15 @@ struct Weapon {
   u32 link_id = kInvalidLink;
 
   Animation animation;
+
+  Vector2f GetPosition() { return Vector2f(x / 16000.f, y / 16000.0f); }
+
+  Vector2f GetVelocity() { return Vector2f(velocity_x / 1600.0f, velocity_y / 1600.0f); }
+
+  void UpdatePosition() {
+    this->position = Vector2f(x / 16000.0f, y / 16000.0f);
+    this->velocity = Vector2f(velocity_x / 1600.0f, velocity_y / 1600.0f);
+  }
 };
 
 struct Camera;
@@ -103,7 +115,6 @@ struct WeaponManager {
   }
 
   void Update(float dt);
-  void DropTrail(Weapon& weapon);
   void Render(Camera& camera, Camera& ui_camera, SpriteRenderer& renderer, float dt,
               const RadarVisibility& radar_visibility);
 
@@ -122,7 +133,7 @@ struct WeaponManager {
   WeaponSimulateResult SimulateRepel(Weapon& weapon);
   bool SimulateWormholeGravity(Weapon& weapon);
 
-  bool SimulateAxis(Weapon& weapon, float dt, int axis);
+  bool SimulateAxis(Weapon& weapon, int axis);
   WeaponSimulateResult SimulatePosition(Weapon& weapon);
 
   void AddLinkRemoval(u32 link_id, WeaponSimulateResult result);
@@ -135,8 +146,6 @@ struct WeaponManager {
 
   WeaponSimulateResult GenerateWeapon(u16 player_id, WeaponData weapon_data, u32 local_timestamp, u32 pos_x, u32 pos_y,
                                       s32 vel_x, s32 vel_y, const Vector2f& heading, u32 link_id);
-
-  Vector2f GetExtrapolatedPos(Weapon& weapon);
 };
 
 int GetEstimatedWeaponDamage(Weapon& weapon, Connection& connection);
