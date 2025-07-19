@@ -156,6 +156,9 @@ struct MapBase {
   // This is the position that's computed to have the largest different between direct distance to spawn and path
   // distance.
   Vector2f flagroom_position;
+
+  // Path from entrance_position (start) to flagroom_position (goal).
+  path::Path path;
 };
 
 struct MapBuildConfig {

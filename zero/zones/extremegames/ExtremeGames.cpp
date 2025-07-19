@@ -53,7 +53,22 @@ void ExtremeGamesController::CreateBases() {
 
   MapBuildConfig cfg = {};
 
+  auto opt_base_count = this->bot->config->GetInt("ExtremeGames", "BaseCount");
+  if (opt_base_count) {
+    cfg.base_count = *opt_base_count;
+  }
+
   eg->bases = FindBases(*bot->bot_controller->pathfinder, spawn, cfg);
+
+  for (MapBase& base : eg->bases) {
+    base.path = bot->bot_controller->pathfinder->FindPath(bot->game->GetMap(), base.entrance_position,
+                                                          base.flagroom_position, 14.0f / 16.0f, 0xFFFF);
+    if (!base.path.points.empty()) {
+      // Move the entrance a bit inside so we are definitely in the base.
+      size_t new_entrance_index = (size_t)(base.path.points.size() * 0.15f);
+      base.entrance_position = base.path.points[new_entrance_index];
+    }
+  }
 }
 
 }  // namespace eg

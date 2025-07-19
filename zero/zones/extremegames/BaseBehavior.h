@@ -10,14 +10,8 @@ namespace eg {
 struct BaseBehavior : public behavior::Behavior {
   void OnInitialize(behavior::ExecuteContext& ctx) override {
     // Setup blackboard here for this specific behavior
-    ctx.blackboard.Set("request_ship", 0);
-    ctx.blackboard.Set("leash_distance", 35.0f);
-
-    std::vector<Vector2f> flagrooms{
-        Vector2f(476, 418),
-    };
-
-    ctx.blackboard.Set("flagrooms", flagrooms);
+    ctx.blackboard.Set("request_ship", 2);
+    ctx.blackboard.Set("leash_distance", 25.0f);
   }
 
   std::unique_ptr<behavior::BehaviorNode> CreateTree(behavior::ExecuteContext& ctx) override;

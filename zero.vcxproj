@@ -238,6 +238,7 @@
     <ClInclude Include="zero\zones\devastation\nodes\CombatRoleNode.h" />
     <ClInclude Include="zero\zones\extremegames\BaseBehavior.h" />
     <ClInclude Include="zero\zones\extremegames\ExtremeGames.h" />
+    <ClInclude Include="zero\zones\extremegames\nodes\BaseNode.h" />
     <ClInclude Include="zero\zones\nexus\FoursBehavior.h" />
     <ClInclude Include="zero\zones\nexus\nodes\NearestTeammatePlayerPositionQueryNode.h" />
     <ClInclude Include="zero\zones\nexus\TwosBoxBehavior.h" />
