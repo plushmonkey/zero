@@ -65,8 +65,27 @@ Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& 
     return path;
   }
 
-  if (!(start->flags & NodeFlag_Traversable)) return path;
-  if (!(goal->flags & NodeFlag_Traversable)) return path;
+  // Try to select a new start/goal if they aren't traversable.
+
+  if (!(start->flags & NodeFlag_Traversable)) {
+    Vector2f from_center(floorf(from.x) + 0.5f, floorf(from.y) + 0.5f);
+    Vector2f new_start = from_center + Normalize(from - from_center);
+    start = processor_->GetNode(ToNodePoint(new_start));
+
+    if (!(start->flags & NodeFlag_Traversable)) {
+      return path;
+    }
+  }
+
+  if (!(goal->flags & NodeFlag_Traversable)) {
+    Vector2f to_center(floorf(to.x) + 0.5f, floorf(to.y) + 0.5f);
+    Vector2f new_goal = to_center + Normalize(to - to_center);
+    goal = processor_->GetNode(ToNodePoint(new_goal));
+
+    if (!(goal->flags & NodeFlag_Traversable)) {
+      return path;
+    }
+  }
 
   NodePoint start_p = processor_->GetPoint(start);
   NodePoint goal_p = processor_->GetPoint(goal);

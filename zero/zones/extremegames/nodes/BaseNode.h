@@ -1,5 +1,6 @@
 #pragma once
 
+#include <time.h>
 #include <zero/ZeroBot.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/zones/extremegames/ExtremeGames.h>
@@ -268,7 +269,7 @@ struct FindBestBaseEntranceNode : public BehaviorNode {
       }
     }
 
-    size_t best_index = 0;
+    size_t best_index = GetCurrentDefaultBase(flag_counts.size());
     size_t best_count = 0;
 
     for (size_t i = 0; i < flag_counts.size(); ++i) {
@@ -281,6 +282,19 @@ struct FindBestBaseEntranceNode : public BehaviorNode {
     ctx.blackboard.Set(output_key, eg->bases[best_index].entrance_position);
 
     return ExecuteResult::Success;
+  }
+
+  // Find a base when flag counts are zero.
+  // Should be something everyone calculates exactly the same so there is a consensus.
+  size_t GetCurrentDefaultBase(size_t base_count) {
+    time_t t = time(nullptr);
+    tm* gm_time = gmtime(&t);
+
+    size_t hour = gm_time->tm_hour;
+    size_t portion = gm_time->tm_min / 20;
+
+    // Cause default base to shift every 20 minutes semi-randomly.
+    return (hour * 67217 + portion * 12347) % base_count;
   }
 
   const char* output_key = nullptr;
@@ -300,13 +314,18 @@ struct FindBestBaseTeammateNode : public BehaviorNode {
 
     ExtremeGames* eg = *opt_eg;
 
+    float enter_delay = ctx.bot->game->connection.settings.EnterDelay / 100.0f;
+
+    // TODO: Find most forward in whichever direction.
+
     for (size_t i = 0; i < pm.player_count; ++i) {
       auto player = pm.players + i;
 
       if (player->id == self->id) continue;
       if (player->ship >= 8) continue;
       if (player->frequency != self->frequency) continue;
-      if (player->IsRespawning()) continue;
+      if (player->enter_delay > 0.0f && player->enter_delay < enter_delay)
+        continue;  // Let us lag attach but ignore if they are really dead.
       if (eg->GetBaseFromPosition(player->position) == -1) continue;
 
       ctx.blackboard.Set(output_key, player);

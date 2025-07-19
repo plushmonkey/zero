@@ -429,7 +429,7 @@ bool Game::Update(const InputState& input, float dt) {
     s32 tick_diff = TICK_DIFF(tick, last_tick);
 
     if (self->flag_timer > 0 && tick_diff > 0) {
-      s32 new_timer = self->flag_timer - tick_diff;
+      s32 new_timer = (s32)self->flag_timer - tick_diff;
 
       if (new_timer <= 0) {
         connection.SendFlagDrop();
@@ -736,13 +736,11 @@ void Game::OnFlagClaim(u8* pkt, size_t size) {
   u16 self_id = player_manager.GetSelf()->id;
 
   if (!(flags[id].flags & GameFlag_Turf) && connection.settings.CarryFlags > 0) {
-    bool was_dropped = flags[id].flags & GameFlag_Dropped;
-
     flags[id].flags &= ~GameFlag_Dropped;
 
     player->flags++;
 
-    if (was_dropped && player->id == self_id) {
+    if (player->id == self_id) {
       player->flag_timer = connection.settings.FlagDropDelay;
     }
 

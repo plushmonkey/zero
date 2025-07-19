@@ -209,11 +209,15 @@ static std::unique_ptr<BehaviorNode> CreateCenterAttackTree(ExecuteContext& ctx)
 static std::unique_ptr<BehaviorNode> CreateBaseAttackTree(ExecuteContext& ctx) {
   BehaviorBuilder builder;
 
+  // How many tiles we should try to avoid teammtes. This keeps us from clumping up.
+  constexpr float kTeamAvoidance = 8.0f;
+
   // clang-format off
   builder
     .Sequence()
         .Child<FindBestBaseEntranceNode>("best_base_entrance")
         .Child<PlayerPositionQueryNode>("self_position")
+        .Child<AvoidTeamNode>(kTeamAvoidance)
         .Selector()
             .Sequence() // If we aren't in base, try attaching or pathing to entrance
                 .InvertChild<SameBaseNode>("self_position", "best_base_entrance")
@@ -237,29 +241,52 @@ static std::unique_ptr<BehaviorNode> CreateBaseAttackTree(ExecuteContext& ctx) {
                     //.InvertChild<VisibilityQueryNode>("nearest_target_position")
                     .Child<GoToNode>("nearest_target_position")
                     .End()
-                .Sequence(CompositeDecorator::Success)
-                    .Child<ExecuteNode>([](ExecuteContext& ctx) { // Determine if we should be shooting bullets.
-                      auto self = ctx.bot->game->player_manager.GetSelf();
-                      if (!self) return ExecuteResult::Failure;
+                .Selector(CompositeDecorator::Success)
+                    .Sequence()
+                        .Child<ExecuteNode>([](ExecuteContext& ctx) { // Determine if we should be shooting bullets.
+                          auto self = ctx.bot->game->player_manager.GetSelf();
+                          if (!self) return ExecuteResult::Failure;
 
-                      float path_distance = ctx.bot->bot_controller->current_path.GetRemainingDistance();
+                          float path_distance = ctx.bot->bot_controller->current_path.GetRemainingDistance();
 
-                      s32 alive_time = ctx.bot->game->connection.settings.BulletAliveTime;
-                      float weapon_speed = GetWeaponSpeed(*ctx.bot->game, *self, WeaponType::Bullet);
-                      float weapon_distance = weapon_speed * (alive_time / 100.0f) * 0.75f;
+                          s32 alive_time = ctx.bot->game->connection.settings.BulletAliveTime;
+                          float weapon_speed = GetWeaponSpeed(*ctx.bot->game, *self, WeaponType::Bullet);
+                          float weapon_distance = weapon_speed * (alive_time / 100.0f) * 0.75f;
 
-                      Vector2f next = ctx.bot->bot_controller->current_path.GetNext();
-                      Vector2f forward = next - self->position;
+                          Vector2f next = ctx.bot->bot_controller->current_path.GetNext();
+                          Vector2f forward = next - self->position;
 
-                      // Don't shoot if we aren't aiming ahead in the path.
-                      if (forward.Dot(self->GetHeading()) < 0.0f) return ExecuteResult::Failure;
-                      // Don't shoot if we aren't moving forward.
-                      if (self->velocity.Dot(forward) < 0.0f) return ExecuteResult::Failure;
+                          // Don't shoot if we aren't aiming ahead in the path.
+                          if (forward.Dot(self->GetHeading()) < 0.0f) return ExecuteResult::Failure;
+                          // Don't shoot if we aren't moving forward.
+                          if (self->velocity.Dot(forward) < 0.0f) return ExecuteResult::Failure;
 
-                      return path_distance <= weapon_distance ? ExecuteResult::Success : ExecuteResult::Failure;
-                    })
-                    .Child<InputActionNode>(InputAction::Bullet)
-                    .End()
+                          return path_distance <= weapon_distance ? ExecuteResult::Success : ExecuteResult::Failure;
+                        })
+                        .Child<InputActionNode>(InputAction::Bullet)
+                        .End()
+                    .Sequence()
+                        .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
+                        .Child<ExecuteNode>([](ExecuteContext& ctx) { // Determine if we should be shooting bombs.
+                          auto self = ctx.bot->game->player_manager.GetSelf();
+                          if (!self) return ExecuteResult::Failure;
+
+                          float path_distance = ctx.bot->bot_controller->current_path.GetRemainingDistance();
+
+                          s32 alive_time = ctx.bot->game->connection.settings.BombAliveTime;
+                          float weapon_speed = GetWeaponSpeed(*ctx.bot->game, *self, WeaponType::Bomb);
+                          float weapon_distance = weapon_speed * (alive_time / 100.0f) * 0.75f;
+
+                          Vector2f next = ctx.bot->bot_controller->current_path.GetNext();
+                          Vector2f forward = next - self->position;
+
+                          // Don't shoot if we aren't aiming ahead in the path.
+                          if (forward.Dot(self->GetHeading()) < 0.0f) return ExecuteResult::Failure;
+                          
+                          return path_distance <= weapon_distance ? ExecuteResult::Success : ExecuteResult::Failure;
+                        })
+                        .Child<InputActionNode>(InputAction::Bomb)
+                        .End()
                 .End()
             .End()
         .End();
