@@ -507,6 +507,9 @@ void PlayerManager::SendPositionPacket() {
         requesting_attach = false;
         Event::Dispatch(PlayerAttachEvent(*player, *parent));
       }
+
+      vel_x = (u16)(parent->velocity.x * 16.0f * 10.0f);
+      vel_y = (u16)(parent->velocity.y * 16.0f * 10.0f);
     } else {
       player->attach_parent = kInvalidPlayerId;
       requesting_attach = false;
