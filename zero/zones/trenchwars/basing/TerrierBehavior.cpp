@@ -33,15 +33,17 @@ namespace tw {
 constexpr float kTerrierLeashDistance = 30.0f;
 
 // This checks all of the enemy weapons to make sure none are in the provided rect.
-// Returns success if it is safe.
+// Returns success if the estimated weapon damage in this area is less than the provided threshold.
 struct SafeRectNode : behavior::BehaviorNode {
-  SafeRectNode(Rectangle rect) : rect(rect) {}
+  SafeRectNode(Rectangle rect, u32 damage_threshold) : rect(rect) {}
 
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
     auto self = ctx.bot->game->player_manager.GetSelf();
     if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
 
     auto& wm = ctx.bot->game->weapon_manager;
+
+    u32 total_damage = 0;
 
     for (size_t i = 0; i < wm.weapon_count; ++i) {
       Weapon* weapon = wm.weapons + i;
@@ -51,12 +53,17 @@ struct SafeRectNode : behavior::BehaviorNode {
       if (weapon->frequency == self->frequency) continue;
       if (!rect.Contains(weapon->position)) continue;
 
-      return behavior::ExecuteResult::Failure;
+      total_damage += GetEstimatedWeaponDamage(*weapon, ctx.bot->game->connection);
+
+      if (total_damage > damage_threshold) {
+        return behavior::ExecuteResult::Failure;
+      }
     }
 
     return behavior::ExecuteResult::Success;
   }
 
+  u32 damage_threshold = 0;
   Rectangle rect;
 };
 
@@ -409,6 +416,40 @@ static std::unique_ptr<behavior::BehaviorNode> CreateOffensiveTree(const char* n
   return builder.Build();
 }
 
+// If we are almost through entrance, rush forward so we don't get stuck.
+static std::unique_ptr<behavior::BehaviorNode> CreateEntranceRushBehavior() {
+  using namespace behavior;
+
+  BehaviorBuilder builder;
+
+  constexpr float kNearEntranceDistance = 15.0f;
+
+  const Rectangle kWestCheckRect(Vector2f(503, 272), Vector2f(508, 277));
+  const Rectangle kEastCheckRect(Vector2f(516, 272), Vector2f(521, 277));
+
+  const Vector2f kWestPosition(498, 278);
+  const Vector2f kEastPosition(525, 278);
+
+  // clang-format off
+  builder
+    .Sequence()
+        .Child<PlayerPositionQueryNode>("self_position")
+        .Selector()
+            .Sequence()
+                .Child<RectangleContainsNode>(kWestCheckRect, "self_position")
+                .Child<GoToNode>(kWestPosition)
+                .End()
+            .Sequence()
+                .Child<RectangleContainsNode>(kEastCheckRect, "self_position")
+                .Child<GoToNode>(kEastPosition)
+                .End()
+            .End()
+        .End();
+  // clang-format on
+
+  return builder.Build();
+}
+
 // This is a tree to handle progressing through the entrance area.
 // It will attempt to move forward when safe and fall back when in danger.
 static std::unique_ptr<behavior::BehaviorNode> CreateEntranceBehavior() {
@@ -426,13 +467,11 @@ static std::unique_ptr<behavior::BehaviorNode> CreateEntranceBehavior() {
         .Child<PlayerPositionQueryNode>("self_position")
         .Child<RectangleContainsNode>(kCheckRect, "self_position")
         .Child<NearEntranceNode>(kNearEntranceDistance)
-        .Child<InfluenceMapPopulateWeapons>()
-        .Child<InfluenceMapPopulateEnemies>(3.0f, 5000.0f, false)
         .SuccessChild<DodgeIncomingDamage>(0.1f, 15.0f, 0.0f)
         .Composite(CreateBurstSequence())
         .Selector()
             .Sequence()
-                .Child<SelectBestEntranceSideNode>()
+                .Child<SelectBestEntranceSideNode>("partition")
                 .Child<FollowPathNode>()
                 .Child<RenderPathNode>(Vector3f(0.0f, 0.0f, 0.75f))
                 .End()
@@ -465,6 +504,35 @@ static std::unique_ptr<behavior::BehaviorNode> CreateEntranceBehavior() {
   return builder.Build();
 }
 
+// We are waiting below the entrance, so try to stay safe while it gets cleared out.
+static std::unique_ptr<behavior::BehaviorNode> CreateEntranceWaitBehavior() {
+  using namespace behavior;
+
+  BehaviorBuilder builder;
+
+  Vector2f west_position(507, 286);
+  Vector2f east_position(517, 286);
+  
+  // clang-format off
+  builder
+    .Selector()
+        .Child<EscapeBombExplodeQuadrantNode>("partition")
+        .Sequence() // If west side is empty, hug that wall.
+            .Child<EmptySideAreaNode>(EmptySideAreaNode::Side::West)
+            .Child<GoToNode>(west_position)
+            .End()
+        .Sequence() // If east side is empty, hug that wall.
+            .Child<EmptySideAreaNode>(EmptySideAreaNode::Side::East)
+            .Child<GoToNode>(east_position)
+            .End()
+        .Sequence()
+            .Child<GoToNode>("tw_entrance_position")
+            .End()
+        .End();
+  // clang-format on
+  return builder.Build();
+}
+
 // This is a tree to handle staying safe below the entrance until it is cleared and safe to move up.
 static std::unique_ptr<behavior::BehaviorNode> CreateBelowEntranceBehavior() {
   using namespace behavior;
@@ -474,6 +542,9 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBelowEntranceBehavior() {
   constexpr float kEntranceNearbyDistance = 24.0f;
   // How many teammates must be in the flagroom before we start moving up including self.
   constexpr u32 kFlagroomPresenceRequirement = 2;
+  // How much potential damage that exists in the entrance for it to be considered dangerous.
+  // We have it higher than the terrier energy because not all should hit.
+  constexpr u32 kDangerousEntranceDamage = 2500;
 
   const Rectangle kEntranceBottomShaftRect(Vector2f(509, 277), Vector2f(516, 293));
 
@@ -508,12 +579,12 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBelowEntranceBehavior() {
                         .End()
                     .End()
                 .Child<EmptyEntranceNode>()
-                .Child<SafeRectNode>(kEntranceBottomShaftRect)
+                .Child<SafeRectNode>(kEntranceBottomShaftRect, kDangerousEntranceDamage)
                 .Child<GoToNode>("tw_entrance_position") // Move into entrance area so other tree takes over.
                 .End()
-            .Selector(CompositeDecorator::Success) // Above area is not yet safe, sit still and dodge. TODO: Move into safe area.
+            .Selector(CompositeDecorator::Success) // Above area is not yet safe, stay below and dodge.
                 .Child<DodgeIncomingDamage>(0.1f, 15.0f, 0.0f)
-                .Child<SeekZeroNode>()
+                .Composite(CreateEntranceWaitBehavior())
                 .End()
             .End()
         .End();
@@ -557,7 +628,6 @@ static std::unique_ptr<behavior::BehaviorNode> CreateSafeFlagroomPositionTree() 
   // clang-format off
   builder
     .Sequence()
-        .Child<FlagroomPartitionNode>("partition")
         .Selector()
             .Sequence() // Try to move to a new quadrant if we are overran by enemies.
                 .Child<FindNewSafePositionNode>("partition", "new_quad_position") // Returns false if we are in the safest quadrant
@@ -672,8 +742,10 @@ std::unique_ptr<behavior::BehaviorNode> CreateTerrierBasingTree(behavior::Execut
   // clang-format off
   builder
     .Sequence()
+        .SuccessChild<FlagroomPartitionNode>("partition")
         .Composite(CreateXRadarBehavior(), CompositeDecorator::Success)
         .Selector() // Handle main behavior based on base position
+            .Composite(CreateEntranceRushBehavior())
             .Composite(CreateEntranceBehavior())
             .Composite(CreateBelowEntranceBehavior())
             .Composite(CreateFlagroomTravelBehavior())

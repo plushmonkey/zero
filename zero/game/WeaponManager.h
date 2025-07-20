@@ -90,6 +90,8 @@ struct RadarVisibility {
   bool see_mines;
 };
 
+constexpr size_t kMaxWeapons = 16383;
+
 struct WeaponManager {
   MemoryArena& temp_arena;
 
@@ -101,7 +103,7 @@ struct WeaponManager {
   u32 next_link_id = 0;
 
   size_t weapon_count = 0;
-  Weapon weapons[65535];
+  Weapon weapons[kMaxWeapons];
 
   size_t link_removal_count = 0;
   WeaponLinkRemoval link_removals[2048];

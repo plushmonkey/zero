@@ -123,7 +123,7 @@ struct Steering {
 
   void AvoidWalls(Game& game) {
     constexpr float kDegToRad = 3.14159f / 180.0f;
-    constexpr size_t kFeelerCount = 29;
+    constexpr size_t kFeelerCount = 7;
 
     static_assert(kFeelerCount & 1, "Feeler count must be odd");
 

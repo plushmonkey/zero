@@ -217,7 +217,10 @@ static std::unique_ptr<BehaviorNode> CreateBaseAttackTree(ExecuteContext& ctx) {
     .Sequence()
         .Child<FindBestBaseEntranceNode>("best_base_entrance")
         .Child<PlayerPositionQueryNode>("self_position")
-        .Child<AvoidTeamNode>(kTeamAvoidance)
+        .Sequence(CompositeDecorator::Success) // Avoid team if we aren't in flagroom so we don't get stuck
+            .InvertChild<InFlagroomNode>("self_position")
+            .Child<AvoidTeamNode>(kTeamAvoidance)
+            .End()
         .Selector()
             .Sequence() // If we aren't in base, try attaching or pathing to entrance
                 .InvertChild<SameBaseNode>("self_position", "best_base_entrance")

@@ -34,6 +34,31 @@ struct InBaseNode : public BehaviorNode {
   const char* position_key = nullptr;
 };
 
+struct InFlagroomNode : public BehaviorNode {
+  InFlagroomNode(const char* position_key) : position_key(position_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto opt_eg = ctx.blackboard.Value<ExtremeGames*>("eg");
+    if (!opt_eg) return ExecuteResult::Failure;
+
+    ExtremeGames* eg = *opt_eg;
+
+    auto opt_position = ctx.blackboard.Value<Vector2f>(position_key);
+    if (!opt_position) return ExecuteResult::Failure;
+
+    Vector2f position = *opt_position;
+
+    size_t base_index = eg->GetBaseFromPosition(position);
+    if (base_index == -1) return ExecuteResult::Failure;
+
+    bool in_fr = eg->bases[base_index].flagroom_bitset.Test((u16)position.x, (u16)position.y);
+
+    return in_fr ? ExecuteResult::Success : ExecuteResult::Failure;
+  }
+
+  const char* position_key = nullptr;
+};
+
 struct SameBaseNode : public BehaviorNode {
   SameBaseNode(const char* position_a_key, const char* position_b_key)
       : position_a_key(position_a_key), position_b_key(position_b_key) {}

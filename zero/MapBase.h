@@ -175,6 +175,6 @@ struct MapBuildConfig {
   int empty_exit_range = 25;
 };
 
-std::vector<MapBase> FindBases(path::Pathfinder& pathfinder, MapCoord spawn, const MapBuildConfig& cfg);
+std::vector<MapBase> FindBases(path::Pathfinder& pathfinder, const MapBuildConfig& cfg);
 
 }  // namespace zero

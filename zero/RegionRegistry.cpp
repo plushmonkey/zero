@@ -9,11 +9,10 @@ bool IsValidPosition(MapCoord coord) {
   return coord.x >= 0 && coord.x < 1024 && coord.y >= 0 && coord.y < 1024;
 }
 
-RegionFiller::RegionFiller(const Map& map, float radius, RegionIndex* coord_regions, int* region_tile_counts)
+RegionFiller::RegionFiller(const Map& map, float radius, RegionIndex* coord_regions)
     : map(map),
       radius(radius),
       coord_regions(coord_regions),
-      region_tile_counts(region_tile_counts),
       highest_coord(9999, 9999) {
   potential_edges.reserve(1024 * 1024);
 
@@ -26,7 +25,6 @@ void RegionFiller::FillEmpty(const MapCoord& coord) {
   if (!map.CanOverlapTile(Vector2f(coord.x, coord.y), radius, 0xFFFF)) return;
 
   coord_regions[coord.y * 1024 + coord.x] = region_index;
-  region_tile_counts[region_index]++;
 
   Event::Dispatch(RegionTileAddEvent(region_index, coord));
 
@@ -67,7 +65,6 @@ void RegionFiller::TraverseEmpty(const Vector2f& from, MapCoord to) {
 
     if (map.CanTraverse(from, to_pos, radius, 0xFFFF)) {
       coord_regions[to_index] = region_index;
-      region_tile_counts[region_index]++;
       Event::Dispatch(RegionTileAddEvent(region_index, to));
       stack.push_back(to);
     }
@@ -152,7 +149,7 @@ bool RegionFiller::IsEmptyBaseTile(const Vector2f& position) const {
 void RegionRegistry::CreateAll(const Map& map, float radius) {
   Event::Dispatch(RegionBuildEvent());
 
-  RegionFiller filler(map, radius, coord_regions_, region_tile_counts_);
+  RegionFiller filler(map, radius, coord_regions_);
 
   for (uint16_t y = 0; y < 1024; ++y) {
     for (uint16_t x = 0; x < 1024; ++x) {
@@ -169,12 +166,6 @@ void RegionRegistry::CreateAll(const Map& map, float radius) {
       }
     }
   }
-}
-
-int RegionRegistry::GetTileCount(MapCoord coord) const {
-  RegionIndex index = coord_regions_[coord.y * 1024 + coord.x];
-
-  return region_tile_counts_[index];
 }
 
 bool RegionRegistry::IsRegistered(MapCoord coord) const {

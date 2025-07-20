@@ -73,7 +73,7 @@ struct SharedRegionOwnership {
 
 struct RegionFiller {
  public:
-  RegionFiller(const Map& map, float radius, RegionIndex* coord_regions, int* region_tile_counts);
+  RegionFiller(const Map& map, float radius, RegionIndex* coord_regions);
 
   void Fill(RegionIndex index, const MapCoord& coord) {
     this->region_index = index;
@@ -112,7 +112,6 @@ class RegionRegistry {
   RegionRegistry() : region_count_(0) { memset(coord_regions_, 0xFF, sizeof(coord_regions_)); }
 
   bool IsConnected(MapCoord a, MapCoord b) const;
-  int GetTileCount(MapCoord coord) const;
   void CreateAll(const Map& map, float radius);
 
   RegionIndex GetRegionIndex(MapCoord coord) const;
@@ -126,6 +125,5 @@ class RegionRegistry {
   RegionIndex region_count_;
 
   RegionIndex coord_regions_[1024 * 1024];
-  int region_tile_counts_[1024 * 1024];
 };
 }  // namespace zero

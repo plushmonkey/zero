@@ -50,7 +50,7 @@ struct SpriteRenderer;
 struct AnimationSystem {
   u16 next_id = 0;
   size_t animation_count;
-  Animation animations[65535];
+  Animation animations[65535 / 2];
 
   void Update(float dt);
   void Render(Camera& camera, SpriteRenderer& renderer);

@@ -48,17 +48,32 @@ void ExtremeGamesController::CreateBases() {
     eg = std::make_unique<ExtremeGames>();
   }
 
+  MapBuildConfig cfg = {};
+
   MapCoord spawn((u16)bot->game->connection.settings.SpawnSettings[0].X,
                  (u16)bot->game->connection.settings.SpawnSettings[0].Y);
+  u32 radius = bot->game->connection.settings.SpawnSettings[0].Radius;
 
-  MapBuildConfig cfg = {};
+  // Try to find a good starting area for searching for bases.
+  constexpr size_t kMaxSpawnTries = 32;
+  for (int i = 0; i < kMaxSpawnTries; ++i) {
+    s16 rand_x = (s16)(((u32)rand() % (radius * 2)) - radius);
+    s16 rand_y = (s16)(((u32)rand() % (radius * 2)) - radius);
+
+    MapCoord coord(spawn.x + rand_x, spawn.y + rand_y);
+
+    if (bot->game->GetMap().CanFit(Vector2f((float)coord.x, (float)coord.y), 14.0f / 16.0f, 0xFFFF)) {
+      cfg.spawn = coord;
+      break;
+    }
+  }
 
   auto opt_base_count = this->bot->config->GetInt("ExtremeGames", "BaseCount");
   if (opt_base_count) {
     cfg.base_count = *opt_base_count;
   }
 
-  eg->bases = FindBases(*bot->bot_controller->pathfinder, spawn, cfg);
+  eg->bases = FindBases(*bot->bot_controller->pathfinder, cfg);
 
   for (MapBase& base : eg->bases) {
     base.path = bot->bot_controller->pathfinder->FindPath(bot->game->GetMap(), base.entrance_position,

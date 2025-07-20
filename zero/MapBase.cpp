@@ -16,7 +16,7 @@ static std::vector<MapBase> BuildBases(const std::vector<MapCoord>& flagrooms, p
 static Vector2f FloodFillRegion(path::Pathfinder& pathfinder, const WalledBitset& walled_bitset, RegionBitset& region,
                                 MapCoord start, std::optional<int> range);
 
-std::vector<MapBase> FindBases(path::Pathfinder& pathfinder, MapCoord spawn, const MapBuildConfig& cfg) {
+std::vector<MapBase> FindBases(path::Pathfinder& pathfinder, const MapBuildConfig& cfg) {
   auto flagroom_positions = DetectFlagroomPositions(pathfinder, cfg);
   return BuildBases(flagroom_positions, pathfinder, cfg);
 }

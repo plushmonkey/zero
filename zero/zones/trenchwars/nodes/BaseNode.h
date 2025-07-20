@@ -9,6 +9,37 @@
 namespace zero {
 namespace tw {
 
+enum class FlagroomQuadrantRegion { NorthEast, NorthWest, SouthWest, SouthEast };
+
+struct FlagroomQuadrant {
+  u16 enemy_count;
+  u16 team_count;
+};
+struct FlagroomPartition {
+  FlagroomQuadrant quadrants[4];
+
+  inline FlagroomQuadrant& GetQuadrant(FlagroomQuadrantRegion region) { return quadrants[(size_t)region]; }
+  inline const FlagroomQuadrant& GetQuadrant(FlagroomQuadrantRegion region) const { return quadrants[(size_t)region]; }
+};
+
+// Determine the flagroom quadrant of a position based on the center.
+inline FlagroomQuadrantRegion GetQuadrantRegion(Vector2f center, Vector2f position) {
+  Vector2f offset = position - center;
+  FlagroomQuadrantRegion region = FlagroomQuadrantRegion::NorthEast;
+
+  if (offset.x >= 0 && offset.y <= 0) {
+    region = FlagroomQuadrantRegion::NorthEast;
+  } else if (offset.x < 0 && offset.y <= 0) {
+    region = FlagroomQuadrantRegion::NorthWest;
+  } else if (offset.x < 0 && offset.y > 0) {
+    region = FlagroomQuadrantRegion::SouthWest;
+  } else if (offset.x >= 0 && offset.y > 0) {
+    region = FlagroomQuadrantRegion::SouthEast;
+  }
+
+  return region;
+}
+
 // Find an enemy in the base while traveling.
 // This will only find enemies that are within our direct view.
 struct FindBaseEnemyNode : public behavior::BehaviorNode {
@@ -98,6 +129,45 @@ struct EmptyEntranceNode : public behavior::BehaviorNode {
   }
 };
 
+// Looks for enemies in the pocket areas next to the entrance.
+// Returns Failure if there is an enemy in there.
+struct EmptySideAreaNode : public behavior::BehaviorNode {
+  enum class Side { West, East };
+  EmptySideAreaNode(Side side) : side(side) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto& pm = ctx.bot->game->player_manager;
+
+    auto self = pm.GetSelf();
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+    if (!opt_tw) return behavior::ExecuteResult::Failure;
+    TrenchWars* tw = *opt_tw;
+
+    Rectangle west_rectangle(Vector2f(500, 283), Vector2f(504, 293));
+    Rectangle east_rectangle(Vector2f(520, 283), Vector2f(524, 293));
+
+    Rectangle* check_rect = side == Side::West ? &west_rectangle : &east_rectangle;
+
+    for (size_t i = 0; i < pm.player_count; ++i) {
+      Player* player = pm.players + i;
+
+      if (player->ship >= 8) continue;
+      if (player->frequency == self->frequency) continue;
+      if (player->enter_delay > 0.0f) continue;
+
+      if (check_rect->Contains(player->position)) {
+        return behavior::ExecuteResult::Failure;
+      }
+    }
+
+    return behavior::ExecuteResult::Success;
+  }
+
+  Side side = Side::West;
+};
+
 // Returns success if we are within nearby_threshold tiles of the 'entrance' position.
 struct NearEntranceNode : public behavior::BehaviorNode {
   NearEntranceNode(float nearby_threshold) : nearby_threshold(nearby_threshold) {}
@@ -129,6 +199,8 @@ struct NearEntranceNode : public behavior::BehaviorNode {
 
 // Goes over the two paths into the base to find which one is less contested.
 struct SelectBestEntranceSideNode : public behavior::BehaviorNode {
+  SelectBestEntranceSideNode(const char* partition_key) : partition_key(partition_key) {}
+
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
     auto& pm = ctx.bot->game->player_manager;
     auto self = pm.GetSelf();
@@ -141,105 +213,33 @@ struct SelectBestEntranceSideNode : public behavior::BehaviorNode {
 
     TrenchWars* tw = *opt_tw;
 
-    if (tw->left_entrance_path.Empty() || tw->right_entrance_path.Empty()) return behavior::ExecuteResult::Failure;
+    auto opt_partition = ctx.blackboard.Value<FlagroomPartition>(partition_key);
+    if (!opt_partition) return behavior::ExecuteResult::Failure;
 
-    size_t left_index = 0;
-    size_t right_index = 0;
+    FlagroomPartition partition = *opt_partition;
 
-    float left_threat = GetPathThreat(ctx, *self, tw->left_entrance_path, &left_index);
-    float right_threat = GetPathThreat(ctx, *self, tw->right_entrance_path, &right_index);
+    const FlagroomQuadrant& sw_quadrant = partition.GetQuadrant(FlagroomQuadrantRegion::SouthWest);
+    const FlagroomQuadrant& se_quadrant = partition.GetQuadrant(FlagroomQuadrantRegion::SouthEast);
 
-    // If we make it this far through a path, continue with it into the flagroom.
-    constexpr float kPathTravelPercentBruteForce = 0.25f;
+    s32 sw_diff = sw_quadrant.team_count - sw_quadrant.enemy_count;
+    s32 se_diff = se_quadrant.team_count - se_quadrant.enemy_count;
 
-    if (left_index / (float)tw->left_entrance_path.points.size() >= kPathTravelPercentBruteForce) {
-      ctx.bot->bot_controller->current_path = tw->left_entrance_path;
-      ctx.bot->bot_controller->current_path.index = left_index;
-      return behavior::ExecuteResult::Success;
-    }
-
-    if (right_index / (float)tw->right_entrance_path.points.size() >= kPathTravelPercentBruteForce) {
-      ctx.bot->bot_controller->current_path = tw->right_entrance_path;
-      ctx.bot->bot_controller->current_path.index = right_index;
-      return behavior::ExecuteResult::Success;
-    }
-
-    if (left_threat > self->energy && right_threat > self->energy) {
+    if (sw_diff <= 0 && se_diff <= 0) {
       return behavior::ExecuteResult::Failure;
     }
 
-    path::Path old_path = ctx.bot->bot_controller->current_path;
+    path::Path* new_path = &tw->left_entrance_path;
 
-    float chosen_threat = left_threat;
-
-    if (left_threat < right_threat) {
-      ctx.bot->bot_controller->current_path = tw->left_entrance_path;
-      ctx.bot->bot_controller->current_path.index = left_index;
-      chosen_threat = left_threat;
-    } else {
-      ctx.bot->bot_controller->current_path = tw->right_entrance_path;
-      ctx.bot->bot_controller->current_path.index = right_index;
-      chosen_threat = right_threat;
+    if (se_diff > sw_diff) {
+      new_path = &tw->right_entrance_path;
     }
 
-    // The amount of path points we should look forward to see how many teammates surround us.
-    constexpr size_t kForwardPointCount = 3;
-    constexpr float kNearbyDistanceSq = 3.0f * 3.0f;
+    size_t path_index = FindNearestPathPoint(*new_path, self->position);
 
-    auto& path = ctx.bot->bot_controller->current_path;
-
-    size_t nearest_point = FindNearestPathPoint(path, self->position);
-    size_t forward_point = nearest_point + kForwardPointCount;
-
-    if (forward_point > path.points.size() - 1) {
-      forward_point = path.points.size() - 1;
-    }
-
-    size_t forward_teammate_count = 0;
-    size_t total_teammate_count = 0;
-
-    for (size_t i = 0; i < pm.player_count; ++i) {
-      Player* p = pm.players + i;
-
-      if (p->id == self->id) continue;
-      if (p->ship >= 8) continue;
-      if (p->frequency != self->frequency) continue;
-      if (p->enter_delay > 0.0f) continue;
-
-      ++total_teammate_count;
-      if (p->position.DistanceSq(path.points[forward_point]) < kNearbyDistanceSq) {
-        ++forward_teammate_count;
-      }
-    }
-
-    if (total_teammate_count > 0 && forward_teammate_count == 0 && chosen_threat > 1.0f) {
-      ctx.bot->bot_controller->current_path = old_path;
-      return behavior::ExecuteResult::Failure;
-    }
+    ctx.bot->bot_controller->current_path = *new_path;
+    ctx.bot->bot_controller->current_path.index = path_index;
 
     return behavior::ExecuteResult::Success;
-  }
-
-  float GetPathThreat(behavior::ExecuteContext& ctx, Player& self, const path::Path& path, size_t* index) {
-    size_t start_index = FindNearestPathPoint(path, self.position);
-    size_t half_index = path.points.size() / 2;
-    size_t end_index = start_index + 15;
-
-    // Don't bother checking the threat inside of the flagroom, only the entranceway.
-    if (end_index > half_index) end_index = half_index;
-
-    *index = start_index;
-
-    float total_threat = 0.0f;
-
-    for (size_t i = start_index; i < end_index; ++i) {
-      Vector2f point = path.points[i];
-
-      float threat = ctx.bot->bot_controller->influence_map.GetValue(point);
-      total_threat += threat;
-    }
-
-    return total_threat;
   }
 
   size_t FindNearestPathPoint(const path::Path& path, Vector2f position) {
@@ -259,6 +259,8 @@ struct SelectBestEntranceSideNode : public behavior::BehaviorNode {
 
     return 0;
   }
+
+  const char* partition_key = nullptr;
 };
 
 struct InFlagroomNode : public behavior::BehaviorNode {
@@ -361,37 +363,6 @@ struct SafeFlagroomNode : public behavior::BehaviorNode {
     return behavior::ExecuteResult::Success;
   }
 };
-
-enum class FlagroomQuadrantRegion { NorthEast, NorthWest, SouthWest, SouthEast };
-
-struct FlagroomQuadrant {
-  u16 enemy_count;
-  u16 team_count;
-};
-struct FlagroomPartition {
-  FlagroomQuadrant quadrants[4];
-
-  inline FlagroomQuadrant& GetQuadrant(FlagroomQuadrantRegion region) { return quadrants[(size_t)region]; }
-  inline const FlagroomQuadrant& GetQuadrant(FlagroomQuadrantRegion region) const { return quadrants[(size_t)region]; }
-};
-
-// Determine the flagroom quadrant of a position based on the center.
-inline FlagroomQuadrantRegion GetQuadrantRegion(Vector2f center, Vector2f position) {
-  Vector2f offset = position - center;
-  FlagroomQuadrantRegion region = FlagroomQuadrantRegion::NorthEast;
-
-  if (offset.x >= 0 && offset.y <= 0) {
-    region = FlagroomQuadrantRegion::NorthEast;
-  } else if (offset.x < 0 && offset.y <= 0) {
-    region = FlagroomQuadrantRegion::NorthWest;
-  } else if (offset.x < 0 && offset.y > 0) {
-    region = FlagroomQuadrantRegion::SouthWest;
-  } else if (offset.x >= 0 && offset.y > 0) {
-    region = FlagroomQuadrantRegion::SouthEast;
-  }
-
-  return region;
-}
 
 // Divides up the flagroom into quadrants and stores the data in output_key.
 struct FlagroomPartitionNode : public behavior::BehaviorNode {
