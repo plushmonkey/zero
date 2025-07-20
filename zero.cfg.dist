@@ -22,6 +22,9 @@ LogLevel = Info
 RequestShip = 1
 # Sets the default behavior. This can be overridden in a zone-specific section with the same key name.
 #Behavior = center
+# How many milliseconds the bot should sleep per update.
+# Increasing this will reduce how often the bot is updated, but will use less cpu.
+SleepMs = 1
 
 [Subgame]
 RequestShip = 5

@@ -142,6 +142,11 @@ void ZeroBot::Run() {
 
   execute_ctx.bot = this;
 
+  int sleep_ms = 1;
+
+  auto opt_sleep_ms = this->config->GetInt("General", "SleepMs");
+  if (opt_sleep_ms) sleep_ms = *opt_sleep_ms;
+
   while (true) {
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -188,8 +193,8 @@ void ZeroBot::Run() {
       debug_renderer.Present();
     }
 
-    if (!g_Settings.debug_window) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    if (!g_Settings.debug_window && sleep_ms > 0) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
     }
 
     auto end = std::chrono::high_resolution_clock::now();
