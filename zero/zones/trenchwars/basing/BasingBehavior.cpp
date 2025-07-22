@@ -38,7 +38,7 @@ std::unique_ptr<behavior::BehaviorNode> BasingBehavior::CreateTree(behavior::Exe
             .End()
         .Sequence() // TODO: Levi
             .Child<ShipQueryNode>(3)
-            .Composite(CreateSharkBasingTree(ctx))
+            .Composite(CreateJavelinBasingTree(ctx))
             .End()
         .Sequence() // Terrier
             .Child<ShipQueryNode>(4)
