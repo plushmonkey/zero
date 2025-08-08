@@ -32,7 +32,7 @@ static void CreateZoneFolder(MemoryArena& temp_arena) {
   platform.CreateFolder(path);
 }
 
-inline bool FileExists(MemoryArena& temp_arena, const char* filename, u32 checksum) {
+inline static bool FileExists(MemoryArena& temp_arena, const char* filename) {
   char path[260];
   GetFilePath(temp_arena, path, filename);
 
@@ -47,14 +47,12 @@ inline bool FileExists(MemoryArena& temp_arena, const char* filename, u32 checks
 
   size_t read_amount = fread(file_data, 1, file_size, file);
   if (read_amount != file_size) {
-    Log(LogLevel::Warning, "FileRequester crc failed to read entire file: %s", filename);
+    Log(LogLevel::Warning, "FileRequester FileExists to read entire file: %s", filename);
   }
 
   fclose(file);
 
-  u32 crc = crc32(file_data, file_size);
-
-  return crc == checksum;
+  return true;
 }
 
 static void OnCompressedMapPkt(void* user, u8* pkt, size_t size) {
@@ -109,6 +107,8 @@ void FileRequester::OnCompressedFile(u8* pkt, size_t size) {
     Log(LogLevel::Error, "Failed to open %s for writing.", current->filename);
   }
 
+  current->size = data_size;
+
   Log(LogLevel::Info, "Download complete: %s", current->filename);
   current->callback(current->user, current, data);
 
@@ -154,29 +154,42 @@ void FileRequester::Request(const char* filename, u16 index, u32 size, u32 check
   request->user = user;
   request->decompress = decompress;
 
-  if (FileExists(temp_arena, filename, checksum)) {
-    FILE* f = fopen(request->filename, "rb");
-    fseek(f, 0, SEEK_END);
-    long filesize = ftell(f);
-    fseek(f, 0, SEEK_SET);
+  if (FileExists(temp_arena, filename)) {
+    constexpr size_t kReadTries = 20;
 
-    ArenaSnapshot snapshot = temp_arena.GetSnapshot();
-    u8* data = (u8*)temp_arena.Allocate(filesize);
+    MemoryRevert reverter = temp_arena.GetReverter();
+    u8* data = nullptr;
 
-    size_t read_amount = fread(data, 1, filesize, f);
-    if (read_amount != filesize) {
-      Log(LogLevel::Warning, "FileRequester failed to read entire file: %s", filename);
+    for (size_t i = 0; i < kReadTries; ++i) {
+      FILE* f = fopen(request->filename, "rb");
+      fseek(f, 0, SEEK_END);
+      long filesize = ftell(f);
+      fseek(f, 0, SEEK_SET);
+
+      request->size = filesize;
+
+      temp_arena.Revert(reverter.snapshot);
+      data = (u8*)temp_arena.Allocate(filesize);
+
+      size_t read_amount = fread(data, 1, filesize, f);
+      if (read_amount != filesize) {
+        Log(LogLevel::Warning, "FileRequester failed to read entire file: %s", filename);
+        data = nullptr;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        continue;
+      }
+
+      fclose(f);
+      break;
     }
 
-    fclose(f);
+    if (data && crc32(data, request->size) == checksum) {
+      callback(user, request, data);
 
-    callback(user, request, data);
-
-    temp_arena.Revert(snapshot);
-
-    request->next = free;
-    free = request;
-    return;
+      request->next = free;
+      free = request;
+      return;
+    }
   }
 
   Log(LogLevel::Info, "Requesting download: %s", filename);

@@ -100,6 +100,7 @@ inline bool IsSolidEmptyDoors(TileId id) {
 
 struct Map {
   bool Load(MemoryArena& arena, const char* filename);
+  bool LoadFromMemory(MemoryArena& arena, const char* filename, const u8* data, size_t size);
 
   bool IsSolid(u16 x, u16 y, u32 frequency) const;
   bool IsSolidEmptyDoors(u16 x, u16 y, u32 frequency) const;

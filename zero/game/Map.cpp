@@ -598,10 +598,6 @@ size_t Map::GetAllOccupiedRects(Vector2f position, float radius, u32 frequency, 
 }
 
 bool Map::Load(MemoryArena& arena, const char* filename) {
-  assert(strlen(filename) < 1024);
-
-  strcpy(this->filename, filename);
-
   FILE* file = fopen(filename, "rb");
 
   if (!file) {
@@ -619,16 +615,34 @@ bool Map::Load(MemoryArena& arena, const char* filename) {
 
   // Maps are allocated in their own arena so they are freed automatically when the arena is reset
   data = (char*)arena.Allocate(size);
-  tiles = arena.Allocate(1024 * 1024);
-
-  assert(data);
-  assert(tiles);
+  if (!data) return false;
 
   size_t read_size = fread(data, 1, size, file);
   if (read_size != size) {
     Log(LogLevel::Warning, "Map load failed to read entire file: %s", filename);
   }
   fclose(file);
+
+  return LoadFromMemory(arena, filename, nullptr, size);
+}
+
+bool Map::LoadFromMemory(MemoryArena& arena, const char* filename, const u8* raw_data, size_t size) {
+  assert(strlen(filename) < 1024);
+
+  strcpy(this->filename, filename);
+
+  if (raw_data) {
+    // Maps are allocated in their own arena so they are freed automatically when the arena is reset
+    data = (char*)arena.Allocate(size);
+    if (!data) return false;
+
+    memcpy(data, raw_data, size);
+  }
+
+  if (!data) return false;
+
+  tiles = arena.Allocate(1024 * 1024);
+  if (!tiles) return false;
 
   size_t pos = 0;
 

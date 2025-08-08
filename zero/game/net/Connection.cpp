@@ -751,8 +751,9 @@ void Connection::SendArenaLogin(u8 ship, u16 audio, u16 xres, u16 yres, u16 aren
 void Connection::OnDownloadComplete(struct FileRequest* request, u8* data) {
   map_arena.Reset();
 
-  if (!map.Load(map_arena, request->filename)) {
+  if (!data || !map.LoadFromMemory(map_arena, request->filename, data, request->size)) {
     Log(LogLevel::Error, "Failed to load map %s.", request->filename);
+    login_state = LoginState::Quit;
     return;
   }
 
