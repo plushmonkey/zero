@@ -17,7 +17,7 @@ namespace nexus {
         bool operator<(const teamList& other) const {
           return distance < other.distance;  // Sort based on 'distance' in ascending order
         }
-    //    teamList(Player* player, float distance) : player(player), distance(distance) {}
+        teamList(Player* player, float distance) : player(player), distance(distance) {}
     };
 
 
