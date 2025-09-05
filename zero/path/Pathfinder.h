@@ -5,6 +5,7 @@
 #include <zero/path/NodeProcessor.h>
 #include <zero/path/Path.h>
 
+#include <algorithm>
 #include <memory>
 #include <unordered_set>
 #include <vector>

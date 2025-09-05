@@ -92,73 +92,6 @@ struct SameBaseNode : public BehaviorNode {
   const char* position_b_key = nullptr;
 };
 
-struct BaseFlagCount {
-  u8 team_dropped_flags = 0;
-  u8 team_carried_flags = 0;
-
-  u8 enemy_dropped_flags = 0;
-  u8 enemy_carried_flags = 0;
-
-  u8 unclaimed = 0;
-};
-
-// Computes the flag counts for each base and stores them as vector<BaseFlagCount> for each base that exists.
-struct BaseFlagCountQueryNode : public BehaviorNode {
-  ExecuteResult Execute(ExecuteContext& ctx) override {
-    auto self = ctx.bot->game->player_manager.GetSelf();
-    if (!self || self->ship >= 8) return ExecuteResult::Failure;
-
-    auto opt_eg = ctx.blackboard.Value<ExtremeGames*>("eg");
-    if (!opt_eg) return ExecuteResult::Failure;
-
-    ExtremeGames* eg = *opt_eg;
-    auto& game = *ctx.bot->game;
-
-    std::vector<BaseFlagCount> flag_counts(eg->bases.size());
-
-    for (size_t i = 0; i < game.flag_count; ++i) {
-      GameFlag* flag = game.flags + i;
-
-      if (flag->flags & GameFlag_Dropped) {
-        size_t base_index = eg->GetBaseFromPosition(flag->position);
-
-        if (base_index != -1 && base_index < flag_counts.size()) {
-          if (flag->owner == self->frequency) {
-            ++flag_counts[base_index].team_dropped_flags;
-          } else if (flag->owner != 0xFFFF) {
-            ++flag_counts[base_index].enemy_dropped_flags;
-          } else {
-            ++flag_counts[base_index].unclaimed;
-          }
-        }
-      }
-    }
-
-    for (size_t i = 0; i < game.player_manager.player_count; ++i) {
-      Player* player = game.player_manager.players + i;
-
-      if (player->ship >= 8) continue;
-      if (player->IsRespawning()) continue;
-
-      size_t base_index = eg->GetBaseFromPosition(player->position);
-
-      if (base_index != -1 && base_index < flag_counts.size()) {
-        if (player->frequency == self->frequency) {
-          flag_counts[base_index].team_carried_flags;
-        } else {
-          flag_counts[base_index].enemy_carried_flags;
-        }
-      }
-    }
-
-    ctx.blackboard.Set(BaseFlagCountQueryNode::Key(), flag_counts);
-
-    return ExecuteResult::Success;
-  }
-
-  static const char* Key() { return "eg_base_flag_counts"; }
-};
-
 // This determines which frequency is in control of the base by determining closest to flagroom.
 // output_key will be stored as u16 frequency.
 struct BaseTeamControlQueryNode : public BehaviorNode {
@@ -179,46 +112,9 @@ struct BaseTeamControlQueryNode : public BehaviorNode {
     size_t base_index = eg->GetBaseFromPosition(position);
     if (base_index == -1) return ExecuteResult::Failure;
 
-    size_t best_path_index = 0;
-    Player* best_player = nullptr;
-
-    auto& pm = ctx.bot->game->player_manager;
-    for (size_t i = 0; i < pm.player_count; ++i) {
-      Player* player = pm.players + i;
-
-      if (player->ship >= 8) continue;
-      if (player->IsRespawning()) continue;
-      if (eg->GetBaseFromPosition(player->position) != base_index) continue;
-
-      // This can be pretty expensive, might want to profile it to make sure it's fine. Should be.
-      size_t path_index = GetClosestPathIndex(eg->bases[base_index].path, player->position);
-
-      if (path_index > best_path_index) {
-        best_path_index = path_index;
-        best_player = player;
-      }
-    }
-
-    if (!best_player) return ExecuteResult::Failure;
-
-    ctx.blackboard.Set<u16>(output_key, best_player->frequency);
+    ctx.blackboard.Set<u16>(output_key, eg->base_states[base_index].controlling_freq);
 
     return ExecuteResult::Success;
-  }
-
-  size_t GetClosestPathIndex(path::Path& path, Vector2f position) {
-    size_t best_index = 0;
-    float best_dist_sq = 1024.0f * 1024.0f;
-
-    for (size_t i = 0; i < path.points.size(); ++i) {
-      float dist_sq = path.points[i].DistanceSq(position);
-      if (dist_sq < best_dist_sq) {
-        best_index = i;
-        best_dist_sq = dist_sq;
-      }
-    }
-
-    return best_index;
   }
 
   const char* position_key = nullptr;
@@ -253,10 +149,10 @@ struct BaseFlagroomPositionNode : public BehaviorNode {
   const char* output_key = nullptr;
 };
 
-// Go through each base and determine which one we should path to.
-// This will prioritize bases with existing flags.
-struct FindBestBaseEntranceNode : public BehaviorNode {
-  FindBestBaseEntranceNode(const char* output_key) : output_key(output_key) {}
+// Find the entrance position of our team's existing base.
+// If our team doesn't have a base, it will default to a new base that every other bot will generate similarly.
+struct FindTeamBaseEntranceNode : public BehaviorNode {
+  FindTeamBaseEntranceNode(const char* output_key) : output_key(output_key) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
     auto& pm = ctx.bot->game->player_manager;
@@ -269,42 +165,18 @@ struct FindBestBaseEntranceNode : public BehaviorNode {
 
     ExtremeGames* eg = *opt_eg;
 
-    std::vector<size_t> flag_counts(eg->bases.size());
+    for (size_t i = 0; i < eg->base_states.size(); ++i) {
+      BaseState& state = eg->base_states[i];
 
-    auto& game = *ctx.bot->game;
-    for (size_t i = 0; i < game.flag_count; ++i) {
-      GameFlag* game_flag = game.flags + i;
-
-      if (game_flag->flags & GameFlag_Dropped) {
-        size_t base_index = eg->GetBaseFromPosition(game_flag->position);
-        if (base_index != -1) {
-          ++flag_counts[base_index];
-        }
+      if (state.controlling_freq == self->frequency && state.GetDefendingFlagCount() > 0) {
+        ctx.blackboard.Set(output_key, eg->bases[i].entrance_position);
+        return ExecuteResult::Success;
       }
     }
 
-    for (size_t i = 0; i < game.player_manager.player_count; ++i) {
-      auto player = game.player_manager.players + i;
+    size_t base_index = GetCurrentDefaultBase(eg->bases.size());
 
-      if (player->flags > 0) {
-        size_t base_index = eg->GetBaseFromPosition(player->position);
-        if (base_index != -1) {
-          flag_counts[base_index] += player->flags;
-        }
-      }
-    }
-
-    size_t best_index = GetCurrentDefaultBase(flag_counts.size());
-    size_t best_count = 0;
-
-    for (size_t i = 0; i < flag_counts.size(); ++i) {
-      if (flag_counts[i] > best_count) {
-        best_index = i;
-        best_count = flag_counts[i];
-      }
-    }
-
-    ctx.blackboard.Set(output_key, eg->bases[best_index].entrance_position);
+    ctx.blackboard.Set(output_key, eg->bases[base_index].entrance_position);
 
     return ExecuteResult::Success;
   }
@@ -325,8 +197,8 @@ struct FindBestBaseEntranceNode : public BehaviorNode {
   const char* output_key = nullptr;
 };
 
-struct FindBestBaseTeammateNode : public BehaviorNode {
-  FindBestBaseTeammateNode(const char* output_key) : output_key(output_key) {}
+struct FindEnemyBaseEntranceNode : public BehaviorNode {
+  FindEnemyBaseEntranceNode(const char* output_key) : output_key(output_key) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
     auto& pm = ctx.bot->game->player_manager;
@@ -339,28 +211,77 @@ struct FindBestBaseTeammateNode : public BehaviorNode {
 
     ExtremeGames* eg = *opt_eg;
 
-    float enter_delay = ctx.bot->game->connection.settings.EnterDelay / 100.0f;
+    for (size_t i = 0; i < eg->base_states.size(); ++i) {
+      BaseState& state = eg->base_states[i];
 
-    // TODO: Find most forward in whichever direction.
-
-    for (size_t i = 0; i < pm.player_count; ++i) {
-      auto player = pm.players + i;
-
-      if (player->id == self->id) continue;
-      if (player->ship >= 8) continue;
-      if (player->frequency != self->frequency) continue;
-      if (player->enter_delay > 0.0f && player->enter_delay < enter_delay)
-        continue;  // Let us lag attach but ignore if they are really dead.
-      if (eg->GetBaseFromPosition(player->position) == -1) continue;
-
-      ctx.blackboard.Set(output_key, player);
-
-      return ExecuteResult::Success;
+      if (state.IsEnemyControlled(self->frequency) && state.GetDefendingFlagCount() > 0) {
+        ctx.blackboard.Set(output_key, eg->bases[i].entrance_position);
+        return ExecuteResult::Success;
+      }
     }
 
     return ExecuteResult::Failure;
   }
 
+  const char* output_key = nullptr;
+};
+
+struct SelectAttackingTeammateNode : public BehaviorNode {
+  SelectAttackingTeammateNode(const char* anchor_key, const char* output_key)
+      : anchor_key(anchor_key), output_key(output_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto& pm = ctx.bot->game->player_manager;
+    auto self = pm.GetSelf();
+
+    if (!self || self->ship >= 8) return ExecuteResult::Failure;
+
+    auto opt_anchor = ctx.blackboard.Value<Player*>(anchor_key);
+    if (!opt_anchor) return ExecuteResult::Failure;
+
+    auto opt_eg = ctx.blackboard.Value<ExtremeGames*>("eg");
+    if (!opt_eg) return ExecuteResult::Failure;
+
+    ExtremeGames* eg = *opt_eg;
+
+    // TODO: Randomize teammate selection with some probability.
+
+    ctx.blackboard.Set(output_key, *opt_anchor);
+
+    return ExecuteResult::Success;
+  }
+
+  const char* anchor_key = nullptr;
+  const char* output_key = nullptr;
+};
+
+struct SelectDefendingTeammateNode : public BehaviorNode {
+  SelectDefendingTeammateNode(const char* anchor_key, const char* output_key)
+    : anchor_key(anchor_key), output_key(output_key) {
+  }
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto& pm = ctx.bot->game->player_manager;
+    auto self = pm.GetSelf();
+
+    if (!self || self->ship >= 8) return ExecuteResult::Failure;
+
+    auto opt_anchor = ctx.blackboard.Value<Player*>(anchor_key);
+    if (!opt_anchor) return ExecuteResult::Failure;
+
+    auto opt_eg = ctx.blackboard.Value<ExtremeGames*>("eg");
+    if (!opt_eg) return ExecuteResult::Failure;
+
+    ExtremeGames* eg = *opt_eg;
+
+    // TODO: Randomize teammate selection with some probability.
+
+    ctx.blackboard.Set(output_key, *opt_anchor);
+
+    return ExecuteResult::Success;
+  }
+
+  const char* anchor_key = nullptr;
   const char* output_key = nullptr;
 };
 
@@ -373,30 +294,43 @@ struct FindNearestEnemyInBaseNode : public BehaviorNode {
     Player* self = game->player_manager.GetSelf();
     if (!self) return ExecuteResult::Failure;
 
-    RegionRegistry& region_registry = *ctx.bot->bot_controller->region_registry;
-
-    Player* best_target = nullptr;
-    float closest_dist_sq = std::numeric_limits<float>::max();
-
     auto opt_eg = ctx.blackboard.Value<ExtremeGames*>("eg");
     if (!opt_eg) return ExecuteResult::Failure;
 
     ExtremeGames* eg = *opt_eg;
 
-    for (size_t i = 0; i < game->player_manager.player_count; ++i) {
-      Player* player = game->player_manager.players + i;
+    size_t base_index = eg->GetBaseFromPosition(self->position);
+    if (base_index >= eg->base_states.size()) return ExecuteResult::Failure;
 
-      if (player->ship >= 8) continue;
+    BaseState& state = eg->base_states[base_index];
+
+    float self_position = 0.0f;
+
+    for (size_t i = 0; i < state.player_data.size(); ++i) {
+      u16 pid = state.player_data[i].player_id;
+      if (pid == self->id) {
+        self_position = state.player_data[i].position_percent;
+        break;
+      }
+    }
+
+    Player* best_target = nullptr;
+    float closest_dist = 1.0f;
+
+    for (size_t i = 0; i < state.player_data.size(); ++i) {
+      u16 pid = state.player_data[i].player_id;
+      float position = state.player_data[i].position_percent;
+      Player* player = game->player_manager.GetPlayerById(pid);
+
+      float position_difference = fabsf(position - self_position);
+
+      if (!player || player->ship >= 8) continue;
       if (player->frequency == self->frequency) continue;
       if (player->IsRespawning()) continue;
-      if (player->position == Vector2f(0, 0)) continue;
       if (game->connection.map.GetTileId(player->position) == kTileIdSafe) continue;
-      if (!region_registry.IsConnected(self->position, player->position)) continue;
-      if (eg->GetBaseFromPosition(player->position) == -1) continue;
 
-      float dist_sq = player->position.DistanceSq(self->position);
-      if (dist_sq < closest_dist_sq) {
-        closest_dist_sq = dist_sq;
+      if (position_difference < closest_dist) {
+        closest_dist = position_difference;
         best_target = player;
       }
     }
@@ -411,6 +345,19 @@ struct FindNearestEnemyInBaseNode : public BehaviorNode {
   }
 
   const char* output_key = nullptr;
+};
+
+struct UpdateBaseStateNode : public BehaviorNode {
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto opt_eg = ctx.blackboard.Value<ExtremeGames*>("eg");
+    if (!opt_eg) return ExecuteResult::Failure;
+
+    ExtremeGames* eg = *opt_eg;
+
+    eg->UpdateBaseState(*ctx.bot);
+
+    return ExecuteResult::Success;
+  }
 };
 
 }  // namespace eg

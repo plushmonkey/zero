@@ -4,7 +4,6 @@
 #include <zero/Types.h>
 #include <zero/game/Clock.h>
 #include <zero/game/Random.h>
-#include <zero/game/WorkQueue.h>
 
 namespace zero {
 

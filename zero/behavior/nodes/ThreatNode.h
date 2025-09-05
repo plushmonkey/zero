@@ -564,7 +564,7 @@ struct PositionThreatQueryNode : public BehaviorNode {
       if (weapon.frequency == freq) continue;
       if (weapon.data.type == WeaponType::Repel || weapon.data.type == WeaponType::Decoy) continue;
       if (weapon.data.type == WeaponType::Burst && !(weapon.flags & WEAPON_FLAG_BURST_ACTIVE)) continue;
-      if (links.contains(weapon.link_id)) continue;
+      if (links.find(weapon.link_id) != links.end()) continue;
 
       if (weapon.link_id != kInvalidLink) {
         links.insert(weapon.link_id);

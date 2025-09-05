@@ -59,7 +59,7 @@ struct IncomingDamageQueryNode : public behavior::BehaviorNode {
       if (weapon.data.type == WeaponType::Repel || weapon.data.type == WeaponType::Decoy) continue;
       if (weapon.data.type == WeaponType::Burst && !(weapon.flags & WEAPON_FLAG_BURST_ACTIVE)) continue;
       if (weapon.position.DistanceSq(player->position) > distance_sq) continue;
-      if (links.contains(weapon.link_id)) continue;
+      if (links.find(weapon.link_id) != links.end()) continue;
 
       float dist = 0.0f;
 

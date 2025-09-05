@@ -57,7 +57,7 @@ struct Lexer {
 
   Lexer(std::string_view data) : data(data), index(0), line(0) {}
 
-  Token GetNextToken(bool expect_string = false) {
+  Token GetNextToken(bool expect_string = false, bool string_to_line_end = false) {
     if (index >= data.size()) return Token();
 
     bool reading_string = false;
@@ -77,10 +77,12 @@ struct Lexer {
       // If reading a string and a new token is found, then return the current
       // string
       if (reading_string && (IsWhitespace(c) || IsSpecial(c)) && current_index - string_start > 0) {
-        // Reset the index to the last read token since it isn't part of this
-        // string.
-        index = current_index;
-        return Token(TokenType::String, data.substr(string_start, index - string_start), line);
+        if (c == '\r' || c == '\n' || !string_to_line_end) {
+          // Reset the index to the last read token since it isn't part of this
+          // string.
+          index = current_index;
+          return Token(TokenType::String, data.substr(string_start, index - string_start), line);
+        }
       }
 
       if (c == '#' && (!reading_string || current_index - string_start > 0)) {
@@ -191,7 +193,7 @@ std::unique_ptr<Config> Config::Load(const char* file_path) {
         return {};
       }
 
-      Token value_token = lexer.GetNextToken(true);
+      Token value_token = lexer.GetNextToken(true, true);
       if (value_token.type != TokenType::String) {
         EmitTokenError(value_token, TokenType::String);
         return {};

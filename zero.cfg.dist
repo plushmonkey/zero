@@ -47,6 +47,14 @@ Chat = zerotw
 # Set this to 1 to broadcast command use to the first chat.
 CommandBroadcast = 1
 
+[ExtremeGames]
+RequestShip = 3
+Behavior = base
+Arena = eg
+BaseCount = 8
+# List of fallback waypoint positions formatted as { x, y }; { x, y }; { x, y }
+Waypoints = { 450, 460 }; { 575, 460 }; { 575, 560 }; { 450, 560 }
+
 # Only these servers are supported. The names must not be changed.
 [Servers]
 Local = 127.0.0.1:5000

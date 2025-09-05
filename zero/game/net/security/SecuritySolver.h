@@ -2,7 +2,6 @@
 #define ZERO_NET_SECURITY_SECURITYSOLVER_H_
 
 #include <zero/Types.h>
-#include <zero/game/WorkQueue.h>
 #include <zero/game/net/Socket.h>
 
 #include <functional>
@@ -53,7 +52,7 @@ struct SecurityNetworkWork {
 };
 
 struct SecuritySolver {
-  WorkQueue& work_queue;
+  struct WorkQueue& work_queue;
 
   SecurityNetworkService service;
 
@@ -61,7 +60,7 @@ struct SecuritySolver {
 
   SecurityNetworkWork work[16];
 
-  SecuritySolver(WorkQueue& work_queue, const char* service_ip, u16 service_port);
+  SecuritySolver(struct WorkQueue& work_queue, const char* service_ip, u16 service_port);
 
   void ExpandKey(u32 key2, SecurityCallback callback);
   void GetChecksum(u32 key, SecurityCallback callback);

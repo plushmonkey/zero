@@ -6,6 +6,7 @@
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/game/Game.h>
 #include <zero/game/Logger.h>
+#include <stdexcept>
 #include <variant>
 
 namespace zero {

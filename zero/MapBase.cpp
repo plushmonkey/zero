@@ -14,7 +14,7 @@ static std::vector<MapCoord> DetectFlagroomPositions(path::Pathfinder& pathfinde
 static std::vector<MapBase> BuildBases(const std::vector<MapCoord>& flagrooms, path::Pathfinder& pathfinder,
                                        const MapBuildConfig& cfg);
 static Vector2f FloodFillRegion(path::Pathfinder& pathfinder, const WalledBitset& walled_bitset, RegionBitset& region,
-                                MapCoord start, std::optional<int> range);
+                                MapCoord start, std::optional<int> range, RegionDataMap<u16>* depth_map);
 
 std::vector<MapBase> FindBases(path::Pathfinder& pathfinder, const MapBuildConfig& cfg) {
   auto flagroom_positions = DetectFlagroomPositions(pathfinder, cfg);
@@ -29,9 +29,11 @@ static std::vector<MapCoord> DetectFlagroomPositions(path::Pathfinder& pathfinde
   struct Node {
     Node* prev = nullptr;
     float dist = 1024.0f * 1024.0f;
-    unsigned int open : 1 = 0;
-    unsigned int visited : 1 = 0;
+    unsigned int open : 1;
+    unsigned int visited : 1;
     unsigned int padding : 30;
+
+    Node() : open(0), visited(0) {}
   };
 
   struct NodeCompare {
@@ -203,8 +205,12 @@ static std::vector<MapBase> BuildBases(const std::vector<MapCoord>& flagrooms, p
     bases.emplace_back();
     MapBase& base = bases.back();
 
-    base.entrance_position = FloodFillRegion(pathfinder, *walled_bitset, base.bitset, fr_coord, std::nullopt);
-    FloodFillRegion(pathfinder, *walled_bitset, base.flagroom_bitset, fr_coord, cfg.flagroom_size);
+    if (cfg.populate_flood_map) {
+      base.entrance_position = FloodFillRegion(pathfinder, *walled_bitset, base.bitset, fr_coord, std::nullopt, &base.path_flood_map);
+    } else {
+      base.entrance_position = FloodFillRegion(pathfinder, *walled_bitset, base.bitset, fr_coord, std::nullopt, nullptr);
+    }
+    FloodFillRegion(pathfinder, *walled_bitset, base.flagroom_bitset, fr_coord, cfg.flagroom_size, nullptr);
     base.flagroom_position.x = (float)fr_coord.x;
     base.flagroom_position.y = (float)fr_coord.y;
   }
@@ -213,7 +219,7 @@ static std::vector<MapBase> BuildBases(const std::vector<MapCoord>& flagrooms, p
 }
 
 static Vector2f FloodFillRegion(path::Pathfinder& pathfinder, const WalledBitset& walled_bitset, RegionBitset& region,
-                                MapCoord start, std::optional<int> range) {
+                                MapCoord start, std::optional<int> range, RegionDataMap<u16>* depth_map) {
   using namespace path;
 
   struct FloodState {
@@ -224,6 +230,10 @@ static Vector2f FloodFillRegion(path::Pathfinder& pathfinder, const WalledBitset
   };
 
   region.Fit(0, 1023, 0, 1023, false);
+
+  if (depth_map) {
+    *depth_map = RegionDataMap<u16>(0, 0, 1023, 1023);
+  }
 
   std::deque<FloodState> stack;
 
@@ -237,6 +247,10 @@ static Vector2f FloodFillRegion(path::Pathfinder& pathfinder, const WalledBitset
     MapCoord coord = current.coord;
 
     stack.pop_front();
+
+    if (depth_map) {
+      depth_map->Set(coord.x, coord.y, current.depth);
+    }
 
     size_t global_index = (size_t)coord.y * (size_t)1024 + (size_t)coord.x;
 
@@ -283,7 +297,9 @@ static Vector2f FloodFillRegion(path::Pathfinder& pathfinder, const WalledBitset
 
   // Shrink region down to minimal memory use.
   region.Fit(start.x, start.y, true);
-
+  if (depth_map) {
+    depth_map->ShrinkFit(start.x, start.x, start.y, start.y);
+  }
   return entrance_position;
 }
 

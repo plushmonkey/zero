@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <zero/game/Logger.h>
 #include <zero/game/Platform.h>
+#include <zero/game/WorkQueue.h>
 
 #define SECURITY_DEBUG_LOG 1
 

@@ -5,11 +5,19 @@
 #include <string.h>
 #include <zero/Types.h>
 
-#include <algorithm>
-
 namespace zero {
 
 constexpr float kPi = 3.14159265f;
+
+template <class T>
+const T& min(const T& a, const T& b) {
+  return (b < a) ? b : a;
+}
+
+template <class T>
+const T& max(const T& a, const T& b) {
+  return (a < b) ? b : a;
+}
 
 inline constexpr float Radians(float degrees) {
   constexpr float kDegreeToRadians = kPi / 180.0f;
@@ -162,7 +170,7 @@ struct Vector2f {
 };
 
 inline Vector2f Absolute(const Vector2f& v) {
-  return Vector2f(abs(v.x), abs(v.y));
+  return Vector2f(fabsf(v.x), fabsf(v.y));
 }
 
 inline Vector2f operator*(float value, const Vector2f& v) {
@@ -283,8 +291,8 @@ inline float BoxPointDistance(Vector2f box_pos, Vector2f box_extent, Vector2f p)
   Vector2f bmin = box_pos;
   Vector2f bmax = box_pos + box_extent;
 
-  float dx = std::max(std::max(bmin.x - p.x, 0.0f), p.x - bmax.x);
-  float dy = std::max(std::max(bmin.y - p.y, 0.0f), p.y - bmax.y);
+  float dx = max(max(bmin.x - p.x, 0.0f), p.x - bmax.x);
+  float dy = max(max(bmin.y - p.y, 0.0f), p.y - bmax.y);
 
   return sqrtf(dx * dx + dy * dy);
 }
@@ -299,9 +307,6 @@ inline bool RayBoxIntersect(const Vector2f& origin, const Vector2f& direction, c
   float t2 = (float)((rt.x - origin.x) * recip.x);
   float t3 = (float)((lb.y - origin.y) * recip.y);
   float t4 = (float)((rt.y - origin.y) * recip.y);
-
-  using std::max;
-  using std::min;
 
   float tmin = max(min(t1, t2), min(t3, t4));
   float tmax = min(max(t1, t2), max(t3, t4));

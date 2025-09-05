@@ -41,6 +41,8 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   target_compile_options(zero PRIVATE "/MP")
 endif()
 
+#target_compile_options(zero PRIVATE "-ftime-trace")
+
 target_include_directories(zero PRIVATE
                            .
                            lib

@@ -10,6 +10,8 @@
 #include <zero/game/net/PacketDispatcher.h>
 #include <zero/game/net/security/Checksum.h>
 
+#include <thread>
+
 namespace zero {
 
 extern const char* kServerName;

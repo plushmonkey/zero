@@ -8,6 +8,7 @@
 #include <zero/game/Memory.h>
 #include <zero/game/Platform.h>
 #include <zero/game/Random.h>
+#include <zero/game/WorkQueue.h>
 #include <zero/game/render/Graphics.h>
 
 namespace zero {

@@ -1,6 +1,7 @@
 #include "ShipController.h"
 
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <zero/game/ArenaSettings.h>

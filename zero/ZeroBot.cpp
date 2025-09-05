@@ -5,6 +5,7 @@
 #include <zero/game/Game.h>
 #include <zero/game/Logger.h>
 #include <zero/game/Settings.h>
+#include <zero/game/WorkQueue.h>
 
 #include <chrono>
 

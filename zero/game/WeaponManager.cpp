@@ -848,7 +848,7 @@ WeaponSimulateResult WeaponManager::GenerateWeapon(u16 player_id, WeaponData wea
   Weapon* weapon = weapons + weapon_count++;
 
   // Shouldn't be necessary, but do it anyway in case something wasn't initialized.
-  memset(weapon, 0, sizeof(Weapon));
+  memset((void*)weapon, 0, sizeof(Weapon));
 
   weapon->data = weapon_data;
   weapon->player_id = player_id;

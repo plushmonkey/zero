@@ -636,7 +636,7 @@ void PlayerManager::OnPlayerEnter(u8* pkt, size_t size) {
 
   Player* player = players + player_index;
 
-  memset(player, 0, sizeof(Player));
+  memset((void*)player, 0, sizeof(Player));
 
   player->ship = ship;
 
