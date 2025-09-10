@@ -227,8 +227,8 @@ struct FindEnemyBaseEntranceNode : public BehaviorNode {
 };
 
 struct SelectAttackingTeammateNode : public BehaviorNode {
-  SelectAttackingTeammateNode(const char* anchor_key, const char* output_key)
-      : anchor_key(anchor_key), output_key(output_key) {}
+  SelectAttackingTeammateNode(const char* in_base_position_key, const char* anchor_key, const char* output_key)
+      : in_base_position_key(in_base_position_key), anchor_key(anchor_key), output_key(output_key) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
     auto& pm = ctx.bot->game->player_manager;
@@ -236,29 +236,52 @@ struct SelectAttackingTeammateNode : public BehaviorNode {
 
     if (!self || self->ship >= 8) return ExecuteResult::Failure;
 
+    auto opt_base_position = ctx.blackboard.Value<Vector2f>(in_base_position_key);
+    if (!opt_base_position) return ExecuteResult::Failure;
+
     auto opt_anchor = ctx.blackboard.Value<Player*>(anchor_key);
     if (!opt_anchor) return ExecuteResult::Failure;
 
     auto opt_eg = ctx.blackboard.Value<ExtremeGames*>("eg");
     if (!opt_eg) return ExecuteResult::Failure;
 
+    // TODO: Randomize teammate selection with some probability.
+    Vector2f base_position = *opt_base_position;
+    Player* anchor = *opt_anchor;
     ExtremeGames* eg = *opt_eg;
 
-    // TODO: Randomize teammate selection with some probability.
+    Player* target = anchor;
 
-    ctx.blackboard.Set(output_key, *opt_anchor);
+    if (!eg->IsPositionInsideBase(anchor->position)) {
+      // Our anchor isn't in the base, so try to find the best
+      size_t base_index = eg->GetBaseFromPosition(base_position);
+
+      if (base_index < eg->bases.size()) {
+        float best_percent = 0.0f;
+
+        // Go through each player in the target base and find deepest teammate.
+        for (PlayerBaseState& state : eg->base_states[base_index].player_data) {
+          if (state.frequency == self->frequency && state.position_percent >= best_percent) {
+            best_percent = state.position_percent;
+            target = ctx.bot->game->player_manager.GetPlayerById(state.player_id);
+          }
+        }
+      }
+    }
+
+    ctx.blackboard.Set(output_key, target);
 
     return ExecuteResult::Success;
   }
 
+  const char* in_base_position_key = nullptr;
   const char* anchor_key = nullptr;
   const char* output_key = nullptr;
 };
 
 struct SelectDefendingTeammateNode : public BehaviorNode {
   SelectDefendingTeammateNode(const char* anchor_key, const char* output_key)
-    : anchor_key(anchor_key), output_key(output_key) {
-  }
+      : anchor_key(anchor_key), output_key(output_key) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
     auto& pm = ctx.bot->game->player_manager;
@@ -358,6 +381,66 @@ struct UpdateBaseStateNode : public BehaviorNode {
 
     return ExecuteResult::Success;
   }
+};
+
+// This will try to find a safe position for the anchor to sit around.
+struct CalculateAnchorPositionNode : public BehaviorNode {
+  CalculateAnchorPositionNode(const char* output_key) : output_key(output_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    auto self = ctx.bot->game->player_manager.GetSelf();
+    if (!self) return ExecuteResult::Failure;
+
+    auto opt_eg = ctx.blackboard.Value<ExtremeGames*>("eg");
+    if (!opt_eg) return ExecuteResult::Failure;
+
+    ExtremeGames* eg = *opt_eg;
+
+    size_t base_index = eg->GetBaseFromPosition(self->position);
+    if (base_index >= eg->bases.size()) return ExecuteResult::Failure;
+
+    auto& base = eg->bases[base_index];
+    auto& base_state = eg->base_states[base_index];
+
+    // TODO: We should find a safe position by looking at the base path instead.
+    constexpr const float kBehindPercentage = 0.03f;
+
+    float target_penetration = base_state.attacking_penetration_percent;
+
+    if (base_state.controlling_freq == self->frequency) {
+      // If we are defending, we want to sit above the penetration depth
+      target_penetration += kBehindPercentage;
+    } else {
+      // If we are attacking, we want to sit behind the penetration depth
+      target_penetration -= kBehindPercentage;
+    }
+
+    Vector2f target_position = GetPenerationPosition(eg, base_index, target_penetration);
+
+    ctx.blackboard.Set(output_key, target_position);
+
+    return ExecuteResult::Success;
+  }
+
+  Vector2f GetPenerationPosition(ExtremeGames* eg, size_t base_index, float target_penetration) const {
+    MapBase& base = eg->bases[base_index];
+
+    if (base.path.Empty()) {
+      return Vector2f(512, 512);
+    }
+
+    for (const Vector2f& position : base.path.points) {
+      float position_percent = eg->GetBasePenetrationPercent(base_index, position);
+
+      if (position_percent >= target_penetration) {
+        return position;
+      }
+    }
+
+    return base.path.points[0];
+  }
+
+  const char* output_key = nullptr;
 };
 
 }  // namespace eg

@@ -113,7 +113,10 @@ void ExtremeGamesController::CreateBases() {
     cfg.base_count = 1;
   }
 
-  // TODO: Add config option for specifying bases manually to reduce startup work. Or just store the results once per map.
+  cfg.populate_flood_map = true;
+
+  // TODO: Add config option for specifying bases manually to reduce startup work. Or just store the results once per
+  // map.
 
   eg->bases = FindBases(*bot->bot_controller->pathfinder, cfg);
   eg->base_states.resize(eg->bases.size());
@@ -158,17 +161,10 @@ void ExtremeGames::UpdateBaseState(ZeroBot& bot) {
     MapBase& base = bases[base_index];
     BaseState& state = base_states[base_index];
 
-    size_t path_size = base.path.points.size();
-    u16 value = base.path_flood_map.Get((u16)player->position.x, (u16)player->position.y);
-    float from_fr_percent = (float)value / (float)path_size;
-
-    if (from_fr_percent < 0.0f) from_fr_percent = 0.0f;
-    if (from_fr_percent > 1.0f) from_fr_percent = 1.0f;
-
     // Store how far through the base the player is. 0.0f is at the entrance and 1.0f is farthest point into flag room.
-    float traverse_percent = 1.0f - from_fr_percent;
+    float traverse_percent = GetBasePenetrationPercent(base_index, player->position);
 
-    state.player_data.push_back(PlayerBaseState{player->id, traverse_percent});
+    state.player_data.push_back(PlayerBaseState{player->id, player->frequency, traverse_percent});
 
     if (player->id == self->id) {
       state.self_penetration_percent = traverse_percent;

@@ -12,6 +12,7 @@ namespace eg {
 
 struct PlayerBaseState {
   PlayerId player_id;
+  u16 frequency;
   float position_percent;
 };
 
@@ -55,7 +56,7 @@ struct ExtremeGames {
   std::vector<MapBase> bases;
   std::vector<BaseState> base_states;
 
-  size_t GetBaseFromPosition(Vector2f position) {
+  size_t GetBaseFromPosition(Vector2f position) const {
     struct Coord {
       u16 x;
       u16 y;
@@ -80,6 +81,33 @@ struct ExtremeGames {
     }
 
     return -1;
+  }
+
+  bool IsPositionInsideBase(Vector2f position) const { return GetBaseFromPosition(position) < bases.size(); }
+
+  bool IsSameBase(Vector2f position1, Vector2f position2) const {
+    size_t base1 = GetBaseFromPosition(position1);
+
+    return base1 != -1 && base1 == GetBaseFromPosition(position2);
+  }
+
+  float GetBasePenetrationPercent(Vector2f position) const {
+    size_t base_index = GetBaseFromPosition(position);
+
+    return GetBasePenetrationPercent(base_index, position);
+  }
+
+  float GetBasePenetrationPercent(size_t base_index, Vector2f position) const {
+    if (base_index >= bases.size()) return 0.0f;
+    if (bases[base_index].max_depth == 0) return 0.0f;
+
+    u16 depth = bases[base_index].path_flood_map.Get((u16)position.x, (u16)position.y);
+    float penetration = (float)depth / bases[base_index].max_depth;
+
+    if (penetration < 0.0f) penetration = 0.0f;
+    if (penetration > 1.0f) penetration = 1.0f;
+
+    return 1.0f - penetration;
   }
 
   void UpdateBaseState(ZeroBot& bot);

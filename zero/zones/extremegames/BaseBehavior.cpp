@@ -29,7 +29,7 @@
 
 /*
 
-TODO: 
+TODO:
 
 This is not complete. It's just the foundation for making it function by detecting bases and collecting flags.
 
@@ -199,10 +199,8 @@ struct CombatRoleDecideNode : public BehaviorNode {
 
     if (base_index >= eg->bases.size()) return ExecuteResult::Failure;
 
-    MapBase& base = eg->bases[base_index];
     BaseState& state = eg->base_states[base_index];
-
-    Player* anchor = FindBestAnchor(ctx.bot->game->player_manager, state, state.controlling_freq == self->frequency);
+    Player* anchor = FindBestAnchor(ctx.bot->game->player_manager, *self, state);
 
     if (anchor) {
       ctx.blackboard.Set(anchor_output_key, anchor);
@@ -219,21 +217,25 @@ struct CombatRoleDecideNode : public BehaviorNode {
     return ExecuteResult::Success;
   }
 
-  Player* FindBestAnchor(PlayerManager& pm, BaseState& state, bool controlling) {
+  Player* FindBestAnchor(PlayerManager& pm, const Player& self, BaseState& state) {
     constexpr float kMaxDistanceFromEnemy = 0.2f;
 
     Player* best_anchor = nullptr;
     float best_distance_from_enemy = 0.0f;
 
+    bool controlling = state.controlling_freq == self.frequency;
+
     for (auto& player_data : state.player_data) {
+      if (player_data.frequency != self.frequency) continue;
+
       Player* player = pm.GetPlayerById(player_data.player_id);
 
       if (!player || player->ship >= 8) continue;
-      if (player->frequency != state.controlling_freq) continue;
 
       float distance_from_enemy = controlling ? (player_data.position_percent - state.attacking_penetration_percent)
                                               : (state.attacking_penetration_percent - player_data.position_percent);
-      if (distance_from_enemy < 0) continue;
+      distance_from_enemy = fabsf(distance_from_enemy);
+      // if (distance_from_enemy < 0) continue;
 
       // Choose this player if they are within the target penetration range and our current best is too far away
       bool new_best_closer_within_range =
@@ -242,7 +244,8 @@ struct CombatRoleDecideNode : public BehaviorNode {
       bool new_best_farther =
           distance_from_enemy > best_distance_from_enemy && distance_from_enemy < kMaxDistanceFromEnemy;
 
-      if (player->ship == 4 && distance_from_enemy < kMaxDistanceFromEnemy) {
+      // if (player->ship == 4 && distance_from_enemy < kMaxDistanceFromEnemy) {
+      if (player->ship == 4) {
         best_anchor = player;
         break;
       }
@@ -367,85 +370,87 @@ static std::unique_ptr<BehaviorNode> CreateCenterAttackTree(ExecuteContext& ctx)
 
   // clang-format off
   builder
-    .Sequence()
-        .Child<FindBestEnemyCenterNode>("nearest_target", kNonflaggerDistanceMultiplier, kNonflaggerDistanceRequirement)
-        .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
-        .Child<BulletDistanceNode>("bullet_distance")
-        .Child<PlayerPositionQueryNode>("self_position")
-        .InvertChild<DodgeIncomingDamage>(0.3f, 14.0f, 0.0f)
-        .Sequence(CompositeDecorator::Success) // If we have a portal but no location, lay one down.
-            .Child<ShipItemCountThresholdNode>(ShipItemType::Portal, 1)
-            .InvertChild<ShipPortalPositionQueryNode>()
-            .Child<InputActionNode>(InputAction::Portal)
-            .End()
-        .Selector()
-            .Sequence() // Path to target
-                .InvertChild<VisibilityQueryNode>("nearest_target_position")
-                .Child<GoToNode>("nearest_target_position")
+    .Selector()
+        .Child<DodgeIncomingDamage>(0.3f, 14.0f, 0.0f)
+        .Sequence()
+            .Child<FindBestEnemyCenterNode>("nearest_target", kNonflaggerDistanceMultiplier, kNonflaggerDistanceRequirement)
+            .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
+            .Child<BulletDistanceNode>("bullet_distance")
+            .Child<PlayerPositionQueryNode>("self_position")
+            .Sequence(CompositeDecorator::Success) // If we have a portal but no location, lay one down.
+                .Child<ShipItemCountThresholdNode>(ShipItemType::Portal, 1)
+                .InvertChild<ShipPortalPositionQueryNode>()
+                .Child<InputActionNode>(InputAction::Portal)
                 .End()
-            .Sequence()    
-                .Child<AimNode>(WeaponType::Bomb, "nearest_target", "bomb_aimshot")
-                .Child<AimNode>(WeaponType::Bullet, "nearest_target", "aimshot")
-                .Parallel() // Main update
-                    .Sequence(CompositeDecorator::Success)
-                        .Child<VectorNode>("aimshot", "face_position")
-                        .Selector() // Rush or keep distance
-                            .Sequence() // Rush at target if we have more energy
-                                .Child<PlayerEnergyQueryNode>("nearest_target", "target_energy")
-                                .Child<PlayerEnergyQueryNode>("self_energy")
-                                .Child<GreaterOrEqualThanNode<float>>("self_energy", "target_energy")
-                                .Child<SeekNode>("aimshot")
+            .Selector()
+                .Sequence() // Path to target
+                    .InvertChild<VisibilityQueryNode>("nearest_target_position")
+                    .Child<GoToNode>("nearest_target_position")
+                    .End()
+                .Sequence()    
+                    .Child<AimNode>(WeaponType::Bomb, "nearest_target", "bomb_aimshot")
+                    .Child<AimNode>(WeaponType::Bullet, "nearest_target", "aimshot")
+                    .Parallel() // Main update
+                        .Sequence(CompositeDecorator::Success)
+                            .Child<VectorNode>("aimshot", "face_position")
+                            .Selector() // Rush or keep distance
+                                .Sequence() // Rush at target if we have more energy
+                                    .Child<PlayerEnergyQueryNode>("nearest_target", "target_energy")
+                                    .Child<PlayerEnergyQueryNode>("self_energy")
+                                    .Child<GreaterOrEqualThanNode<float>>("self_energy", "target_energy")
+                                    .Child<SeekNode>("aimshot")
+                                    .End()
+                                .Child<SeekNode>("aimshot", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
                                 .End()
-                            .Child<SeekNode>("aimshot", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
                             .End()
+                        .Sequence(CompositeDecorator::Success) // Always check incoming damage so we can use it in repel and portal sequences.
+                            .Child<RepelDistanceQueryNode>("repel_distance")
+                            .Child<svs::IncomingDamageQueryNode>("repel_distance", "incoming_damage")
+                            .Child<PlayerCurrentEnergyQueryNode>("self_energy")
+                            .End()
+                        .Sequence(CompositeDecorator::Success) // If we are in danger but can't repel, use our portal.
+                            .InvertChild<ShipItemCountThresholdNode>(ShipItemType::Repel)
+                            .Child<ShipPortalPositionQueryNode>() // Check if we have a portal down.
+                            .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
+                            .Child<TimerExpiredNode>("defense_timer")
+                            .Child<InputActionNode>(InputAction::Warp)
+                            .Child<TimerSetNode>("defense_timer", 100)
+                            .End()
+                        .Sequence(CompositeDecorator::Success) // Use repel when in danger.
+                            .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Repel)
+                            .Child<TimerExpiredNode>("defense_timer")
+                            .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
+                            .Child<InputActionNode>(InputAction::Repel)
+                            .Child<TimerSetNode>("defense_timer", 100)
+                            .End()
+                        .Sequence(CompositeDecorator::Success) // Fire bomb
+                            .InvertChild<TileQueryNode>(kTileIdSafe)
+                            .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
+                            .Child<ShotVelocityQueryNode>(WeaponType::Bomb, "bomb_fire_velocity")
+                            .Child<RayNode>("self_position", "bomb_fire_velocity", "bomb_fire_ray")
+                            .Child<svs::DynamicPlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 3.0f)
+                            .Child<MoveRectangleNode>("target_bounds", "bomb_aimshot", "target_bounds")
+                            .Child<RayRectangleInterceptNode>("bomb_fire_ray", "target_bounds")
+                            .Child<InputActionNode>(InputAction::Bomb)
+                            .End()
+                        .Sequence(CompositeDecorator::Success) // Fire bullet
+                            .InvertChild<TileQueryNode>(kTileIdSafe)
+                            .InvertChild<InputQueryNode>(InputAction::Bomb)
+                            .InvertChild<DistanceThresholdNode>("nearest_target_position", "bullet_distance") // Only fire bullets when close
+                            .Child<ShotVelocityQueryNode>(WeaponType::Bullet, "bullet_fire_velocity")
+                            .Child<RayNode>("self_position", "bullet_fire_velocity", "bullet_fire_ray")
+                            .Child<svs::DynamicPlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 3.0f)
+                            .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
+                            .Child<RayRectangleInterceptNode>("bullet_fire_ray", "target_bounds")
+                            .Child<InputActionNode>(InputAction::Bullet)
+                            .End()
+                        .End() // End main update parallel
+                    .Sequence()
+                        .Child<BlackboardSetQueryNode>("face_position")
+                        .Child<RotationThresholdSetNode>(0.35f)
+                        .Child<FaceNode>("face_position")
+                        .Child<BlackboardEraseNode>("face_position")
                         .End()
-                    .Sequence(CompositeDecorator::Success) // Always check incoming damage so we can use it in repel and portal sequences.
-                        .Child<RepelDistanceQueryNode>("repel_distance")
-                        .Child<svs::IncomingDamageQueryNode>("repel_distance", "incoming_damage")
-                        .Child<PlayerCurrentEnergyQueryNode>("self_energy")
-                        .End()
-                    .Sequence(CompositeDecorator::Success) // If we are in danger but can't repel, use our portal.
-                        .InvertChild<ShipItemCountThresholdNode>(ShipItemType::Repel)
-                        .Child<ShipPortalPositionQueryNode>() // Check if we have a portal down.
-                        .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
-                        .Child<TimerExpiredNode>("defense_timer")
-                        .Child<InputActionNode>(InputAction::Warp)
-                        .Child<TimerSetNode>("defense_timer", 100)
-                        .End()
-                    .Sequence(CompositeDecorator::Success) // Use repel when in danger.
-                        .Child<ShipWeaponCapabilityQueryNode>(WeaponType::Repel)
-                        .Child<TimerExpiredNode>("defense_timer")
-                        .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
-                        .Child<InputActionNode>(InputAction::Repel)
-                        .Child<TimerSetNode>("defense_timer", 100)
-                        .End()
-                    .Sequence(CompositeDecorator::Success) // Fire bomb
-                        .InvertChild<TileQueryNode>(kTileIdSafe)
-                        .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
-                        .Child<ShotVelocityQueryNode>(WeaponType::Bomb, "bomb_fire_velocity")
-                        .Child<RayNode>("self_position", "bomb_fire_velocity", "bomb_fire_ray")
-                        .Child<svs::DynamicPlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 3.0f)
-                        .Child<MoveRectangleNode>("target_bounds", "bomb_aimshot", "target_bounds")
-                        .Child<RayRectangleInterceptNode>("bomb_fire_ray", "target_bounds")
-                        .Child<InputActionNode>(InputAction::Bomb)
-                        .End()
-                    .Sequence(CompositeDecorator::Success) // Fire bullet
-                        .InvertChild<TileQueryNode>(kTileIdSafe)
-                        .InvertChild<InputQueryNode>(InputAction::Bomb)
-                        .InvertChild<DistanceThresholdNode>("nearest_target_position", "bullet_distance") // Only fire bullets when close
-                        .Child<ShotVelocityQueryNode>(WeaponType::Bullet, "bullet_fire_velocity")
-                        .Child<RayNode>("self_position", "bullet_fire_velocity", "bullet_fire_ray")
-                        .Child<svs::DynamicPlayerBoundingBoxQueryNode>("nearest_target", "target_bounds", 3.0f)
-                        .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
-                        .Child<RayRectangleInterceptNode>("bullet_fire_ray", "target_bounds")
-                        .Child<InputActionNode>(InputAction::Bullet)
-                        .End()
-                    .End() // End main update parallel
-                .Sequence()
-                    .Child<BlackboardSetQueryNode>("face_position")
-                    .Child<RotationThresholdSetNode>(0.35f)
-                    .Child<FaceNode>("face_position")
-                    .Child<BlackboardEraseNode>("face_position")
                     .End()
                 .End()
             .End()
@@ -464,9 +469,13 @@ static std::unique_ptr<BehaviorNode> CreateFlagCollectTree(ExecuteContext& ctx) 
   // TODO: Stop cheating and actually have to look for flags.
   // TODO: Warp to center when it makes sense.
 
+  // How many tiles we should try to avoid teammates. This keeps us from clumping up.
+  constexpr float kTeamAvoidance = 6.0f;
+
   // clang-format off
   builder
     .Sequence()
+        .SuccessChild<AvoidTeamNode>(kTeamAvoidance)
         .Selector() // Choose between attacking and collecting flags
             .Composite(CreateCenterAttackTree(ctx))
             .Sequence()
@@ -480,11 +489,107 @@ static std::unique_ptr<BehaviorNode> CreateFlagCollectTree(ExecuteContext& ctx) 
   return builder.Build();
 }
 
+static std::unique_ptr<BehaviorNode> CreateAnchorTree(ExecuteContext& ctx) {
+  BehaviorBuilder builder;
+
+  // clang-format off
+  builder
+    .Sequence()
+        .Child<FindNearestEnemyInBaseNode>("nearest_player")
+        .Child<PlayerPositionQueryNode>("nearest_player", "nearest_target_position")
+        .Child<SameBaseNode>("self_position", "nearest_target_position")
+        .Child<CalculateAnchorPositionNode>("anchor_target_position")
+        .Selector(CompositeDecorator::Success) 
+            .Sequence()
+                .Child<ShipTraverseQueryNode>("anchor_target_position")
+                .Child<ArriveNode>("anchor_target_position", 1.25f)
+                .End()
+            .Child<GoToNode>("anchor_target_position")
+            .End()
+        .Selector(CompositeDecorator::Success) // TODO: Improve combat
+            .Sequence()
+                .Child<PlayerEnergyPercentThresholdNode>(0.8f)
+                .Child<InputActionNode>(InputAction::Bomb)
+                .End()
+        .End();
+  // clang-format on
+
+  return builder.Build();
+}
+
+static std::unique_ptr<BehaviorNode> CreateRusherTree(ExecuteContext& ctx) {
+  BehaviorBuilder builder;
+
+  // clang-format off
+  builder
+    .Sequence()
+        .Child<FindNearestEnemyInBaseNode>("nearest_player")
+        .Child<PlayerPositionQueryNode>("nearest_player", "nearest_target_position")
+        .Child<SameBaseNode>("self_position", "nearest_target_position")
+        .Sequence(CompositeDecorator::Success) 
+            //.InvertChild<VisibilityQueryNode>("nearest_target_position")
+            .Child<GoToNode>("nearest_target_position")
+            .End()
+        .Selector(CompositeDecorator::Success) // TODO: Improve combat
+            .Sequence()
+                .Child<ExecuteNode>([](ExecuteContext& ctx) { // Determine if we should be shooting bullets.
+                  auto self = ctx.bot->game->player_manager.GetSelf();
+                  if (!self) return ExecuteResult::Failure;
+
+                  float path_distance = ctx.bot->bot_controller->current_path.GetRemainingDistance();
+
+                  s32 alive_time = ctx.bot->game->connection.settings.BulletAliveTime;
+                  float weapon_speed = GetWeaponSpeed(*ctx.bot->game, *self, WeaponType::Bullet);
+                  float weapon_distance = weapon_speed * (alive_time / 100.0f) * 0.75f;
+
+                  Vector2f next = ctx.bot->bot_controller->current_path.GetNext();
+                  Vector2f forward = next - self->position;
+
+                  // Don't shoot if we aren't aiming ahead in the path.
+                  if (forward.Dot(self->GetHeading()) < 0.0f) return ExecuteResult::Failure;
+                  // Don't shoot if we aren't moving forward.
+                  if (self->velocity.Dot(forward) < 0.0f) return ExecuteResult::Failure;
+
+                  return path_distance <= weapon_distance ? ExecuteResult::Success : ExecuteResult::Failure;
+                })
+                .Child<InputActionNode>(InputAction::Bullet)
+                .End()
+            .Sequence()
+                .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
+                .Child<ExecuteNode>([](ExecuteContext& ctx) { // Determine if we should be shooting bombs.
+                  auto self = ctx.bot->game->player_manager.GetSelf();
+                  if (!self) return ExecuteResult::Failure;
+
+                  float path_distance = ctx.bot->bot_controller->current_path.GetRemainingDistance();
+
+                  s32 alive_time = ctx.bot->game->connection.settings.BombAliveTime;
+                  float weapon_speed = GetWeaponSpeed(*ctx.bot->game, *self, WeaponType::Bomb);
+                  float weapon_distance = weapon_speed * (alive_time / 100.0f) * 0.75f;
+
+                  Vector2f next = ctx.bot->bot_controller->current_path.GetNext();
+                  Vector2f forward = next - self->position;
+
+                  // Don't shoot if we aren't aiming ahead in the path.
+                  if (forward.Dot(self->GetHeading()) < 0.0f) return ExecuteResult::Failure;
+                          
+                  return path_distance <= weapon_distance ? ExecuteResult::Success : ExecuteResult::Failure;
+                })
+                .Child<InputActionNode>(InputAction::Bomb)
+                .End()
+        .End();
+  // clang-format on
+
+  return builder.Build();
+}
+
 static std::unique_ptr<BehaviorNode> CreateBaseAttackTree(ExecuteContext& ctx) {
   BehaviorBuilder builder;
 
   // How many tiles we should try to avoid teammtes. This keeps us from clumping up.
   constexpr float kTeamAvoidance = 8.0f;
+  // Don't attach if the best attach target is closer than this many tiles. This is to prevent every bot from attaching
+  // right at the base entrance when approaching.
+  constexpr float kAttachDistanceRequirement = 45.0f;
 
   // clang-format off
   builder
@@ -502,7 +607,9 @@ static std::unique_ptr<BehaviorNode> CreateBaseAttackTree(ExecuteContext& ctx) {
                 .Selector()
                     .Sequence() // Try attaching to a teammate if we aren't in base.
                         .Child<TimerExpiredNode>("attach_cooldown")
-                        .Child<SelectAttackingTeammateNode>("anchor", "best_attach_teammate")
+                        .Child<SelectAttackingTeammateNode>("best_base_entrance", "anchor", "best_attach_teammate")
+                        .Child<PlayerPositionQueryNode>("best_attach_teammate", "best_attach_teammate_position")
+                        .Child<DistanceThresholdNode>("best_attach_teammate_position", kAttachDistanceRequirement)
                         .Child<AttachNode>("best_attach_teammate")
                         .Child<TimerSetNode>("attach_cooldown", kAttachCooldown)
                         .End()
@@ -510,60 +617,15 @@ static std::unique_ptr<BehaviorNode> CreateBaseAttackTree(ExecuteContext& ctx) {
                     .Child<GoToNode>("best_base_entrance")
                     .End()
                 .End()
-            .Sequence() // If we are in base, attack nearest target.
-                .Child<FindNearestEnemyInBaseNode>("nearest_player")
-                .Child<PlayerPositionQueryNode>("nearest_player", "nearest_target_position")
-                .Child<SameBaseNode>("self_position", "nearest_target_position")
-                .Sequence(CompositeDecorator::Success) 
-                    //.InvertChild<VisibilityQueryNode>("nearest_target_position")
-                    .Child<GoToNode>("nearest_target_position")
+            .Selector() // We are in the target base, select tree based on combat role
+                .Sequence()
+                    .Child<CombatRoleEqualityNode>("combat_role", CombatRole::Anchor)
+                    .Composite(CreateAnchorTree(ctx))
                     .End()
-                .Selector(CompositeDecorator::Success) // TODO: Improve combat
-                    .Sequence()
-                        .Child<ExecuteNode>([](ExecuteContext& ctx) { // Determine if we should be shooting bullets.
-                          auto self = ctx.bot->game->player_manager.GetSelf();
-                          if (!self) return ExecuteResult::Failure;
-
-                          float path_distance = ctx.bot->bot_controller->current_path.GetRemainingDistance();
-
-                          s32 alive_time = ctx.bot->game->connection.settings.BulletAliveTime;
-                          float weapon_speed = GetWeaponSpeed(*ctx.bot->game, *self, WeaponType::Bullet);
-                          float weapon_distance = weapon_speed * (alive_time / 100.0f) * 0.75f;
-
-                          Vector2f next = ctx.bot->bot_controller->current_path.GetNext();
-                          Vector2f forward = next - self->position;
-
-                          // Don't shoot if we aren't aiming ahead in the path.
-                          if (forward.Dot(self->GetHeading()) < 0.0f) return ExecuteResult::Failure;
-                          // Don't shoot if we aren't moving forward.
-                          if (self->velocity.Dot(forward) < 0.0f) return ExecuteResult::Failure;
-
-                          return path_distance <= weapon_distance ? ExecuteResult::Success : ExecuteResult::Failure;
-                        })
-                        .Child<InputActionNode>(InputAction::Bullet)
-                        .End()
-                    .Sequence()
-                        .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
-                        .Child<ExecuteNode>([](ExecuteContext& ctx) { // Determine if we should be shooting bombs.
-                          auto self = ctx.bot->game->player_manager.GetSelf();
-                          if (!self) return ExecuteResult::Failure;
-
-                          float path_distance = ctx.bot->bot_controller->current_path.GetRemainingDistance();
-
-                          s32 alive_time = ctx.bot->game->connection.settings.BombAliveTime;
-                          float weapon_speed = GetWeaponSpeed(*ctx.bot->game, *self, WeaponType::Bomb);
-                          float weapon_distance = weapon_speed * (alive_time / 100.0f) * 0.75f;
-
-                          Vector2f next = ctx.bot->bot_controller->current_path.GetNext();
-                          Vector2f forward = next - self->position;
-
-                          // Don't shoot if we aren't aiming ahead in the path.
-                          if (forward.Dot(self->GetHeading()) < 0.0f) return ExecuteResult::Failure;
-                          
-                          return path_distance <= weapon_distance ? ExecuteResult::Success : ExecuteResult::Failure;
-                        })
-                        .Child<InputActionNode>(InputAction::Bomb)
-                        .End()
+                .Sequence()
+                    .Child<CombatRoleEqualityNode>("combat_role", CombatRole::Rusher)
+                    .Composite(CreateRusherTree(ctx))
+                    .End()
                 .End()
             .End()
         .End();
@@ -577,6 +639,8 @@ static std::unique_ptr<BehaviorNode> CreateBaseDefendTree(ExecuteContext& ctx) {
 
   // How many tiles we should try to avoid teammtes. This keeps us from clumping up.
   constexpr float kTeamAvoidance = 8.0f;
+  // Don't attach if the best attach target is closer than this many tiles.
+  constexpr float kAttachDistanceRequirement = 45.0f;
 
   // clang-format off
   builder
@@ -595,6 +659,8 @@ static std::unique_ptr<BehaviorNode> CreateBaseDefendTree(ExecuteContext& ctx) {
                     .Sequence() // Try attaching to a teammate if we aren't in base.
                         .Child<TimerExpiredNode>("attach_cooldown")
                         .Child<SelectDefendingTeammateNode>("anchor", "best_attach_teammate")
+                        .Child<PlayerPositionQueryNode>("best_attach_teammate", "best_attach_teammate_position")
+                        .Child<DistanceThresholdNode>("best_attach_teammate_position", kAttachDistanceRequirement)
                         .Child<AttachNode>("best_attach_teammate")
                         .Child<TimerSetNode>("attach_cooldown", kAttachCooldown)
                         .End()
@@ -602,60 +668,24 @@ static std::unique_ptr<BehaviorNode> CreateBaseDefendTree(ExecuteContext& ctx) {
                     .Child<GoToNode>("best_base_entrance")
                     .End()
                 .End()
-            .Sequence() // If we are in base, attack nearest target.
-                .Child<FindNearestEnemyInBaseNode>("nearest_target")
-                .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
-                .Child<SameBaseNode>("self_position", "nearest_target_position")
-                .Sequence(CompositeDecorator::Success) 
-                    //.InvertChild<VisibilityQueryNode>("nearest_target_position")
-                    .Child<GoToNode>("nearest_target_position")
+            .Selector()
+                .Sequence()
+                    .Child<CombatRoleEqualityNode>("combat_role", CombatRole::Anchor)
+#if 0
+                    .Sequence(CompositeDecorator::Success)
+                        .Child<TimerExpiredNode>("chatspam")
+                        .Child<TimerSetNode>("chatspam", 100)
+                        .Child<ExecuteNode>([](ExecuteContext& ctx) -> ExecuteResult {
+                              ctx.bot->game->chat.SendMessage(ChatType::Public, "Executing anchor tree.");
+                              return ExecuteResult::Success;
+                            })
+                        .End()
+#endif
+                    .Composite(CreateAnchorTree(ctx))
                     .End()
-                .Selector(CompositeDecorator::Success) // TODO: Improve combat
-                    .Sequence()
-                        .Child<ExecuteNode>([](ExecuteContext& ctx) { // Determine if we should be shooting bullets.
-                          auto self = ctx.bot->game->player_manager.GetSelf();
-                          if (!self) return ExecuteResult::Failure;
-
-                          float path_distance = ctx.bot->bot_controller->current_path.GetRemainingDistance();
-
-                          s32 alive_time = ctx.bot->game->connection.settings.BulletAliveTime;
-                          float weapon_speed = GetWeaponSpeed(*ctx.bot->game, *self, WeaponType::Bullet);
-                          float weapon_distance = weapon_speed * (alive_time / 100.0f) * 0.75f;
-
-                          Vector2f next = ctx.bot->bot_controller->current_path.GetNext();
-                          Vector2f forward = next - self->position;
-
-                          // Don't shoot if we aren't aiming ahead in the path.
-                          if (forward.Dot(self->GetHeading()) < 0.0f) return ExecuteResult::Failure;
-                          // Don't shoot if we aren't moving forward.
-                          if (self->velocity.Dot(forward) < 0.0f) return ExecuteResult::Failure;
-
-                          return path_distance <= weapon_distance ? ExecuteResult::Success : ExecuteResult::Failure;
-                        })
-                        .Child<InputActionNode>(InputAction::Bullet)
-                        .End()
-                    .Sequence()
-                        .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
-                        .Child<ExecuteNode>([](ExecuteContext& ctx) { // Determine if we should be shooting bombs.
-                          auto self = ctx.bot->game->player_manager.GetSelf();
-                          if (!self) return ExecuteResult::Failure;
-
-                          float path_distance = ctx.bot->bot_controller->current_path.GetRemainingDistance();
-
-                          s32 alive_time = ctx.bot->game->connection.settings.BombAliveTime;
-                          float weapon_speed = GetWeaponSpeed(*ctx.bot->game, *self, WeaponType::Bomb);
-                          float weapon_distance = weapon_speed * (alive_time / 100.0f) * 0.75f;
-
-                          Vector2f next = ctx.bot->bot_controller->current_path.GetNext();
-                          Vector2f forward = next - self->position;
-
-                          // Don't shoot if we aren't aiming ahead in the path.
-                          if (forward.Dot(self->GetHeading()) < 0.0f) return ExecuteResult::Failure;
-                          
-                          return path_distance <= weapon_distance ? ExecuteResult::Success : ExecuteResult::Failure;
-                        })
-                        .Child<InputActionNode>(InputAction::Bomb)
-                        .End()
+                .Sequence()
+                    .Child<CombatRoleEqualityNode>("combat_role", CombatRole::Rusher)
+                    .Composite(CreateRusherTree(ctx))
                     .End()
                 .End()
             .Sequence() // We are in a base, but no closest enemy. Path to start of base.

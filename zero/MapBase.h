@@ -278,6 +278,7 @@ struct MapBase {
   path::Path path;
 
   RegionDataMap<u16> path_flood_map;
+  u16 max_depth;
 };
 
 struct MapBuildConfig {
