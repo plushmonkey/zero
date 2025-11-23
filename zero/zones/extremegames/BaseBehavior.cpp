@@ -33,13 +33,11 @@ TODO:
 
 This is not complete. It's just the foundation for making it function by detecting bases and collecting flags.
 
-There is no anchor implemented so they will all just rush in and die.
-The bots will stay in a base if it's cleared with no flags.
-There are situations where they will fall back to waypointing when they shouldn't.
-Dropping flags and neuting flags is not implemented.
-Combat is not really implemented.
+Dropping flags and neuting flags is not properly implemented.
+Combat is not really implemented. Both center and basing combat is rudimentary.
 Center flag fetching is not very good. The combat is bad and the bots need team-avoidance steering.
 Detecting flanking and deciding to flank needs to be implemented.
+Should collect flags if the nearest one is very close. Currently just follows basic guideline of collecting some flags and going to a base.
 
 */
 
@@ -85,7 +83,7 @@ struct GameRoleDecideNode : public BehaviorNode {
         role = has_base_control ? GameRole::DefendBase : GameRole::AttackBase;
 
         if (has_base_control && self->flags > 0) {
-          // role = GameRole::DropFlags;
+          role = GameRole::DropFlags;
         }
       }
     } else {
@@ -125,7 +123,8 @@ struct GameRoleDecideNode : public BehaviorNode {
           for (size_t i = 0; i < ctx.bot->game->flag_count; ++i) {
             GameFlag* flag = ctx.bot->game->flags + i;
 
-            if ((flag->flags & GameFlag_Dropped) && eg->GetBaseFromPosition(flag->position) == -1) {
+            if ((flag->flags & GameFlag_Dropped) && flag->owner != self->frequency &&
+                eg->GetBaseFromPosition(flag->position) == -1) {
               has_public_flag = true;
               break;
             }
@@ -234,8 +233,7 @@ struct CombatRoleDecideNode : public BehaviorNode {
 
       float distance_from_enemy = controlling ? (player_data.position_percent - state.attacking_penetration_percent)
                                               : (state.attacking_penetration_percent - player_data.position_percent);
-      distance_from_enemy = fabsf(distance_from_enemy);
-      // if (distance_from_enemy < 0) continue;
+      if (distance_from_enemy < 0) continue;
 
       // Choose this player if they are within the target penetration range and our current best is too far away
       bool new_best_closer_within_range =
@@ -244,8 +242,7 @@ struct CombatRoleDecideNode : public BehaviorNode {
       bool new_best_farther =
           distance_from_enemy > best_distance_from_enemy && distance_from_enemy < kMaxDistanceFromEnemy;
 
-      // if (player->ship == 4 && distance_from_enemy < kMaxDistanceFromEnemy) {
-      if (player->ship == 4) {
+      if (player->ship == 4 && distance_from_enemy < kMaxDistanceFromEnemy) {
         best_anchor = player;
         break;
       }
@@ -499,12 +496,16 @@ static std::unique_ptr<BehaviorNode> CreateAnchorTree(ExecuteContext& ctx) {
         .Child<PlayerPositionQueryNode>("nearest_player", "nearest_target_position")
         .Child<SameBaseNode>("self_position", "nearest_target_position")
         .Child<CalculateAnchorPositionNode>("anchor_target_position")
+        .Child<RectangleNode>("anchor_target_position", Vector2f(1, 1), "anchor_rect")
+        .Child<RenderRectNode>("world_camera", "anchor_rect", Vector3f(1, 0, 0))
         .Selector(CompositeDecorator::Success) 
             .Sequence()
                 .Child<ShipTraverseQueryNode>("anchor_target_position")
-                .Child<ArriveNode>("anchor_target_position", 1.25f)
+                .Child<ArriveNode>("anchor_target_position", 16.0f)
                 .End()
-            .Child<GoToNode>("anchor_target_position")
+            .Sequence()
+                .Child<GoToNode>("anchor_target_position")
+                .End()
             .End()
         .Selector(CompositeDecorator::Success) // TODO: Improve combat
             .Sequence()
@@ -622,7 +623,7 @@ static std::unique_ptr<BehaviorNode> CreateBaseAttackTree(ExecuteContext& ctx) {
                     .Child<CombatRoleEqualityNode>("combat_role", CombatRole::Anchor)
                     .Composite(CreateAnchorTree(ctx))
                     .End()
-                .Sequence()
+                .Sequence() // TODO: Defend anchor while near front of base and slowly move in.
                     .Child<CombatRoleEqualityNode>("combat_role", CombatRole::Rusher)
                     .Composite(CreateRusherTree(ctx))
                     .End()
@@ -731,18 +732,47 @@ static std::unique_ptr<BehaviorNode> CreateBaseDefendTree(ExecuteContext& ctx) {
 static std::unique_ptr<BehaviorNode> CreateFlagDropTree(ExecuteContext& ctx) {
   BehaviorBuilder builder;
 
-  // TODO: Implement
+  constexpr float kNearAnchorDistance = 2.0f;
 
   // clang-format off
   builder
     .Sequence()
-        .Selector() // Choose between attacking and collecting flags
-            .Composite(CreateCenterAttackTree(ctx))
-            .Sequence()
-                .Child<NearestFlagNode>(NearestFlagNode::Type::Unclaimed, "nearest_flag")
-                .Child<FlagPositionQueryNode>("nearest_flag", "nearest_flag_position")
-                .Child<GoToNode>("nearest_flag_position")
+        .Child<FindTeamBaseEntranceNode>("best_base_entrance")
+        .Child<CombatRoleDecideNode>("best_base_entrance", "combat_role", "anchor")
+        .Selector()
+            .Sequence() // Don't drop flags as anchor TODO: Implement something better
+                .Child<CombatRoleEqualityNode>("combat_role", CombatRole::Anchor)
+                .Composite(CreateBaseDefendTree(ctx), CompositeDecorator::Success)
                 .End()
+            .Selector() // If we aren't the anchor, neut flags near anchor. TODO: Move behind the anchor and drop in safe area
+                .Sequence()
+                    .InvertChild<CombatRoleEqualityNode>("combat_role", CombatRole::Anchor)
+#if 0
+                    .Child<ArenaFlagCountNode>("arena_flag_count")
+                    .Child<TeamFlagCountNode>("anchor", "team_flag_count")
+                    .Child<EqualityNode<size_t>>("arena_flag_count", "team_flag_count")
+#endif
+                    .Child<PlayerPositionQueryNode>("anchor", "anchor_position")
+                    .Child<GoToNode>("anchor_position")
+                    .Sequence(CompositeDecorator::Success)
+                        .InvertChild<DistanceThresholdNode>("anchor_position", kNearAnchorDistance)
+                        .Selector() // Switch to another ship if we are near the anchor.
+                            .Sequence()
+                                .Child<ShipQueryNode>(0)
+                                .Child<ShipRequestNode>(1)
+                                .End()
+                            .Sequence()
+                                .Child<ShipRequestNode>(0)
+                                .End()
+                            .End()
+                        .End()
+                    .End()
+                .Sequence()
+                    .Child<BaseFlagroomPositionNode>("best_base_entrance", "base_flagroom_position")
+                    .Child<GoToNode>("base_flagroom_position")
+                    .End()
+                .End()
+            .End()
         .End();
   // clang-format on
 
@@ -787,7 +817,7 @@ std::unique_ptr<BehaviorNode> BaseBehavior::CreateTree(ExecuteContext& ctx) {
                     .End()
                 .Sequence()
                     .Child<GameRoleEqualityNode>("game_role", GameRole::DropFlags)
-                    .Composite(CreateBaseDefendTree(ctx)) // TODO: Implement
+                    .Composite(CreateFlagDropTree(ctx))
                     .End()
                 .End()
             .End()

@@ -24,6 +24,9 @@ struct BaseState {
   // How far through the base the farthest attacker is.
   float attacking_penetration_percent;
 
+  // How far through the base the closest-to-entrance defender is. 0.0 is entrance, 1.0 is flagroom.
+  float defending_penetration_percent;
+
   // How far through the base we are. 0.0f being entrance 1.0f being flagroom.
   float self_penetration_percent;
 
@@ -49,6 +52,24 @@ struct BaseState {
 
   inline u32 GetDefendingFlagCount() const {
     return flag_controlling_dropped_count + flag_controlling_carried_count + flag_unclaimed_dropped_count;
+  }
+
+  inline bool GetPlayerPenetration(PlayerId pid, float* penetration) {
+    for (size_t i = 0; i < player_data.size(); ++i) {
+      if (pid == player_data[i].player_id) {
+        if (penetration) {
+          *penetration = player_data[i].position_percent;
+        }
+
+        return true;
+      }
+    }
+
+    if (penetration) {
+      *penetration = 0.0f;
+    }
+
+    return false;
   }
 };
 

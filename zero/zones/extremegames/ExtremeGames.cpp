@@ -140,6 +140,7 @@ void ExtremeGames::UpdateBaseState(ZeroBot& bot) {
     state.flag_controlling_dropped_count = 0;
     state.controlling_freq = 0xFFFF;
     state.attacking_penetration_percent = 0.0f;
+    state.defending_penetration_percent = 1.0f;
     state.player_data.clear();
   }
 
@@ -150,10 +151,14 @@ void ExtremeGames::UpdateBaseState(ZeroBot& bot) {
 
   if (!self) return;
 
+  float enter_delay = (float)bot.game->connection.settings.EnterDelay;
+
   for (size_t i = 0; i < pm.player_count; ++i) {
     Player* player = pm.players + i;
 
     if (player->ship >= 8) continue;
+    // Skip player if they are dead and outside of attach time.
+    if (player->enter_delay > 0.0f && player->enter_delay <= enter_delay) continue;
 
     size_t base_index = GetBaseFromPosition(player->position);
     if (base_index >= bases.size() || base_index >= base_states.size()) continue;
@@ -188,6 +193,8 @@ void ExtremeGames::UpdateBaseState(ZeroBot& bot) {
 
       if (!control_player && player_state.position_percent > state.attacking_penetration_percent) {
         state.attacking_penetration_percent = player_state.position_percent;
+      } else if (control_player && player_state.position_percent < state.defending_penetration_percent) {
+        state.defending_penetration_percent = player_state.position_percent;
       }
 
       if (player->flags > 0) {

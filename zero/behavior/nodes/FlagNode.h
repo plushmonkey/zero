@@ -47,6 +47,49 @@ struct FlagPositionQueryNode : public BehaviorNode {
   const char* output_key = nullptr;
 };
 
+struct ArenaFlagCountNode : public behavior::BehaviorNode {
+  ArenaFlagCountNode(const char* output_key) : output_key(output_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    ctx.blackboard.Set<size_t>(output_key, ctx.bot->game->flag_count);
+    return behavior::ExecuteResult::Success;
+  }
+
+  const char* output_key = nullptr;
+};
+
+struct TeamFlagCountNode : public behavior::BehaviorNode {
+  TeamFlagCountNode(const char* output_key) : output_key(output_key) {}
+  TeamFlagCountNode(const char* player_key, const char* output_key) : player_key(player_key), output_key(output_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    Player* player = ctx.bot->game->player_manager.GetSelf();
+
+    if (player_key) {
+      auto opt_player = ctx.blackboard.Value<Player*>(player_key);
+      if (!opt_player) return behavior::ExecuteResult::Failure;
+
+      player = *opt_player;
+    }
+
+    size_t count = 0;
+    for (size_t i = 0; i < ctx.bot->game->flag_count; ++i) {
+      GameFlag* flag = ctx.bot->game->flags + i;
+
+      if (flag->owner == player->frequency) {
+        ++count;
+      }
+    }
+
+    ctx.blackboard.Set<size_t>(output_key, count);
+
+    return behavior::ExecuteResult::Success;
+  }
+
+  const char* player_key = nullptr;
+  const char* output_key = nullptr;
+};
+
 struct NearestFlagNode : public behavior::BehaviorNode {
   enum class Type { Claimed, Unclaimed, Any };
 

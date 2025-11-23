@@ -267,6 +267,25 @@ struct SelectAttackingTeammateNode : public BehaviorNode {
           }
         }
       }
+
+      if (target == anchor) {
+        // Search teammates for closest to base if none are inside the target base.
+        float best_distance_sq = 1024 * 1024.0f;
+
+        for (size_t i = 0; i < pm.player_count; ++i) {
+          Player* player = pm.players + i;
+
+          if (player->ship >= 8) continue;
+          if (player->frequency != self->frequency) continue;
+          if (player->IsRespawning()) continue;
+
+          float dist_sq = player->position.DistanceSq(base_position);
+          if (dist_sq < best_distance_sq) {
+            best_distance_sq = dist_sq;
+            target = player;
+          }
+        }
+      }
     }
 
     ctx.blackboard.Set(output_key, target);
@@ -329,13 +348,7 @@ struct FindNearestEnemyInBaseNode : public BehaviorNode {
 
     float self_position = 0.0f;
 
-    for (size_t i = 0; i < state.player_data.size(); ++i) {
-      u16 pid = state.player_data[i].player_id;
-      if (pid == self->id) {
-        self_position = state.player_data[i].position_percent;
-        break;
-      }
-    }
+    state.GetPlayerPenetration(self->id, &self_position);
 
     Player* best_target = nullptr;
     float closest_dist = 1.0f;
@@ -403,16 +416,16 @@ struct CalculateAnchorPositionNode : public BehaviorNode {
     auto& base_state = eg->base_states[base_index];
 
     // TODO: We should find a safe position by looking at the base path instead.
-    constexpr const float kBehindPercentage = 0.03f;
+    constexpr const float kBehindPercentage = 0.075f;
 
-    float target_penetration = base_state.attacking_penetration_percent;
+    float target_penetration = 0.0f;
 
     if (base_state.controlling_freq == self->frequency) {
-      // If we are defending, we want to sit above the penetration depth
-      target_penetration += kBehindPercentage;
+      // If we are defending, we want to sit above the attacking penetration depth
+      target_penetration = base_state.attacking_penetration_percent + kBehindPercentage;
     } else {
-      // If we are attacking, we want to sit behind the penetration depth
-      target_penetration -= kBehindPercentage;
+      // If we are attacking, we want to sit behind the defending penetration depth
+      target_penetration = base_state.defending_penetration_percent - kBehindPercentage;
     }
 
     Vector2f target_position = GetPenerationPosition(eg, base_index, target_penetration);
