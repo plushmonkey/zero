@@ -277,16 +277,14 @@ static std::unique_ptr<behavior::BehaviorNode> CreateMineAreaBehavior() {
             .End()
         .Selector() // We have a mine location, so go lay it there.
             .Sequence()
-                .InvertChild<ShipTraverseQueryNode>("mine_position")
-                .Child<GoToNode>("mine_position")
-                .End()
-            .Sequence()
+                .Child<ShipTraverseQueryNode>("mine_position")
                 .Child<ArriveNode>("mine_position", 1.25f)
                 .Sequence(CompositeDecorator::Success)
                     .InvertChild<DistanceThresholdNode>("mine_position", 0.5f)
                     .Child<InputActionNode>(InputAction::Mine)
                     .End()
                 .End()
+            .Child<GoToNode>("mine_position")
             .End()
         .End();
   // clang-format on
@@ -387,10 +385,10 @@ std::unique_ptr<behavior::BehaviorNode> CreateSharkBasingTree(behavior::ExecuteC
                     .Child<InFlagroomNode>("nearest_target_position")
                     .Selector()
                         .Sequence()
-                            .InvertChild<ShipTraverseQueryNode>("nearest_target_position")
-                            .Child<GoToNode>("nearest_target_position")
+                            .Child<ShipTraverseQueryNode>("nearest_target_position")
+                            .Composite(CreateOffensiveTree("nearest_target", "nearest_target_position"))
                             .End()
-                        .Composite(CreateOffensiveTree("nearest_target", "nearest_target_position"))
+                        .Child<GoToNode>("nearest_target_position")
                         .End()
                     .End()
                 .Composite(CreateMineAreaBehavior()) // No enemy, so mine areas if possible

@@ -2,6 +2,7 @@
 
 #include <zero/behavior/BehaviorBuilder.h>
 #include <zero/behavior/BehaviorTree.h>
+#include <zero/behavior/nodes/InputActionNode.h>
 #include <zero/behavior/nodes/MapNode.h>
 #include <zero/behavior/nodes/MathNode.h>
 #include <zero/behavior/nodes/MoveNode.h>
@@ -135,14 +136,17 @@ std::unique_ptr<behavior::BehaviorNode> SoloBehavior::CreateTree(behavior::Execu
             .Child<WaypointNode>("waypoints", "waypoint_index", "waypoint_position", 15.0f)
             .Selector()
                 .Sequence()
-                    .InvertChild<ShipTraverseQueryNode>("waypoint_position")
-                    .Child<GoToNode>("waypoint_position")
-                    .End()
-                .Parallel()
+                    .Child<ShipTraverseQueryNode>("waypoint_position")
                     .Child<FaceNode>("waypoint_position")
                     .Child<ArriveNode>("waypoint_position", 1.25f)
                     .End()
+                .Sequence()
+                    .Child<GoToNode>("waypoint_position")
+                    .End()                
                 .End()
+            .End()
+        .Sequence() // Warp out if all above sequences failed. We must be in a non-traversable area because waypoint following failed to build a path.
+            .Child<WarpNode>()
             .End()
         .End();
   // clang-format on

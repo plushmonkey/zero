@@ -220,12 +220,12 @@ struct FollowPathNode : public BehaviorNode {
     auto& game = *ctx.bot->game;
     float radius = game.connection.settings.ShipSettings[self->ship].GetRadius();
 
-    if (current_path.IsDone()) {
-      return ExecuteResult::Success;
-    }
-
     if (current_path.Empty()) {
       return ExecuteResult::Failure;
+    }
+
+    if (current_path.IsDone()) {
+      return ExecuteResult::Success;
     }
 
     Vector2f movement_target = current_path.GetCurrent();

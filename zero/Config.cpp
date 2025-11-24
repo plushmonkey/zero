@@ -1,5 +1,6 @@
 #include "Config.h"
 
+#include <zero/Utility.h>
 #include <zero/game/Logger.h>
 
 #include <string>
@@ -202,7 +203,7 @@ std::unique_ptr<Config> Config::Load(const char* file_path) {
       ConfigGroup& group = result->GetOrCreateGroup(std::string(current_group.data));
 
       std::string key(token.data);
-      std::string value(value_token.data);
+      std::string value(Trim(value_token.data));
 
       group.map[key] = value;
     }

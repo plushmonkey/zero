@@ -602,8 +602,8 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
 
         if (settings->DoorMode >= 0) {
           // Force update
-          map.last_seed_tick = GetCurrentTick() - settings->DoorDelay;
-          map.UpdateDoors(*settings);
+          map.last_seed_tick = MAKE_TICK(GetCurrentTick() - settings->DoorDelay);
+          map.UpdateDoors(*settings, true);
         }
 
         if (old_door_mode != this->settings.DoorMode) {
@@ -626,7 +626,7 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
 
         map.door_rng.Seed(security.door_seed);
         map.last_seed_tick = MAKE_TICK(security.timestamp - time_diff);
-        map.UpdateDoors(settings);
+        map.UpdateDoors(settings, true);
 
         if (security.checksum_key && map.checksum) {
           SendSecurityPacket();

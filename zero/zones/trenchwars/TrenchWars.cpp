@@ -329,6 +329,11 @@ void TwController::CreateFlagroomBitset() {
 }
 
 void TrenchWars::HandleEvent(const DoorToggleEvent&) {
+  // Always clear path on door change in TrenchWars.
+  // This improves the behaviors so they don't get stuck thinking they can go somewhere impossible when they get stuck
+  // behind doors.
+  this->bot.bot_controller->current_path.Clear();
+
   if (roof_fr_set.empty()) return;
 
   Log(LogLevel::Debug, "TrenchWars: Updating roof flagroom set.");

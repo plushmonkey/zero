@@ -1,5 +1,8 @@
 #pragma once
 
+#include <stdlib.h>
+#include <zero/Types.h>
+
 #include <string>
 #include <string_view>
 #include <vector>

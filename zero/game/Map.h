@@ -134,7 +134,7 @@ struct Map {
   // Checks if a ship is currently overlapping any tiles.
   bool IsColliding(const Vector2f& position, float radius, u32 frequency) const;
 
-  void UpdateDoors(const ArenaSettings& settings);
+  void UpdateDoors(const ArenaSettings& settings, bool force_update = false);
   void SeedDoors(u32 seed);
 
   u32 GetChecksum(u32 key) const;

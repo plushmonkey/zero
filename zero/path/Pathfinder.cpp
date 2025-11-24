@@ -105,6 +105,7 @@ Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& 
 
     // this is the only way to break the pathfinder
     if (node == goal) {
+      touched_.push_back(node);
       break;
     }
 
@@ -185,28 +186,29 @@ Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& 
     }
   }
 
+  // Only build the path if the goal was reached.
   if (goal->parent_id != ~0) {
     path.Add(Vector2f(start_p.x + 0.5f, start_p.y + 0.5f));
-  }
 
-  // Construct path backwards from goal node
-  std::vector<NodePoint> points;
-  Node* current = goal;
+    // Construct path backwards from goal node
+    std::vector<NodePoint> points;
+    Node* current = goal;
 
-  while (current != nullptr && current != start) {
-    NodePoint p = processor_->GetPoint(current);
-    points.push_back(p);
-    current = processor_->GetNodeFromIndex(current->parent_id);
-  }
+    while (current != nullptr && current != start) {
+      NodePoint p = processor_->GetPoint(current);
+      points.push_back(p);
+      current = processor_->GetNodeFromIndex(current->parent_id);
+    }
 
-  // Reverse and store as vector
-  for (std::size_t i = 0; i < points.size(); ++i) {
-    std::size_t index = points.size() - i - 1;
-    Vector2f pos(points[index].x + 0.5f, points[index].y + 0.5f);
+    // Reverse and store as vector
+    for (std::size_t i = 0; i < points.size(); ++i) {
+      std::size_t index = points.size() - i - 1;
+      Vector2f pos(points[index].x + 0.5f, points[index].y + 0.5f);
 
-    pos = map.ResolveShipCollision(pos, radius, 0xFFFF);
+      pos = map.ResolveShipCollision(pos, radius, 0xFFFF);
 
-    path.Add(pos);
+      path.Add(pos);
+    }
   }
 
   for (Node* node : touched_) {

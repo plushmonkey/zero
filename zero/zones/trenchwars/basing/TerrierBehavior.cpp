@@ -512,7 +512,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateEntranceWaitBehavior() {
 
   Vector2f west_position(507, 286);
   Vector2f east_position(517, 286);
-  
+
   // clang-format off
   builder
     .Selector()
@@ -734,6 +734,64 @@ static std::unique_ptr<behavior::BehaviorNode> CreateXRadarBehavior() {
   return builder.Build();
 }
 
+// Check if we can path to the flag while we're in the flagroom. If we can't, then warp to center because we are behind
+// a door. This is done here manually instead of falling back to the BasingBehavior default because it's too much work
+// to refactor this tree.
+static std::unique_ptr<behavior::BehaviorNode> CreateBadRegionWarpBehavior() {
+  using namespace behavior;
+
+  BehaviorBuilder builder;
+
+  struct PathableFlagNode : public BehaviorNode {
+    ExecuteResult Execute(ExecuteContext& ctx) override {
+      auto self = ctx.bot->game->player_manager.GetSelf();
+      if (!self || self->ship >= 8) return ExecuteResult::Failure;
+
+      auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+      if (!opt_tw) return ExecuteResult::Failure;
+
+      TrenchWars* tw = *opt_tw;
+
+      float radius = ctx.bot->game->connection.settings.ShipSettings[self->ship].GetRadius();
+
+      auto& pathfinder = ctx.bot->bot_controller->pathfinder;
+      if (pathfinder) {
+        auto path =
+            pathfinder->FindPath(ctx.bot->game->GetMap(), self->position, tw->flag_position, radius, self->frequency);
+
+        if (path.Empty()) {
+          return ExecuteResult::Failure;
+        }
+      }
+
+      return ExecuteResult::Success;
+    }
+  };
+
+  constexpr u32 kStuckTimerTicks = 500;
+
+  // clang-format off
+  builder
+    .Sequence()
+        .Child<PlayerPositionQueryNode>("self_position")
+        .Child<InFlagroomNode>("self_position")
+        .Child<TimerExpiredNode>("tw_stuck_detect_timer")
+        .InvertChild<PathableFlagNode>()
+        .Sequence(CompositeDecorator::Success) // Not pathable, so always return success to stop running main behavior while we wait for energy.
+            .Sequence(CompositeDecorator::Success) // Turn off xradar if we have it on.
+                .Child<PlayerStatusQueryNode>(Status_XRadar)
+                .Child<InputActionNode>(InputAction::XRadar)
+                .End()
+            .Child<PlayerEnergyPercentThresholdNode>(1.0f)
+            .Child<WarpNode>()
+            .Child<TimerSetNode>("tw_stuck_detect_timer", kStuckTimerTicks)
+            .End()
+        .End();
+  // clang-format on
+
+  return builder.Build();
+}
+
 std::unique_ptr<behavior::BehaviorNode> CreateTerrierBasingTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
@@ -741,16 +799,19 @@ std::unique_ptr<behavior::BehaviorNode> CreateTerrierBasingTree(behavior::Execut
 
   // clang-format off
   builder
-    .Sequence()
-        .SuccessChild<FlagroomPartitionNode>("partition")
-        .Composite(CreateXRadarBehavior(), CompositeDecorator::Success)
-        .Selector() // Handle main behavior based on base position
-            .Composite(CreateEntranceRushBehavior())
-            .Composite(CreateEntranceBehavior())
-            .Composite(CreateBelowEntranceBehavior())
-            .Composite(CreateFlagroomTravelBehavior())
-            .Composite(CreateFlagroomBehavior())
-            .Composite(CreateIdleBehavior())
+    .Selector()
+        .Composite(CreateBadRegionWarpBehavior())
+        .Sequence()
+            .SuccessChild<FlagroomPartitionNode>("partition")
+            .Composite(CreateXRadarBehavior(), CompositeDecorator::Success)
+            .Selector() // Handle main behavior based on base position
+                .Composite(CreateEntranceRushBehavior())
+                .Composite(CreateEntranceBehavior())
+                .Composite(CreateBelowEntranceBehavior())
+                .Composite(CreateFlagroomTravelBehavior())
+                .Composite(CreateFlagroomBehavior())
+                .Composite(CreateIdleBehavior())
+                .End()
             .End()
         .End();
   // clang-format on

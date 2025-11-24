@@ -712,7 +712,7 @@ size_t Map::GetTileCount(Tile* tiles, size_t tile_count, TileId id_begin, TileId
   return count;
 }
 
-void Map::UpdateDoors(const ArenaSettings& settings) {
+void Map::UpdateDoors(const ArenaSettings& settings, bool force_update) {
   u32 current_tick = GetCurrentTick();
 
   // Check if we received any settings first
@@ -727,6 +727,10 @@ void Map::UpdateDoors(const ArenaSettings& settings) {
 
   if (count >= 100) {
     count = 100;
+  }
+
+  if (force_update && settings.DoorMode >= 0) {
+    count = 1;
   }
 
   for (s32 i = 0; i < count; ++i) {

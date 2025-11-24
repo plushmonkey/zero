@@ -35,7 +35,9 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>,
                        EventHandler<DoorToggleEvent>,
                        EventHandler<LoginResponseEvent>,
                        EventHandler<BrickTileEvent>,
-                       EventHandler<BrickTileClearEvent> {
+                       EventHandler<BrickTileClearEvent>,
+                       EventHandler<TeleportEvent>,
+                       EventHandler<PlayerAttachEvent> {
   Game& game;
 
   std::unique_ptr<path::Pathfinder> pathfinder;
@@ -72,6 +74,8 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>,
   void HandleEvent(const BrickTileEvent& event) override;
   void HandleEvent(const BrickTileClearEvent& event) override;
   void HandleEvent(const LoginResponseEvent& event) override;
+  void HandleEvent(const TeleportEvent& event) override;
+  void HandleEvent(const PlayerAttachEvent& event) override;
 
   struct UpdateEvent : public Event {
     BotController& controller;

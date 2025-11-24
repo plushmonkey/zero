@@ -58,6 +58,16 @@ void BotController::HandleEvent(const PlayerFreqAndShipChangeEvent& event) {
   UpdatePathfinder(radius);
 }
 
+void BotController::HandleEvent(const TeleportEvent& event) {
+  this->current_path.Clear();
+}
+
+void BotController::HandleEvent(const PlayerAttachEvent& event) {
+  if (event.attacher.id == this->game.player_manager.player_id) {
+    this->current_path.Clear();
+  }
+}
+
 void BotController::UpdatePathfinder(float radius) {
   if (pathfinder && pathfinder->config.ship_radius == radius) {
     pathfinder->SetDoorSolidMethod(door_solid_method);
