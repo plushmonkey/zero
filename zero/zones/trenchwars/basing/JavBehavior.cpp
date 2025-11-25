@@ -389,8 +389,6 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
 
   BehaviorBuilder builder;
 
-  constexpr float kNearFlagroomDistance = 50.0f;
-
   // clang-format off
   builder
     .Sequence()
@@ -419,21 +417,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
                     .Child<AfterburnerThresholdNode>()
                     .End()
                 .Selector()
-                    .Sequence() // Attach to teammate if possible
-                        .InvertChild<AttachedQueryNode>("self")
-                        .Child<DistanceThresholdNode>("tw_flag_position", kNearFlagroomDistance)
-                        .Child<TimerExpiredNode>("attach_cooldown")
-                        .Child<BestAttachQueryNode>("best_attach_player")
-                        .Child<AttachNode>("best_attach_player")
-                        .Child<TimerSetNode>("attach_cooldown", 100)
-                        .End()
-                    .Sequence() // Detach when near flag room
-                        .Child<AttachedQueryNode>("self")
-                        .InvertChild<DistanceThresholdNode>("tw_flag_position", kNearFlagroomDistance)
-                        .Child<TimerExpiredNode>("attach_cooldown")
-                        .Child<DetachNode>()
-                        .Child<TimerSetNode>("attach_cooldown", 100)
-                        .End()
+                    .Composite(CreateBaseAttachTree("self"))
                     .Sequence() // Go directly to the flag room if we aren't there.
                         .InvertChild<InFlagroomNode>("self_position")
                         .Child<GoToNode>("tw_flag_position")

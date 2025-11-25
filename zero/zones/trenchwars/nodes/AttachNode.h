@@ -3,6 +3,8 @@
 #include <zero/ZeroBot.h>
 #include <zero/behavior/BehaviorBuilder.h>
 #include <zero/behavior/BehaviorTree.h>
+#include <zero/behavior/nodes/AttachNode.h>
+#include <zero/behavior/nodes/TimerNode.h>
 #include <zero/zones/trenchwars/TrenchWars.h>
 
 namespace zero {
@@ -64,6 +66,63 @@ struct BestAttachQueryNode : public behavior::BehaviorNode {
   bool require_closer_than_self = true;
   const char* output_key = nullptr;
 };
+
+struct AttachParentValidNode : public behavior::BehaviorNode {
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto self = ctx.bot->game->player_manager.GetSelf();
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    PlayerId parent_id = self->attach_parent;
+    if (parent_id == kInvalidPlayerId) return behavior::ExecuteResult::Failure;
+
+    Player* parent = ctx.bot->game->player_manager.GetPlayerById(parent_id);
+    if (parent == nullptr || parent->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    constexpr float kMinimumSpeed = 0.1f;
+
+    if (parent->velocity.LengthSq() <= kMinimumSpeed * kMinimumSpeed) return behavior::ExecuteResult::Failure;
+
+    return behavior::ExecuteResult::Success;
+  }
+};
+
+inline std::unique_ptr<behavior::BehaviorNode> CreateBaseAttachTree(const char* self_key) {
+  using namespace behavior;
+
+  BehaviorBuilder builder;
+
+  constexpr u32 kAttachCooldown = 100;
+  constexpr u32 kDetachTimeout = 2000;
+  constexpr float kNearFlagroomDistance = 50.0f;
+
+  // clang-format off
+  builder
+    .Selector()
+        .Sequence() // Attach to teammate if possible
+            .InvertChild<AttachedQueryNode>(self_key)
+            .Child<DistanceThresholdNode>("tw_flag_position", kNearFlagroomDistance)
+            .Child<TimerExpiredNode>("attach_cooldown")
+            .Child<BestAttachQueryNode>("best_attach_player")
+            .Child<AttachNode>("best_attach_player")
+            .Child<TimerSetNode>("attach_cooldown", kAttachCooldown)
+            .Child<TimerSetNode>("detach_timeout", kDetachTimeout)
+            .End()
+        .Sequence() // Detach if near flagroom or bad parent
+            .Child<AttachedQueryNode>(self_key)
+            .Selector() // Detach if we are close to flagroom or our parent ended up being a bad attach target.
+                .InvertChild<DistanceThresholdNode>("tw_flag_position", kNearFlagroomDistance)
+                .InvertChild<AttachParentValidNode>()
+                .Child<TimerExpiredNode>("detach_timeout")
+                .End()
+            .Child<TimerExpiredNode>("attach_cooldown")
+            .Child<DetachNode>()
+            .Child<TimerSetNode>("attach_cooldown", kAttachCooldown)
+            .End()
+        .End();
+  // clang-format on
+
+  return builder.Build();
+}
 
 }  // namespace tw
 }  // namespace zero
