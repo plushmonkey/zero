@@ -201,10 +201,10 @@ void TwController::CreateFlagroomBitset() {
   // Mark unreachable tiles near the flag as part of the flagroom.
   // This will stop weasels from hiding in there and not being considered occupying flagroom.
   const MapCoord kSpecialTiles[] = {
-      MapCoord(507, 269),
-      MapCoord(507, 270),
-      MapCoord(517, 269),
-      MapCoord(517, 270),
+      MapCoord(flag_x - 5, flag_y),
+      MapCoord(flag_x - 5, flag_y + 1),
+      MapCoord(flag_x + 5, flag_y),
+      MapCoord(flag_x + 5, flag_y + 1),
   };
 
   for (auto coord : kSpecialTiles) {

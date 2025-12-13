@@ -35,11 +35,18 @@ constexpr float kTerrierLeashDistance = 30.0f;
 // This checks all of the enemy weapons to make sure none are in the provided rect.
 // Returns success if the estimated weapon damage in this area is less than the provided threshold.
 struct SafeRectNode : behavior::BehaviorNode {
-  SafeRectNode(Rectangle rect, u32 damage_threshold) : rect(rect) {}
+  SafeRectNode(const char* rect_key, u32 damage_threshold) : rect_key(rect_key), damage_threshold(damage_threshold) {}
+  SafeRectNode(Rectangle rect, u32 damage_threshold) : rect(rect), damage_threshold(damage_threshold) {}
 
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
     auto self = ctx.bot->game->player_manager.GetSelf();
     if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    if (rect_key) {
+      auto opt_rect = ctx.blackboard.Value<Rectangle>(rect_key);
+      if (!opt_rect) return behavior::ExecuteResult::Failure;
+      rect = *opt_rect;
+    }
 
     auto& wm = ctx.bot->game->weapon_manager;
 
@@ -64,6 +71,7 @@ struct SafeRectNode : behavior::BehaviorNode {
   }
 
   u32 damage_threshold = 0;
+  const char* rect_key = nullptr;
   Rectangle rect;
 };
 
@@ -422,28 +430,48 @@ static std::unique_ptr<behavior::BehaviorNode> CreateEntranceRushBehavior() {
 
   BehaviorBuilder builder;
 
-  constexpr float kNearEntranceDistance = 15.0f;
+  struct EntranceRushNode : public BehaviorNode {
+    EntranceRushNode(const char* output_key) : output_key(output_key) {}
 
-  const Rectangle kWestCheckRect(Vector2f(503, 272), Vector2f(508, 277));
-  const Rectangle kEastCheckRect(Vector2f(516, 272), Vector2f(521, 277));
+    ExecuteResult Execute(ExecuteContext& ctx) override {
+      auto self = ctx.bot->game->player_manager.GetSelf();
+      if (!self || self->ship >= 8) return ExecuteResult::Failure;
 
-  const Vector2f kWestPosition(498, 278);
-  const Vector2f kEastPosition(525, 278);
+      auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+      if (!opt_tw) return ExecuteResult::Failure;
+      TrenchWars* tw = *opt_tw;
+
+      Vector2f flag_pos = tw->flag_position + Vector2f(0.5f, 0.5f);
+      Rectangle west_rect(flag_pos + Vector2f(-9, 2), flag_pos + Vector2f(-4, 7));
+      Rectangle east_rect(flag_pos + Vector2f(4, 2), flag_pos + Vector2f(9, 7));
+
+      if (west_rect.Contains(self->position)) {
+        Vector2f west_position = flag_pos + Vector2f(-14, 9);
+
+        ctx.blackboard.Set<Vector2f>(output_key, west_position);
+
+        return ExecuteResult::Success;
+      }
+
+      if (east_rect.Contains(self->position)) {
+        Vector2f east_position = flag_pos + Vector2f(14, 9);
+
+        ctx.blackboard.Set<Vector2f>(output_key, east_position);
+
+        return ExecuteResult::Success;
+      }
+
+      return ExecuteResult::Failure;
+    }
+
+    const char* output_key = nullptr;
+  };
 
   // clang-format off
   builder
     .Sequence()
-        .Child<PlayerPositionQueryNode>("self_position")
-        .Selector()
-            .Sequence()
-                .Child<RectangleContainsNode>(kWestCheckRect, "self_position")
-                .Child<GoToNode>(kWestPosition)
-                .End()
-            .Sequence()
-                .Child<RectangleContainsNode>(kEastCheckRect, "self_position")
-                .Child<GoToNode>(kEastPosition)
-                .End()
-            .End()
+        .Child<EntranceRushNode>("rush_position")
+        .Child<GoToNode>("rush_position")
         .End();
   // clang-format on
 
@@ -459,13 +487,33 @@ static std::unique_ptr<behavior::BehaviorNode> CreateEntranceBehavior() {
 
   constexpr float kNearEntranceDistance = 15.0f;
 
-  const Rectangle kCheckRect(Vector2f(504, 271), Vector2f(520, 285));
+  struct GetCheckRectNode : public BehaviorNode {
+    GetCheckRectNode(const char* output_key) : output_key(output_key) {}
+
+    ExecuteResult Execute(ExecuteContext& ctx) override {
+      auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+      if (!opt_tw) return ExecuteResult::Failure;
+      TrenchWars* tw = *opt_tw;
+
+      Vector2f flag_pos = tw->flag_position + Vector2f(0.5f, 0.5f);
+      Vector2f start = flag_pos + Vector2f(-8, 2);
+      Vector2f end = flag_pos + Vector2f(8, 16);
+      Rectangle rect(start, end);
+
+      ctx.blackboard.Set(output_key, rect);
+
+      return ExecuteResult::Success;
+    }
+
+    const char* output_key = nullptr;
+  };
 
   // clang-format off
   builder
     .Sequence()
         .Child<PlayerPositionQueryNode>("self_position")
-        .Child<RectangleContainsNode>(kCheckRect, "self_position")
+        .Child<GetCheckRectNode>("entrance_rect")
+        .Child<RectangleContainsNode>("entrance_rect", "self_position")
         .Child<NearEntranceNode>(kNearEntranceDistance)
         .SuccessChild<DodgeIncomingDamage>(0.1f, 15.0f, 0.0f)
         .Composite(CreateBurstSequence())
@@ -510,8 +558,34 @@ static std::unique_ptr<behavior::BehaviorNode> CreateEntranceWaitBehavior() {
 
   BehaviorBuilder builder;
 
-  Vector2f west_position(507, 286);
-  Vector2f east_position(517, 286);
+  struct GetSafePositionNode : public BehaviorNode {
+    GetSafePositionNode(EmptySideAreaNode::Side side, const char* output_key) : side(side), output_key(output_key) {}
+
+    ExecuteResult Execute(ExecuteContext& ctx) override {
+      auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+      if (!opt_tw) return ExecuteResult::Failure;
+      TrenchWars* tw = *opt_tw;
+
+      switch (side) {
+        case EmptySideAreaNode::Side::West: {
+          Vector2f position = tw->flag_position + Vector2f(-5, 20);
+          ctx.blackboard.Set<Vector2f>(output_key, position);
+        } break;
+        case EmptySideAreaNode::Side::East: {
+          Vector2f position = tw->flag_position + Vector2f(5, 20);
+          ctx.blackboard.Set<Vector2f>(output_key, position);
+        } break;
+        default: {
+          return ExecuteResult::Failure;
+        } break;
+      }
+
+      return ExecuteResult::Success;
+    }
+
+    EmptySideAreaNode::Side side = EmptySideAreaNode::Side::West;
+    const char* output_key = nullptr;
+  };
 
   // clang-format off
   builder
@@ -519,11 +593,13 @@ static std::unique_ptr<behavior::BehaviorNode> CreateEntranceWaitBehavior() {
         .Child<EscapeBombExplodeQuadrantNode>("partition")
         .Sequence() // If west side is empty, hug that wall.
             .Child<EmptySideAreaNode>(EmptySideAreaNode::Side::West)
-            .Child<GoToNode>(west_position)
+            .Child<GetSafePositionNode>(EmptySideAreaNode::Side::West, "safe_position")
+            .Child<GoToNode>("safe_position")
             .End()
         .Sequence() // If east side is empty, hug that wall.
             .Child<EmptySideAreaNode>(EmptySideAreaNode::Side::East)
-            .Child<GoToNode>(east_position)
+            .Child<GetSafePositionNode>(EmptySideAreaNode::Side::East, "safe_position")
+            .Child<GoToNode>("safe_position")
             .End()
         .Sequence()
             .Child<GoToNode>("tw_entrance_position")
@@ -546,7 +622,27 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBelowEntranceBehavior() {
   // We have it higher than the terrier energy because not all should hit.
   constexpr u32 kDangerousEntranceDamage = 2500;
 
-  const Rectangle kEntranceBottomShaftRect(Vector2f(509, 277), Vector2f(516, 293));
+  struct GetEntranceShaftRectNode : public BehaviorNode {
+    GetEntranceShaftRectNode(const char* output_key) : output_key(output_key) {}
+
+    ExecuteResult Execute(ExecuteContext& ctx) override {
+      auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+      if (!opt_tw) return ExecuteResult::Failure;
+      TrenchWars* tw = *opt_tw;
+
+      Vector2f flag_pos = tw->flag_position + Vector2f(0.5f, 0.5f);
+
+      Vector2f start = flag_pos + Vector2f(-3, 2);
+      Vector2f end = flag_pos + Vector2f(3, 24);
+      Rectangle rect(start, end);
+
+      ctx.blackboard.Set(output_key, rect);
+
+      return ExecuteResult::Success;
+    }
+
+    const char* output_key = nullptr;
+  };
 
   // clang-format off
   builder
@@ -579,7 +675,8 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBelowEntranceBehavior() {
                         .End()
                     .End()
                 .Child<EmptyEntranceNode>()
-                .Child<SafeRectNode>(kEntranceBottomShaftRect, kDangerousEntranceDamage)
+                .Child<GetEntranceShaftRectNode>("entrance_shaft_rect")
+                .Child<SafeRectNode>("entrance_shaft_rect", kDangerousEntranceDamage)
                 .Child<GoToNode>("tw_entrance_position") // Move into entrance area so other tree takes over.
                 .End()
             .Selector(CompositeDecorator::Success) // Above area is not yet safe, stay below and dodge.

@@ -3,6 +3,7 @@
 #include <zero/Math.h>
 #include <zero/behavior/Behavior.h>
 #include <zero/behavior/BehaviorBuilder.h>
+#include <zero/zones/trenchwars/TrenchWars.h>
 
 namespace zero {
 namespace tw {
@@ -19,14 +20,22 @@ struct BasingBehavior : public behavior::Behavior {
 
     ctx.blackboard.Set("leash_distance", 35.0f);
 
-    std::vector<Vector2f> waypoints{
-        Vector2f(495, 275),
-        Vector2f(505, 263),
-        Vector2f(530, 265),
-        Vector2f(525, 280),
-    };
+    auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+    if (opt_tw) {
+      TrenchWars* tw = *opt_tw;
+      Vector2f flag_pos = tw->flag_position;
 
-    ctx.blackboard.Set("waypoints", waypoints);
+      // TODO: Should find empty spaces in base instead of hoping they are traversable.
+      std::vector<Vector2f> waypoints{
+          flag_pos + Vector2f(-17, 6),
+          flag_pos + Vector2f(-7, -6),
+
+          flag_pos + Vector2f(18, -4),
+          flag_pos + Vector2f(13, 11),
+      };
+
+      ctx.blackboard.Set("waypoints", waypoints);
+    }
   }
 
   std::unique_ptr<behavior::BehaviorNode> CreateTree(behavior::ExecuteContext& ctx) override;

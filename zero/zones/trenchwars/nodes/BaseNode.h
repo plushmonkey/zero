@@ -145,8 +145,10 @@ struct EmptySideAreaNode : public behavior::BehaviorNode {
     if (!opt_tw) return behavior::ExecuteResult::Failure;
     TrenchWars* tw = *opt_tw;
 
-    Rectangle west_rectangle(Vector2f(500, 283), Vector2f(504, 293));
-    Rectangle east_rectangle(Vector2f(520, 283), Vector2f(524, 293));
+    Vector2f flag_pos = tw->flag_position + Vector2f(0.5f, 0.5f);
+
+    Rectangle west_rectangle(flag_pos + Vector2f(-12, 14), flag_pos + Vector2f(-8, 24));
+    Rectangle east_rectangle(flag_pos + Vector2f(8, 14), flag_pos + Vector2f(12, 24));
 
     Rectangle* check_rect = side == Side::West ? &west_rectangle : &east_rectangle;
 
