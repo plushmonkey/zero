@@ -48,7 +48,7 @@ class CommandExecutor {
  public:
   virtual void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) = 0;
   virtual CommandAccessFlags GetAccess() = 0;
-  virtual CommandFlags GetFlags() { return 0; }
+  virtual CommandFlags GetFlags() { return CommandFlag_Lockable; }
   // All of the aliases provided here should be lowercase.
   virtual std::vector<std::string> GetAliases() = 0;
   virtual std::string GetDescription() = 0;

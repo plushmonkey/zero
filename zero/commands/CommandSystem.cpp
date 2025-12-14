@@ -242,7 +242,7 @@ class SetFreqCommand : public CommandExecutor {
   }
 
   CommandAccessFlags GetAccess() override { return CommandAccess_Standard; }
-  std::vector<std::string> GetAliases() override { return { "setfreq", "sf"}; }
+  std::vector<std::string> GetAliases() override { return {"setfreq", "sf"}; }
   std::string GetDescription() override { return "Sets the frequency."; }
 };
 
@@ -398,6 +398,30 @@ class CommandsCommand : public CommandExecutor {
   std::string GetDescription() override { return "Shows available commands"; }
 };
 
+class LockCommand : public CommandExecutor {
+ public:
+  void Execute(CommandSystem& cmd, ZeroBot& bot, const std::string& sender, const std::string& arg) override {
+    bool new_value = !bot.execute_ctx.blackboard.ValueOr<bool>("CmdLock", false);
+
+    if (arg.size() > 0) {
+      if (arg[0] == 't' || arg[0] == 'T') {
+        new_value = true;
+      } else if (arg[0] == 'f' || arg[0] == 'F') {
+        new_value = false;
+      }
+    }
+
+    bot.execute_ctx.blackboard.Set<bool>("CmdLock", new_value);
+
+    std::string output = "Bot commands " + std::string(new_value ? "locked" : "unlocked");
+    Event::Dispatch(ChatQueueEvent::Private(sender.data(), output.data()));
+  }
+
+  CommandAccessFlags GetAccess() override { return CommandAccess_Private; }
+  std::vector<std::string> GetAliases() override { return {"lock"}; }
+  std::string GetDescription() override { return "Toggles command locking. !lock, !lock true, !lock false"; }
+};
+
 static inline std::string Lowercase(std::string_view str) {
   std::string result;
 
@@ -435,6 +459,7 @@ CommandSystem::CommandSystem(ZeroBot& bot, PacketDispatcher& dispatcher) : bot(b
   default_commands_.emplace_back(std::make_shared<BehaviorsCommand>());
   default_commands_.emplace_back(std::make_shared<QuitCommand>());
   default_commands_.emplace_back(std::make_shared<ReloadCommand>());
+  default_commands_.emplace_back(std::make_shared<LockCommand>());
 
   Reset();
 }
@@ -532,7 +557,7 @@ void CommandSystem::OnChatPacket(const u8* pkt, size_t size) {
 
           // If the command is lockable, bot is locked, and requester isn't an operator then ignore it.
           if (!(command.GetFlags() & CommandFlag_Lockable) || !bb.ValueOr<bool>("CmdLock", false) ||
-              security_level > 0) {
+              security_level > default_security_level_) {
             command.Execute(*this, bot, std::string(sender_name), arg);
             executed = true;
           }
@@ -596,6 +621,7 @@ void CommandSystem::SetDefaultSecurityLevels() {
   SetCommandSecurityLevel("commands", 0);
   SetCommandSecurityLevel("quit", 10);
   SetCommandSecurityLevel("reload", 10);
+  SetCommandSecurityLevel("lock", 10);
 }
 
 void CommandSystem::SetCommandSecurityLevel(const std::string& name, int level) {
