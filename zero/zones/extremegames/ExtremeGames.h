@@ -77,6 +77,8 @@ struct ExtremeGames {
   std::vector<MapBase> bases;
   std::vector<BaseState> base_states;
 
+  void CreateBases(ZeroBot& bot);
+
   size_t GetBaseFromPosition(Vector2f position) const {
     struct Coord {
       u16 x;

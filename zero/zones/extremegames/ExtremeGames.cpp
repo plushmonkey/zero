@@ -22,7 +22,6 @@ struct ExtremeGamesController : ZoneController {
   }
 
   void CreateBehaviors(const char* arena_name) override;
-  void CreateBases();
 
   std::unique_ptr<ExtremeGames> eg;
 };
@@ -32,7 +31,8 @@ static ExtremeGamesController controller;
 void ExtremeGamesController::CreateBehaviors(const char* arena_name) {
   Log(LogLevel::Info, "Registering eg behaviors.");
 
-  CreateBases();
+  eg = std::make_unique<ExtremeGames>();
+  eg->CreateBases(*bot);
 
   bot->execute_ctx.blackboard.Set("eg", eg.get());
 
@@ -46,16 +46,13 @@ void ExtremeGamesController::CreateBehaviors(const char* arena_name) {
   bot->bot_controller->energy_tracker.estimate_type = EnergyHeuristicType::Average;
 }
 
-void ExtremeGamesController::CreateBases() {
-  if (!eg) {
-    eg = std::make_unique<ExtremeGames>();
-  }
-
+void ExtremeGames::CreateBases(ZeroBot& bot) {
   MapBuildConfig cfg = {};
 
-  MapCoord spawn((u16)bot->game->connection.settings.SpawnSettings[0].X,
-                 (u16)bot->game->connection.settings.SpawnSettings[0].Y);
-  u32 radius = bot->game->connection.settings.SpawnSettings[0].Radius;
+  MapCoord spawn((u16)bot.game->connection.settings.SpawnSettings[0].X,
+                 (u16)bot.game->connection.settings.SpawnSettings[0].Y);
+  u32 radius = bot.game->connection.settings.SpawnSettings[0].Radius;
+  if (radius == 0) radius = 512;
 
   // Try to find a good starting area for searching for bases.
   constexpr size_t kMaxSpawnTries = 32;
@@ -65,7 +62,7 @@ void ExtremeGamesController::CreateBases() {
 
     MapCoord coord(spawn.x + rand_x, spawn.y + rand_y);
 
-    if (bot->game->GetMap().CanFit(Vector2f((float)coord.x, (float)coord.y), 14.0f / 16.0f, 0xFFFF)) {
+    if (bot.game->GetMap().CanFit(Vector2f((float)coord.x, (float)coord.y), 14.0f / 16.0f, 0xFFFF)) {
       cfg.spawn = coord;
       break;
     }
@@ -73,7 +70,7 @@ void ExtremeGamesController::CreateBases() {
 
   std::vector<Vector2f> waypoints;
 
-  auto opt_waypoints = this->bot->config->GetString("ExtremeGames", "Waypoints");
+  auto opt_waypoints = bot.config->GetString("ExtremeGames", "Waypoints");
   if (opt_waypoints) {
     std::string_view waypoint_str = *opt_waypoints;
     std::vector<std::string_view> split_waypoints = SplitString(waypoint_str, ";");
@@ -104,9 +101,9 @@ void ExtremeGamesController::CreateBases() {
     waypoints.emplace_back(450.0f, 560.0f);
   }
 
-  this->bot->execute_ctx.blackboard.Set("base_center_waypoints", waypoints);
+  bot.execute_ctx.blackboard.Set("base_center_waypoints", waypoints);
 
-  auto opt_base_count = this->bot->config->GetInt("ExtremeGames", "BaseCount");
+  auto opt_base_count = bot.config->GetInt("ExtremeGames", "BaseCount");
   if (opt_base_count) {
     cfg.base_count = *opt_base_count;
   } else {
@@ -118,12 +115,12 @@ void ExtremeGamesController::CreateBases() {
   // TODO: Add config option for specifying bases manually to reduce startup work. Or just store the results once per
   // map.
 
-  eg->bases = FindBases(*bot->bot_controller->pathfinder, cfg);
-  eg->base_states.resize(eg->bases.size());
+  this->bases = FindBases(*bot.bot_controller->pathfinder, cfg);
+  this->base_states.resize(this->bases.size());
 
-  for (MapBase& base : eg->bases) {
-    base.path = bot->bot_controller->pathfinder->FindPath(bot->game->GetMap(), base.entrance_position,
-                                                          base.flagroom_position, 14.0f / 16.0f, 0xFFFF);
+  for (MapBase& base : this->bases) {
+    base.path = bot.bot_controller->pathfinder->FindPath(bot.game->GetMap(), base.entrance_position,
+                                                         base.flagroom_position, 14.0f / 16.0f, 0xFFFF);
     if (!base.path.points.empty()) {
       // Move the entrance a bit inside so we are definitely in the base.
       size_t new_entrance_index = (size_t)(base.path.points.size() * 0.15f);

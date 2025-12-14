@@ -30,8 +30,6 @@ struct TwController : ZoneController {
 
   void CreateBehaviors(const char* arena_name) override;
 
-  void CreateFlagroomBitset();
-
   std::unique_ptr<TrenchWars> trench_wars;
 };
 
@@ -44,7 +42,7 @@ void TwController::CreateBehaviors(const char* arena_name) {
   trench_wars = std::make_unique<TrenchWars>(*bot);
   bot->execute_ctx.blackboard.Set("tw", trench_wars.get());
 
-  CreateFlagroomBitset();
+  trench_wars->BuildFlagroom(*bot);
 
   auto& repo = bot->bot_controller->behaviors;
 
@@ -56,9 +54,9 @@ void TwController::CreateBehaviors(const char* arena_name) {
   SetBehavior("basing");
 }
 
-void TwController::CreateFlagroomBitset() {
-  auto& map = bot->game->GetMap();
-  auto& pathfinder = *bot->bot_controller->pathfinder;
+void TrenchWars::BuildFlagroom(ZeroBot& bot) {
+  auto& map = bot.game->GetMap();
+  auto& pathfinder = *bot.bot_controller->pathfinder;
 
   const AnimatedTileSet& flag_tiles = map.GetAnimatedTileSet(AnimatedTile::Flag);
   if (flag_tiles.count != 1 && flag_tiles.count != 3) {
@@ -78,13 +76,13 @@ void TwController::CreateFlagroomBitset() {
 
   Log(LogLevel::Debug, "TrenchWars: Building flag room region.");
 
-  auto tw = trench_wars.get();
+  auto tw = this;
 
   tw->flag_position = Vector2f((float)flag_x, (float)flag_y);
   tw->entrance_position = tw->flag_position + Vector2f(0, 12);
 
-  bot->execute_ctx.blackboard.Set("tw_flag_position", tw->flag_position);
-  bot->execute_ctx.blackboard.Set("tw_entrance_position", tw->entrance_position);
+  bot.execute_ctx.blackboard.Set("tw_flag_position", tw->flag_position);
+  bot.execute_ctx.blackboard.Set("tw_entrance_position", tw->entrance_position);
 
   auto visit = [tw](MapCoord coord) {
     tw->fr_bitset.Set(coord.x, coord.y);

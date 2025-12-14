@@ -106,12 +106,13 @@ std::unique_ptr<behavior::BehaviorNode> CenterBehavior::CreateTree(behavior::Exe
             .InvertChild<ShipQueryNode>("request_ship")
             .Child<ShipRequestNode>("request_ship")
             .End()
+#if 0
         .Sequence()
             .Child<PlayerPositionQueryNode>("self_position")
             .InvertChild<RectangleContainsNode>(center_rect, "self_position")
-            .Child<DebugPrintNode>("Warping")
             .Child<InputActionNode>(InputAction::Warp)
             .End()
+#endif
         .Selector() // Choose to fight the player or follow waypoints.
             .Sequence() // Execute jav center behavior
                 //.Child<ShipQueryNode>(1)

@@ -64,6 +64,8 @@ struct TrenchWars : EventHandler<DoorToggleEvent> {
 
   TrenchWars(ZeroBot& bot) : bot(bot) {}
 
+  void BuildFlagroom(ZeroBot& bot);
+
   void HandleEvent(const DoorToggleEvent&) override;
 };
 

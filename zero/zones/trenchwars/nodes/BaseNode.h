@@ -51,10 +51,14 @@ struct FindBaseEnemyNode : public behavior::BehaviorNode {
 
     if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
 
+    auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+    if (!opt_tw) return behavior::ExecuteResult::Failure;
+    TrenchWars* tw = *opt_tw;
+
     float radius = ctx.bot->game->connection.settings.ShipSettings[self->ship].GetRadius();
 
     // We shouldn't fight enemies below this line because we will be wasting our time.
-    constexpr float kBaseStartY = 370;
+    const float kBaseStartY = tw->flag_position.y + 100.0f;
     // How far on each side of the center we should look for an enemy. We don't want to be running all over the base
     // fighting people on the side.
     constexpr float kSearchX = 40.0f;
