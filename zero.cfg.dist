@@ -46,6 +46,8 @@ RequestShip = 3
 Chat = zerotw
 # Set this to 1 to broadcast command use to the first chat.
 CommandBroadcast = 1
+# How often scorereset should be sent in ticks. 360000 = 1 hour. Set to 0 to disable.
+ScoreresetInterval = 360000
 
 [ExtremeGames]
 RequestShip = 3

@@ -30,7 +30,21 @@ struct TwController : ZoneController {
 
   void CreateBehaviors(const char* arena_name) override;
 
+  void HandleEvent(const BotController::UpdateEvent& event) override {
+    if (trench_wars && scorereset_interval > 0) {
+      Tick current_tick = GetCurrentTick();
+
+      if (TICK_DIFF(current_tick, last_scorereset_tick) > scorereset_interval) {
+        Event::Dispatch(ChatQueueEvent::Public("?scorereset"));
+        last_scorereset_tick = current_tick;
+      }
+    }
+  }
+
   std::unique_ptr<TrenchWars> trench_wars;
+
+  Tick last_scorereset_tick = 0;
+  s32 scorereset_interval = 0;
 };
 
 static TwController controller;
@@ -52,6 +66,17 @@ void TwController::CreateBehaviors(const char* arena_name) {
   repo.Add("team", std::make_unique<TeamBehavior>());
 
   SetBehavior("basing");
+
+  last_scorereset_tick = GetCurrentTick();
+  auto opt_scorereset_interval = bot->config->GetInt("TrenchWars", "ScoreresetInterval");
+  if (opt_scorereset_interval) {
+    scorereset_interval = *opt_scorereset_interval;
+  } else {
+    // Default to 1 hour if no config exists.
+    scorereset_interval = 360000;
+  }
+
+  Log(LogLevel::Info, "Scorereset interval: %u", scorereset_interval);
 }
 
 void TrenchWars::BuildFlagroom(ZeroBot& bot) {
