@@ -5,6 +5,8 @@
 #include <zero/game/Logger.h>
 #include <zero/game/Memory.h>
 
+#include <random>
+
 #ifdef _WIN32
 #ifdef APIENTRY
 // Fix warning with glad definition
@@ -97,6 +99,17 @@ u8* StandardLoadAssetArena(MemoryArena& arena, const char* filename, size_t* siz
   fclose(f);
 
   return buffer;
+}
+
+// Compute non-negative machine id of random bytes.
+static inline u32 GenerateRandomMachineId() {
+  constexpr u32 kMinimumId = 1234567;
+  constexpr u32 kMaximumId = 0x6DFFFFFF;
+
+  std::random_device rd;
+  std::uniform_int_distribution<u32> dist(kMinimumId, kMaximumId);
+
+  return dist(rd);
 }
 
 #ifdef _WIN32
@@ -263,7 +276,7 @@ int null_stricmp(const char* s1, const char* s2) {
 }
 
 unsigned int GetMachineId() {
-  return rand();
+  return GenerateRandomMachineId();
 }
 
 int GetTimeZoneBias() {
