@@ -187,7 +187,26 @@ std::unique_ptr<Config> Config::Load(const char* file_path) {
 
       current_group = group_id;
     } else if (token.type == TokenType::String) {
-      Token equals_token = lexer.GetNextToken();
+      Token next_token = lexer.GetNextToken();
+
+      // Coalesce Key strings by consuming tokens and adjusting the final token to span the consumed tokens.
+      // This allows for spaces in key names.
+      {
+        Token prev_token = token;
+
+        while (next_token.type == TokenType::String) {
+          prev_token = next_token;
+          next_token = lexer.GetNextToken();
+        }
+
+        const char* key_start_ptr = token.data.data();
+        const char* key_end_ptr = prev_token.data.data() + prev_token.data.size();
+        size_t key_size = (size_t)(key_end_ptr - key_start_ptr);
+
+        token.data = std::string_view(key_start_ptr, key_size);
+      }
+
+      Token equals_token = next_token;
 
       if (equals_token.type != TokenType::Equals) {
         EmitTokenError(equals_token, TokenType::Equals);
@@ -202,7 +221,7 @@ std::unique_ptr<Config> Config::Load(const char* file_path) {
 
       ConfigGroup& group = result->GetOrCreateGroup(std::string(current_group.data));
 
-      std::string key(token.data);
+      std::string key(Trim(token.data));
       std::string value(Trim(value_token.data));
 
       group.map[key] = value;
