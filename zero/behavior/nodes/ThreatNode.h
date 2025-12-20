@@ -1,12 +1,14 @@
 #pragma once
 
 #include <stdio.h>
+#include <zero/BotController.h>
 #include <zero/InfluenceMap.h>
 #include <zero/ZeroBot.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/game/Game.h>
 
 #include <random>
+#include <unordered_set>
 
 // These nodes are pretty bad. They could be improved by projecting weapons through an influence map and finding a
 // nearby tile on the map that is safe.

@@ -59,11 +59,11 @@ struct Weapon {
 
   Vector2f GetPosition() { return Vector2f(x / 16000.f, y / 16000.0f); }
 
-  Vector2f GetVelocity() { return Vector2f(velocity_x / 1600.0f, velocity_y / 1600.0f); }
+  Vector2f GetVelocity() { return Vector2f(velocity_x / 160.0f, velocity_y / 160.0f); }
 
   void UpdatePosition() {
     this->position = Vector2f(x / 16000.0f, y / 16000.0f);
-    this->velocity = Vector2f(velocity_x / 1600.0f, velocity_y / 1600.0f);
+    this->velocity = Vector2f(velocity_x / 160.0f, velocity_y / 160.0f);
   }
 };
 
