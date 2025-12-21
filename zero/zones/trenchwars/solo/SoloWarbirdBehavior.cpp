@@ -43,7 +43,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateDefensiveTree(behavior::Exe
             .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
             .Child<InputActionNode>(InputAction::Warp)
             .End()
-        .Child<DodgeIncomingDamage>(0.6f, 35.0f) 
+        .Child<DodgeIncomingDamage>(0.6f, 35.0f, 0.0f) 
         .Child<InputActionNode>(InputAction::Afterburner) // If DodgeIncomingDamage is true, then we should activate afterburners to escape
         .End();
   // clang-format on
@@ -94,16 +94,28 @@ struct AvoidEnemyAimshotNode : public behavior::BehaviorNode {
     Ray shot_ray(enemy->position, Normalize(shot_velocity));
 
     // How much we should multiply the radius by so we avoid slightly larger than our own ship bounding box.
-    constexpr float kRadiusMultiplier = 1.2f;
+    constexpr float kRadiusMultiplier = 1.75f;
 
     float self_radius = game.connection.settings.ShipSettings[self->ship].GetRadius();
     Vector2f self_half_extents(self_radius * kRadiusMultiplier, self_radius * kRadiusMultiplier);
     Rectangle self_collider(self->position - self_half_extents, self->position + self_half_extents);
 
-    if (RayBoxIntersect(shot_ray, self_collider, nullptr, nullptr)) {
-      Vector2f side = Perpendicular(Normalize(shot_velocity));
-      Vector2f away = Normalize(self->position - enemy->position);
-      Vector2f movement = Normalize(side + away);
+    float dist = 0.0f;
+    if (RayBoxIntersect(shot_ray, self_collider, &dist, nullptr)) {
+      Vector2f hit_position = shot_ray.origin + shot_ray.direction * dist;
+      Vector2f away = Perpendicular(shot_ray.direction);
+      // TODO: Might be good to include existing velocity in the calculation so we don't end up trying to reverse our
+      // high movement.
+      // Determine which way to dodge. This will choose the fastest perpendicular movement to make the
+      // collider not hit the ray.
+      float dot = Normalize(self->position - hit_position).Dot(Perpendicular(shot_ray.direction));
+
+      if (dot < 0.0f) {
+        away *= -1.0f;
+      }
+
+      // Combine perpendicular dodge with backwards movement to increase chances of dodging.
+      Vector2f movement = Normalize(away + shot_ray.direction);
       Vector2f target_position = self->position + movement * 10.0f;
 
       ctx.bot->bot_controller->steering.Seek(*ctx.bot->game, target_position);
@@ -139,14 +151,15 @@ static std::unique_ptr<behavior::BehaviorNode> CreateAimTree(behavior::ExecuteCo
                 .Sequence() // If we have more energy than target, rush close to them to get a better shot.
                     .Child<PlayerEnergyQueryNode>("nearest_target", "nearest_target_energy")
                     .Child<ScalarThresholdNode<float>>("self_energy", "nearest_target_energy")
-                    .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
+                    .Child<SeekNode>("aimshot", 5.0f, SeekNode::DistanceResolveType::Zero)
                     .End()
                 .Sequence() // If enemy is very close to us, ab away fast.
                     .InvertChild<DistanceThresholdNode>("nearest_target_position", kNearDistance)
-                    .Child<InputActionNode>(InputAction::Afterburner)
+                    .Child<BlackboardEraseNode>("face_position")
                     .Selector() // Choose how to escape
                         .Sequence() // Dodge away from enemy's heading direction if we have low energy
                             .InvertChild<PlayerEnergyPercentThresholdNode>(kDodgeEnemyAimshotEnergyThreshold)
+                            .Child<InputActionNode>(InputAction::Afterburner)
                             .Child<AvoidEnemyAimshotNode>("nearest_target")
                             .End()
                         .Child<SeekNode>("nearest_target_position", "leash_distance", SeekNode::DistanceResolveType::Dynamic)

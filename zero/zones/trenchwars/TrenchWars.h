@@ -42,6 +42,9 @@ struct TrenchWars : EventHandler<DoorToggleEvent> {
 
   // Bitset representing every tile that is considered part of the flagroom.
   RegionBitset fr_bitset;
+  // Bitset representing every tile that is considered part of the entire base.
+  RegionBitset base_bitset;
+
   // The average position of the flags, which should be the middle flag.
   Vector2f flag_position;
   // The middle corridor leading into the flagroom. This is used for some behavior checks, such as pathfinding from it
@@ -62,13 +65,21 @@ struct TrenchWars : EventHandler<DoorToggleEvent> {
   std::vector<Vector2f> fr_positions;
 #endif
 
+  // This is the most common y position of rays shot up at the bottom of the base.
+  // This isn't perfect for the base bottom, but it simplifies certain actions, such as base flooding.
+  u16 base_bottom_y = 0;
+
   TrenchWars(ZeroBot& bot) : bot(bot) {}
 
   void BuildFlagroom(ZeroBot& bot);
+  void BuildBase(ZeroBot& bot);
 
   void HandleEvent(const DoorToggleEvent&) override;
 
   static inline const char* SpawnExecuteCooldownKey() { return "tw_spawn_execute_cooldown"; }
+
+ private:
+  u16 CalculateBaseBottom(ZeroBot& bot) const;
 };
 
 }  // namespace tw

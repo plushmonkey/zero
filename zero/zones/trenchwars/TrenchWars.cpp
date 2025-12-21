@@ -16,6 +16,7 @@
 #include <bitset>
 #include <deque>
 #include <memory>
+#include <unordered_map>
 
 namespace zero {
 namespace tw {
@@ -358,6 +359,123 @@ void TrenchWars::BuildFlagroom(ZeroBot& bot) {
 
   // Fake a door update so we get the right flagroom.
   tw->HandleEvent(DoorToggleEvent());
+  BuildBase(bot);
+}
+
+void TrenchWars::BuildBase(ZeroBot& bot) {
+  constexpr float kShipRadius = 0.85f;
+
+  auto& pathfinder = *bot.bot_controller->pathfinder;
+  Map& map = bot.game->GetMap();
+
+  u8 prev_door_mode = (u8)bot.game->connection.settings.DoorMode;
+#define DOORSEED_BIT(tile_id) (1 << ((tile_id) - 162))
+  u8 temp_door_mode = DOORSEED_BIT(165) | DOORSEED_BIT(166) | DOORSEED_BIT(168);
+
+  // Temporarily update the door seed so only the outer base doors are closed. This allows us to use the pathfinder to
+  // determine traversability for the base flooding while stopping at outer layer.
+  map.SeedDoors(temp_door_mode);
+  Event::Dispatch(DoorToggleEvent());
+
+  auto visit = [this](MapCoord coord) { this->base_bitset.Set(coord.x, coord.y); };
+  auto visited = [this](MapCoord coord) { return this->base_bitset.Test(coord.x, coord.y); };
+
+  struct VisitState {
+    MapCoord coord;
+    int depth;
+
+    VisitState(MapCoord coord, int depth) : coord(coord), depth(depth) {}
+  };
+
+  std::deque<VisitState> stack;
+
+  u16 flag_x = (u16)flag_position.x;
+  u16 flag_y = (u16)flag_position.y;
+  stack.emplace_back(MapCoord(flag_x, flag_y), 0);
+
+  visit(stack.front().coord);
+
+  this->base_bottom_y = CalculateBaseBottom(bot);
+
+  while (!stack.empty()) {
+    VisitState current = stack.front();
+    MapCoord coord = current.coord;
+
+    stack.pop_front();
+
+    if (coord.y > this->base_bottom_y) continue;
+
+    path::Node* node = pathfinder.GetProcessor().GetNode(path::NodePoint(coord.x, coord.y));
+
+    if (node->flags & path::NodeFlag_DynamicEmpty) {
+      pathfinder.GetProcessor().UpdateDynamicNode(node, kShipRadius, 0xFFFF);
+    }
+
+    if (!(node->flags & path::NodeFlag_Traversable)) continue;
+
+    path::EdgeSet edgeset = pathfinder.GetProcessor().FindEdges(node, kShipRadius);
+
+    MapCoord west(coord.x - 1, coord.y);
+    MapCoord east(coord.x + 1, coord.y);
+    MapCoord north(coord.x, coord.y - 1);
+    MapCoord south(coord.x, coord.y + 1);
+
+    if (edgeset.IsSet(path::CoordOffset::WestIndex()) && !visited(west)) {
+      stack.emplace_back(west, current.depth + 1);
+      visit(west);
+    }
+
+    if (edgeset.IsSet(path::CoordOffset::EastIndex()) && !visited(east)) {
+      stack.emplace_back(east, current.depth + 1);
+      visit(east);
+    }
+
+    if (edgeset.IsSet(path::CoordOffset::NorthIndex()) && !visited(north)) {
+      stack.emplace_back(north, current.depth + 1);
+      visit(north);
+    }
+
+    if (edgeset.IsSet(path::CoordOffset::SouthIndex()) && !visited(south)) {
+      stack.emplace_back(south, current.depth + 1);
+      visit(south);
+    }
+  }
+
+  // Restore map seed and alert pathfinder to mark as dynamic again.
+  map.SeedDoors(prev_door_mode);
+  Event::Dispatch(DoorToggleEvent());
+}
+
+u16 TrenchWars::CalculateBaseBottom(ZeroBot& bot) const {
+  // Track how many times each y was hit while shooting rays toward the base from below.
+  std::unordered_map<u16, size_t> y_counts;
+
+  MapCoord start(512, 460);
+
+  Map& map = bot.game->GetMap();
+
+  constexpr u16 kRadius = 75;
+  constexpr TileId kSpecialTileStart = 191;
+  for (u16 x = start.x - kRadius; x < start.x + kRadius; ++x) {
+    for (u16 y = start.y; y > start.y - 100; --y) {
+      if (map.IsSolid(x, y, 0xFFFF) && map.GetTileId(x, y) < kSpecialTileStart) {
+        y_counts[y]++;
+        break;
+      }
+    }
+  }
+
+  size_t best_count = 0;
+  u16 best_y = 0;
+
+  for (auto& pair : y_counts) {
+    if (pair.second > best_count) {
+      best_count = pair.second;
+      best_y = pair.first;
+    }
+  }
+
+  return best_y;
 }
 
 void TrenchWars::HandleEvent(const DoorToggleEvent&) {

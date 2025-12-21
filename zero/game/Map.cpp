@@ -825,7 +825,7 @@ void Map::SeedDoors(u32 seed) {
     if (player_manager) {
       self = player_manager->GetSelf();
 
-      if (self) {
+      if (self && self->ship < 8) {
         float radius = player_manager->connection.settings.ShipSettings[self->ship].GetRadius();
 
         self_min = self->position - Vector2f(radius, radius);
@@ -845,7 +845,7 @@ void Map::SeedDoors(u32 seed) {
     tiles[door->y * 1024 + door->x] = id;
 
     // If the tile just changed from open to closed then check for collisions
-    if (self && previous_id == kOpenDoorId && id != kOpenDoorId) {
+    if (self && self->ship < 8 && previous_id == kOpenDoorId && id != kOpenDoorId) {
       Vector2f door_position((float)door->x, (float)door->y);
 
       // Perform door warp on overlap
