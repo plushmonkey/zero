@@ -4,6 +4,7 @@
 #include <zero/behavior/BehaviorBuilder.h>
 #include <zero/behavior/BehaviorTree.h>
 #include <zero/behavior/nodes/AttachNode.h>
+#include <zero/behavior/nodes/MapNode.h>
 #include <zero/behavior/nodes/TimerNode.h>
 #include <zero/zones/trenchwars/TrenchWars.h>
 
@@ -107,13 +108,15 @@ inline std::unique_ptr<behavior::BehaviorNode> CreateBaseAttachTree(const char* 
             .Child<TimerSetNode>("attach_cooldown", kAttachCooldown)
             .Child<TimerSetNode>("detach_timeout", kDetachTimeout)
             .End()
-        .Sequence() // Detach if near flagroom or bad parent
+        .Sequence() // Detach after cooldown
             .Child<AttachedQueryNode>(self_key)
+#if 0
             .Selector() // Detach if we are close to flagroom or our parent ended up being a bad attach target.
                 .InvertChild<DistanceThresholdNode>("tw_flag_position", kNearFlagroomDistance)
                 .InvertChild<AttachParentValidNode>()
                 .Child<TimerExpiredNode>("detach_timeout")
                 .End()
+#endif
             .Child<TimerExpiredNode>("attach_cooldown")
             .Child<DetachNode>()
             .Child<TimerSetNode>("attach_cooldown", kAttachCooldown)

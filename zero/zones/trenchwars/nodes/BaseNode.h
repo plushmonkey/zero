@@ -359,7 +359,7 @@ struct SafeFlagroomNode : public behavior::BehaviorNode {
       Player* player = pm.players + i;
 
       if (player->ship >= 8) continue;
-      if (player->frequency != self->frequency) continue;
+      if (player->frequency == self->frequency) continue;
 
       if (tw->fr_bitset.Test(player->position)) {
         return behavior::ExecuteResult::Failure;

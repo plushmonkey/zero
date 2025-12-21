@@ -67,6 +67,8 @@ struct TrenchWars : EventHandler<DoorToggleEvent> {
   void BuildFlagroom(ZeroBot& bot);
 
   void HandleEvent(const DoorToggleEvent&) override;
+
+  static inline const char* SpawnExecuteCooldownKey() { return "tw_spawn_execute_cooldown"; }
 };
 
 }  // namespace tw

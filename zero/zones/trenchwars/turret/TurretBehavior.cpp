@@ -28,6 +28,9 @@ std::unique_ptr<behavior::BehaviorNode> TurretBehavior::CreateTree(behavior::Exe
             .InvertChild<ShipQueryNode>("request_ship")
             .Child<ShipRequestNode>("request_ship")
             .End()
+        .Sequence() // Do nothing while waiting for spawn cooldown
+            .InvertChild<TimerExpiredNode>(TrenchWars::SpawnExecuteCooldownKey())
+            .End()
         .Sequence() // Attach to terrier if we can
             .InvertChild<ShipQueryNode>(4)
             .InvertChild<AttachedQueryNode>()

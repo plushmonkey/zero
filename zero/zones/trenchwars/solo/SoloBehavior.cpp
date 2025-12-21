@@ -10,6 +10,7 @@
 #include <zero/behavior/nodes/ShipNode.h>
 #include <zero/behavior/nodes/TimerNode.h>
 #include <zero/behavior/nodes/WaypointNode.h>
+#include <zero/zones/trenchwars/TrenchWars.h>
 #include <zero/zones/trenchwars/solo/SoloWarbirdBehavior.h>
 
 namespace zero {
@@ -87,6 +88,9 @@ std::unique_ptr<behavior::BehaviorNode> SoloBehavior::CreateTree(behavior::Execu
         .Sequence() // Enter the specified ship if not already in it.
             .InvertChild<ShipQueryNode>("request_ship")
             .Child<ShipRequestNode>("request_ship")
+            .End()
+        .Sequence() // Do nothing while waiting for spawn cooldown
+            .InvertChild<TimerExpiredNode>(TrenchWars::SpawnExecuteCooldownKey())
             .End()
         .Sequence() // Switch to own frequency when possible.
             .Child<PlayerFrequencyCountQueryNode>("self_freq_count")

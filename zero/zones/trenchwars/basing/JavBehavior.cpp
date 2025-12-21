@@ -389,6 +389,9 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
 
   BehaviorBuilder builder;
 
+  // Spread out from team members while going to flagroom so we don't all die in one shot.
+  float kAvoidTeamTravelRange = 4.0f;
+
   // clang-format off
   builder
     .Sequence()
@@ -412,6 +415,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
                 .Composite(CreateOffensiveTree("nearest_target", "nearest_target_position"))
                 .End()
             .Sequence() // Travel to the flag room
+                .Child<AvoidTeamNode>(kAvoidTeamTravelRange)
                 .Sequence(CompositeDecorator::Success) // Use afterburners to get to flagroom faster.
                     .InvertChild<InFlagroomNode>("self_position")
                     .Child<AfterburnerThresholdNode>()

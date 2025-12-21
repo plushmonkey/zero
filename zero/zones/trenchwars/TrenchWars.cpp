@@ -20,7 +20,7 @@
 namespace zero {
 namespace tw {
 
-struct TwController : ZoneController {
+struct TwController : ZoneController, EventHandler<SpawnEvent> {
   bool IsZone(Zone zone) override {
     bot->execute_ctx.blackboard.Erase("tw");
     bot->execute_ctx.blackboard.Erase("tw_flag_position");
@@ -38,6 +38,15 @@ struct TwController : ZoneController {
         Event::Dispatch(ChatQueueEvent::Public("?scorereset"));
         last_scorereset_tick = current_tick;
       }
+    }
+  }
+
+  void HandleEvent(const SpawnEvent& event) override {
+    constexpr u32 kSpawnDelayTicks = 50;
+
+    if (trench_wars) {
+      Tick cooldown_end = MAKE_TICK(GetCurrentTick() + kSpawnDelayTicks);
+      bot->execute_ctx.blackboard.Set<Tick>(TrenchWars::SpawnExecuteCooldownKey(), cooldown_end);
     }
   }
 

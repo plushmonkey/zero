@@ -7,6 +7,7 @@
 #include <zero/behavior/nodes/MoveNode.h>
 #include <zero/behavior/nodes/RenderNode.h>
 #include <zero/behavior/nodes/ShipNode.h>
+#include <zero/behavior/nodes/TimerNode.h>
 #include <zero/behavior/nodes/WaypointNode.h>
 #include <zero/zones/trenchwars/TrenchWars.h>
 
@@ -24,6 +25,9 @@ std::unique_ptr<behavior::BehaviorNode> BasingBehavior::CreateTree(behavior::Exe
         .Sequence() // Enter the specified ship if not already in it.
             .InvertChild<ShipQueryNode>("request_ship")
             .Child<ShipRequestNode>("request_ship")
+            .End()
+        .Sequence() // Do nothing while waiting for spawn cooldown
+            .InvertChild<TimerExpiredNode>(TrenchWars::SpawnExecuteCooldownKey())
             .End()
         .Sequence() // TODO: Warbird
             .Child<ShipQueryNode>(0)

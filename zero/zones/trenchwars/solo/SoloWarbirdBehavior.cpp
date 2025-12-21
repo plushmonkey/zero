@@ -43,7 +43,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateDefensiveTree(behavior::Exe
             .Child<ScalarThresholdNode<float>>("incoming_damage", "self_energy")
             .Child<InputActionNode>(InputAction::Warp)
             .End()
-        .Child<DodgeIncomingDamage>(0.6f, 25.0f) 
+        .Child<DodgeIncomingDamage>(0.6f, 35.0f) 
         .Child<InputActionNode>(InputAction::Afterburner) // If DodgeIncomingDamage is true, then we should activate afterburners to escape
         .End();
   // clang-format on
@@ -74,12 +74,57 @@ static std::unique_ptr<behavior::BehaviorNode> CreateChaseTree(behavior::Execute
   return builder.Build();
 }
 
+struct AvoidEnemyAimshotNode : public behavior::BehaviorNode {
+  AvoidEnemyAimshotNode(const char* enemy_key) : enemy_key(enemy_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto self = ctx.bot->game->player_manager.GetSelf();
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    auto opt_enemy = ctx.blackboard.Value<Player*>(enemy_key);
+    if (!opt_enemy) return behavior::ExecuteResult::Failure;
+
+    Player* enemy = *opt_enemy;
+    if (!enemy || enemy->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    Game& game = *ctx.bot->game;
+    float weapon_speed = behavior::GetWeaponSpeed(game, *enemy, WeaponType::Bullet);
+    float alive_time = game.connection.settings.BulletAliveTime / 100.0f;
+    Vector2f shot_velocity = enemy->velocity + enemy->GetHeading() * weapon_speed;
+    Ray shot_ray(enemy->position, Normalize(shot_velocity));
+
+    // How much we should multiply the radius by so we avoid slightly larger than our own ship bounding box.
+    constexpr float kRadiusMultiplier = 1.2f;
+
+    float self_radius = game.connection.settings.ShipSettings[self->ship].GetRadius();
+    Vector2f self_half_extents(self_radius * kRadiusMultiplier, self_radius * kRadiusMultiplier);
+    Rectangle self_collider(self->position - self_half_extents, self->position + self_half_extents);
+
+    if (RayBoxIntersect(shot_ray, self_collider, nullptr, nullptr)) {
+      Vector2f side = Perpendicular(Normalize(shot_velocity));
+      Vector2f away = Normalize(self->position - enemy->position);
+      Vector2f movement = Normalize(side + away);
+      Vector2f target_position = self->position + movement * 10.0f;
+
+      ctx.bot->bot_controller->steering.Seek(*ctx.bot->game, target_position);
+
+      return behavior::ExecuteResult::Success;
+    }
+
+    return behavior::ExecuteResult::Failure;
+  }
+  const char* enemy_key = nullptr;
+};
+
 static std::unique_ptr<behavior::BehaviorNode> CreateAimTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
   BehaviorBuilder builder;
 
   constexpr float kBulletEnergyCost = 0.9f;
+  // If we are below this percentage of energy, adjust our heading to be away from the target so we can dodge better
+  constexpr float kDodgeFaceEnergyThreshold = 0.65f;
+  constexpr float kDodgeEnemyAimshotEnergyThreshold = 0.65f;
   constexpr float kNearDistance = 20.0f;
 
   // clang-format off
@@ -99,7 +144,13 @@ static std::unique_ptr<behavior::BehaviorNode> CreateAimTree(behavior::ExecuteCo
                 .Sequence() // If enemy is very close to us, ab away fast.
                     .InvertChild<DistanceThresholdNode>("nearest_target_position", kNearDistance)
                     .Child<InputActionNode>(InputAction::Afterburner)
-                    .Child<SeekNode>("nearest_target_position", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
+                    .Selector() // Choose how to escape
+                        .Sequence() // Dodge away from enemy's heading direction if we have low energy
+                            .InvertChild<PlayerEnergyPercentThresholdNode>(kDodgeEnemyAimshotEnergyThreshold)
+                            .Child<AvoidEnemyAimshotNode>("nearest_target")
+                            .End()
+                        .Child<SeekNode>("nearest_target_position", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
+                        .End()
                     .End()
                 .Child<SeekNode>("nearest_target_position", "leash_distance", SeekNode::DistanceResolveType::Dynamic)
                 .End()
@@ -116,7 +167,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateAimTree(behavior::ExecuteCo
             .Child<InputActionNode>(InputAction::Bullet)
             .End()    
         .Sequence(CompositeDecorator::Success) // Face away from target so it can dodge while waiting for energy
-            .Child<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
+            .InvertChild<PlayerEnergyPercentThresholdNode>(kDodgeFaceEnergyThreshold)
             .Child<PerpendicularNode>("nearest_target_position", "self_position", "away_dir", true)
             .Child<VectorSubtractNode>("nearest_target_position", "self_position", "target_direction", true)
             .Child<VectorAddNode>("away_dir", "target_direction", "away_dir", true)
