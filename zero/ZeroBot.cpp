@@ -39,7 +39,7 @@ MemoryArena* perm_global = nullptr;
 
 ZeroBot::ZeroBot() : perm_arena(nullptr, 0), trans_arena(nullptr, 0) {}
 
-bool ZeroBot::Initialize(const char* name, const char* password) {
+bool ZeroBot::Initialize(std::unique_ptr<ArgParser> args, const char* name, const char* password) {
   constexpr size_t kPermanentSize = Megabytes(64);
   constexpr size_t kTransientSize = Megabytes(32);
   constexpr size_t kWorkSize = Megabytes(4);
@@ -71,6 +71,7 @@ bool ZeroBot::Initialize(const char* name, const char* password) {
 
   strcpy(this->name, name);
   strcpy(this->password, password);
+  this->args = std::move(args);
 
   g_Settings.vsync = true;
 
@@ -114,6 +115,12 @@ bool ZeroBot::JoinZone(ServerInfo& server) {
 
   const char* group_lookups[] = {to_string(server.zone), "General"};
   auto default_arena = config->GetString(group_lookups, ZERO_ARRAY_SIZE(group_lookups), "Arena");
+
+  std::string_view arena_override = args->GetValue({"arena", "a"});
+  if (!arena_override.empty()) {
+    default_arena = std::make_optional(arena_override.data());
+  }
+
   if (default_arena) {
     bot_controller->default_arena = std::string(*default_arena);
   }

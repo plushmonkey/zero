@@ -135,6 +135,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="zero\Actuator.h" />
+    <ClInclude Include="zero\Args.h" />
     <ClInclude Include="zero\behavior\Behavior.h" />
     <ClInclude Include="zero\behavior\BehaviorBuilder.h" />
     <ClInclude Include="zero\behavior\BehaviorTree.h" />

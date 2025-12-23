@@ -3,7 +3,7 @@
 Username = ZeroBot
 # The login password for the bot.
 Password = none
-# This must be one of the names listed under the [Servers] section. It is case sensitive.
+# This must be one of the names listed under the [Servers] section.
 Server = Subgame
 # Encryption should be either Subspace or Continuum
 Encryption = Subspace

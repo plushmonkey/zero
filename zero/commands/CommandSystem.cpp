@@ -422,23 +422,6 @@ class LockCommand : public CommandExecutor {
   std::string GetDescription() override { return "Toggles command locking. !lock, !lock true, !lock false"; }
 };
 
-static inline std::string Lowercase(std::string_view str) {
-  std::string result;
-
-  std::string_view name = str;
-
-  // remove "^" that gets placed on names when biller is down
-  if (!name.empty() && name[0] == '^') {
-    name = name.substr(1);
-  }
-
-  result.resize(name.size());
-
-  std::transform(name.begin(), name.end(), result.begin(), ::tolower);
-
-  return result;
-}
-
 static void RawOnChatPacket(void* user, u8* pkt, size_t size) {
   CommandSystem* cmd = (CommandSystem*)user;
 

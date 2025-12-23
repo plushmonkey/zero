@@ -46,8 +46,16 @@ struct ZoneController : EventHandler<ZeroBot::JoinRequestEvent>,
 
     auto default_behavior = bot->config->GetString(group_lookups, ZERO_ARRAY_SIZE(group_lookups), "Behavior");
     auto request_ship = bot->config->GetInt(group_lookups, ZERO_ARRAY_SIZE(group_lookups), "RequestShip");
-
     float radius = bot->game->connection.settings.ShipSettings[0].GetRadius();
+
+    std::string_view request_ship_override = bot->args->GetValue({"ship"});
+
+    if (!request_ship_override.empty()) {
+      int new_request_ship = (int)(request_ship_override[0] - '0');
+      if (new_request_ship >= 1 && new_request_ship <= 9) {
+        request_ship = std::make_optional(new_request_ship);
+      }
+    }
 
     if (request_ship && *request_ship >= 1 && *request_ship <= 8) {
       radius = bot->game->connection.settings.ShipSettings[*request_ship - 1].GetRadius();
@@ -58,6 +66,11 @@ struct ZoneController : EventHandler<ZeroBot::JoinRequestEvent>,
 
     bot->commands->Reset();
     CreateBehaviors(event.name);
+
+    std::string_view behavior_override = bot->args->GetValue({"behavior", "b"});
+    if (!behavior_override.empty()) {
+      default_behavior = std::make_optional(behavior_override.data());
+    }
 
     if (default_behavior) {
       SetBehavior(*default_behavior);

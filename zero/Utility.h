@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ctype.h>
 #include <stdlib.h>
 #include <zero/Types.h>
 
@@ -39,6 +40,16 @@ inline std::string_view Trim(std::string_view str) {
   }
 
   return str;
+}
+
+inline std::string Lowercase(std::string_view str) {
+  std::string result(str);
+
+  for (size_t i = 0; i < result.size(); ++i) {
+    result[i] = tolower(result[i]);
+  }
+
+  return result;
 }
 
 // Gets the frequency and request arena name from a user arena string. This is because the arena_number and arena_name

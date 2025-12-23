@@ -1,5 +1,6 @@
 #pragma once
 
+#include <zero/Args.h>
 #include <zero/Config.h>
 #include <zero/DebugRenderer.h>
 #include <zero/Event.h>
@@ -63,6 +64,7 @@ struct ZeroBot {
   DebugRenderer debug_renderer;
 
   std::unique_ptr<Config> config;
+  std::unique_ptr<ArgParser> args;
 
   ServerInfo server_info = {};
 
@@ -78,7 +80,7 @@ struct ZeroBot {
 
   ZeroBot();
 
-  bool Initialize(const char* name, const char* password);
+  bool Initialize(std::unique_ptr<ArgParser> args, const char* name, const char* password);
   bool JoinZone(ServerInfo& server);
 
   void Run();

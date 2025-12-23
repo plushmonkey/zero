@@ -17,6 +17,8 @@ Config file order:
 2. `zero.cfg` if nothing is specified on command line.
 3. `zero.cfg.dist` if `zero.cfg` was not found.
 
+Run the executable with the `--help` flag to see command-line overrides.
+
 ## Building
 ### Getting source
 1. `git clone https://github.com/plushmonkey/zero`
