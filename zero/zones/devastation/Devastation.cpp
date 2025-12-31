@@ -182,7 +182,7 @@ void DevastationController::LoadArenaType(ArenaType arena_type) {
     case ArenaType::PublicTrenchWars: {
       bot->bot_controller->energy_tracker.estimate_type = EnergyHeuristicType::Maximum;
       devastation.trench_wars = std::make_unique<tw::TrenchWars>(*bot);
-      devastation.trench_wars->BuildFlagroom(*bot);
+      devastation.trench_wars->Build(*bot);
       bot->execute_ctx.blackboard.Set("tw", devastation.trench_wars.get());
 
       repo.Add("basing", std::make_unique<tw::BasingBehavior>());

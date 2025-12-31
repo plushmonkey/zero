@@ -27,7 +27,23 @@ struct GlobalGoToNode : public behavior::BehaviorNode {
     }
 
     int self_sector = GetSectorFromPosition(*ctx.bot->bot_controller->region_registry, self->position);
-    int target_sector = GetSectorFromPosition(*ctx.bot->bot_controller->region_registry, target);
+    int target_sector = -1;
+
+    Vector2f checks[] = {target, target + Vector2f(1, 0), target + Vector2f(-1, 0), target + Vector2f(0, 1),
+                         target + Vector2f(0, -1)};
+
+    // Search around the target to find the best sector.
+    // This is used to handle the case where flags are in a tight space in center that wouldn't be recognized by the
+    // region registry.
+    for (auto& check : checks) {
+      target_sector = GetSectorFromPosition(*ctx.bot->bot_controller->region_registry, target);
+
+      if (target_sector != -1) {
+        // Adjust the target so it becomes a valid position for the GoToNode.
+        target = check;
+        break;
+      }
+    }
 
     if (self_sector == -1 || target_sector == -1) {
       return behavior::ExecuteResult::Failure;
