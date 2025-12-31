@@ -26,11 +26,18 @@
 #include <zero/zones/trenchwars/nodes/BaseNode.h>
 #include <zero/zones/trenchwars/nodes/FlagNode.h>
 #include <zero/zones/trenchwars/nodes/MoveNode.h>
+#include <zero/zones/trenchwars/nodes/SectorNode.h>
 
 namespace zero {
 namespace tw {
 
 constexpr float kTerrierLeashDistance = 30.0f;
+
+const char* kSelfSectorKey = "self_sector";
+const char* kSelfPositionKey = "self_position";
+const char* kPartitionKey = "partition";
+
+static std::unique_ptr<behavior::BehaviorNode> CreateEntranceWaitBehavior();
 
 // This checks all of the enemy weapons to make sure none are in the provided rect.
 // Returns success if the estimated weapon damage in this area is less than the provided threshold.
@@ -411,7 +418,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateOffensiveTree(const char* n
                 .InvertChild<InputQueryNode>(InputAction::Bomb) // Don't try to shoot a bullet when shooting a bomb.
                 .InvertChild<TileQueryNode>(kTileIdSafe)
                 .Child<ShotVelocityQueryNode>(WeaponType::Bullet, "bullet_fire_velocity")
-                .Child<RayNode>("self_position", "bullet_fire_velocity", "bullet_fire_ray")
+                .Child<RayNode>(kSelfPositionKey, "bullet_fire_velocity", "bullet_fire_ray")
                 .Child<svs::DynamicPlayerBoundingBoxQueryNode>(nearest_target_key, "target_bounds", 4.0f)
                 .Child<MoveRectangleNode>("target_bounds", "aimshot", "target_bounds")
                 .Child<RayRectangleInterceptNode>("bullet_fire_ray", "target_bounds")
@@ -424,6 +431,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateOffensiveTree(const char* n
   return builder.Build();
 }
 
+#if 0
 // If we are almost through entrance, rush forward so we don't get stuck.
 static std::unique_ptr<behavior::BehaviorNode> CreateEntranceRushBehavior() {
   using namespace behavior;
@@ -511,15 +519,14 @@ static std::unique_ptr<behavior::BehaviorNode> CreateEntranceBehavior() {
   // clang-format off
   builder
     .Sequence()
-        .Child<PlayerPositionQueryNode>("self_position")
         .Child<GetCheckRectNode>("entrance_rect")
-        .Child<RectangleContainsNode>("entrance_rect", "self_position")
+        .Child<RectangleContainsNode>("entrance_rect", kSelfPositionKey)
         .Child<NearEntranceNode>(kNearEntranceDistance)
         .SuccessChild<DodgeIncomingDamage>(0.1f, 15.0f, 0.0f)
         .Composite(CreateBurstSequence())
         .Selector()
             .Sequence()
-                .Child<SelectBestEntranceSideNode>("partition")
+                .Child<SelectBestEntranceSideNode>(kPartitionKey)
                 .Child<FollowPathNode>()
                 .Child<RenderPathNode>(Vector3f(0.0f, 0.0f, 0.75f))
                 .End()
@@ -545,12 +552,12 @@ static std::unique_ptr<behavior::BehaviorNode> CreateEntranceBehavior() {
                 .Child<ArriveNode>("tw_entrance_position", 1.25f)
                 .End()
             .End()
-        .End()
         .End();
   // clang-format on
 
   return builder.Build();
 }
+#endif
 
 // We are waiting below the entrance, so try to stay safe while it gets cleared out.
 static std::unique_ptr<behavior::BehaviorNode> CreateEntranceWaitBehavior() {
@@ -590,7 +597,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateEntranceWaitBehavior() {
   // clang-format off
   builder
     .Selector()
-        .Child<EscapeBombExplodeQuadrantNode>("partition")
+        .Child<EscapeBombExplodeQuadrantNode>(kPartitionKey)
         .Sequence() // If west side is empty, hug that wall.
             .Child<EmptySideAreaNode>(EmptySideAreaNode::Side::West)
             .Child<GetSafePositionNode>(EmptySideAreaNode::Side::West, "safe_position")
@@ -610,7 +617,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateEntranceWaitBehavior() {
 }
 
 // This is a tree to handle staying safe below the entrance until it is cleared and safe to move up.
-static std::unique_ptr<behavior::BehaviorNode> CreateBelowEntranceBehavior() {
+static std::unique_ptr<behavior::BehaviorNode> CreateEntranceBehavior() {
   using namespace behavior;
 
   BehaviorBuilder builder;
@@ -620,7 +627,10 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBelowEntranceBehavior() {
   constexpr u32 kFlagroomPresenceRequirement = 2;
   // How much potential damage that exists in the entrance for it to be considered dangerous.
   // We have it higher than the terrier energy because not all should hit.
-  constexpr u32 kDangerousEntranceDamage = 2500;
+  constexpr u32 kDangerousEntranceDamage = 500;
+  // How close to the flag we need to be to use bursts in the entrance. This should be low enough to burst at the top of
+  // the entrance area.
+  constexpr float kEntranceFlagBurstDistance = 6.0f;
 
   struct GetEntranceShaftRectNode : public BehaviorNode {
     GetEntranceShaftRectNode(const char* output_key) : output_key(output_key) {}
@@ -632,8 +642,8 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBelowEntranceBehavior() {
 
       Vector2f flag_pos = tw->flag_position + Vector2f(0.5f, 0.5f);
 
-      Vector2f start = flag_pos + Vector2f(-3, 2);
-      Vector2f end = flag_pos + Vector2f(3, 24);
+      Vector2f start = flag_pos + Vector2f(-3.5f, 1.5f);
+      Vector2f end = flag_pos + Vector2f(3.5f, 24.5f);
       Rectangle rect(start, end);
 
       ctx.blackboard.Set(output_key, rect);
@@ -644,43 +654,210 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBelowEntranceBehavior() {
     const char* output_key = nullptr;
   };
 
+  // If we're at the top of entrance, try to find a safe way to go.
+  // TODO: This needs to be improved. It should check for nearby teammates and hide between them while following.
+  // If no nearby teammates, it should rush directly in.
+  struct EntranceTopNode : public BehaviorNode {
+    EntranceTopNode(const char* output_key) : output_key(output_key) {}
+
+    ExecuteResult Execute(ExecuteContext& ctx) override {
+      constexpr float kTopExtent = 6.5f;
+
+      auto self = ctx.bot->game->player_manager.GetSelf();
+      if (!self || self->ship >= 8) return ExecuteResult::Failure;
+
+      auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+      if (!opt_tw) return ExecuteResult::Failure;
+      TrenchWars* tw = *opt_tw;
+
+      Vector2f flag_pos = tw->flag_position + Vector2f(0.5f, 0.5f);
+
+      // If we are too far from the flag vertically, don't rush through.
+      if (self->position.y > flag_pos.y + kTopExtent) return ExecuteResult::Failure;
+
+      auto opt_partition = ctx.blackboard.Value<FlagroomPartition>(kPartitionKey);
+      if (!opt_partition) return ExecuteResult::Failure;
+
+      const FlagroomPartition& partition = *opt_partition;
+
+      int west_enemy_count = (int)partition.GetQuadrant(FlagroomQuadrantRegion::SouthWest).enemy_count;
+      int west_team_count = (int)partition.GetQuadrant(FlagroomQuadrantRegion::SouthWest).team_count;
+      int east_enemy_count = (int)partition.GetQuadrant(FlagroomQuadrantRegion::SouthEast).enemy_count;
+      int east_team_count = (int)partition.GetQuadrant(FlagroomQuadrantRegion::SouthEast).team_count;
+
+      int west_danger = west_enemy_count - west_team_count;
+      int east_danger = east_enemy_count - east_team_count;
+
+      if (west_danger <= east_danger) {
+        Vector2f west_position = flag_pos + Vector2f(-14, 9);
+
+        ctx.blackboard.Set<Vector2f>(output_key, west_position);
+      } else {
+        Vector2f east_position = flag_pos + Vector2f(14, 9);
+
+        ctx.blackboard.Set<Vector2f>(output_key, east_position);
+      }
+
+#if 0
+      Rectangle west_rect(flag_pos + Vector2f(-9, 2), flag_pos + Vector2f(-4, 7));
+      Rectangle east_rect(flag_pos + Vector2f(4, 2), flag_pos + Vector2f(9, 7));
+
+      if (west_rect.Contains(self->position)) {
+        Vector2f west_position = flag_pos + Vector2f(-14, 9);
+
+        ctx.blackboard.Set<Vector2f>(output_key, west_position);
+
+        return ExecuteResult::Success;
+      }
+
+      if (east_rect.Contains(self->position)) {
+        Vector2f east_position = flag_pos + Vector2f(14, 9);
+
+        ctx.blackboard.Set<Vector2f>(output_key, east_position);
+
+        return ExecuteResult::Success;
+      }
+#endif
+
+      return ExecuteResult::Success;
+    }
+
+    const char* output_key = nullptr;
+  };
+
+  // Looks at enemies, teammates, and bombs to do determine the best location to push forward.
+  // Finds the best teammate and lags behind them by offset_y.
+  struct GetSafePushCoordNode : public BehaviorNode {
+    GetSafePushCoordNode(float offset_y, const char* entrance_shaft_rect_key, const char* output_key)
+        : offset_y(offset_y), entrance_shaft_rect_key(entrance_shaft_rect_key), output_key(output_key) {}
+
+    ExecuteResult Execute(ExecuteContext& ctx) override {
+      auto& game = *ctx.bot->game;
+
+      Player* self = game.player_manager.GetSelf();
+      if (!self || self->ship >= 8) return ExecuteResult::Failure;
+
+      auto opt_shaft_rect = ctx.blackboard.Value<Rectangle>(entrance_shaft_rect_key);
+      if (!opt_shaft_rect) return ExecuteResult::Failure;
+
+      Rectangle shaft_rect = *opt_shaft_rect;
+      Player* lowest_enemy = GetLowestShaftEnemy(game, shaft_rect, self->frequency);
+      Player* highest_teammate = GetHighestShaftTeammateBelowEnemy(game, shaft_rect, *self, lowest_enemy);
+
+      if (!highest_teammate) return ExecuteResult::Failure;
+
+      // Create a rectangle that encompasses the lower part of the shaft that we will be moving through.
+      Rectangle traverse_shaft = shaft_rect;
+      traverse_shaft.min.y = highest_teammate->position.y;
+
+      // If there's an enemy bomb in the traverse shaft, fail to move forwards.
+      for (size_t i = 0; i < game.weapon_manager.weapon_count; ++i) {
+        Weapon* weapon = game.weapon_manager.weapons + i;
+        WeaponType type = weapon->data.type;
+
+        if (weapon->frequency == self->frequency) continue;
+
+        if (type == WeaponType::Bomb || type == WeaponType::ProximityBomb) {
+          return ExecuteResult::Failure;
+        }
+      }
+
+      // Get the center of the shaft so we try to move right up the center
+      Vector2f traverse_position = (shaft_rect.min + shaft_rect.max) * 0.5f;
+      traverse_position.y = highest_teammate->position.y + offset_y;
+
+      ctx.blackboard.Set<Vector2f>(output_key, traverse_position);
+
+      return ExecuteResult::Success;
+    }
+
+    Player* GetLowestShaftEnemy(Game& game, Rectangle& shaft_rect, u16 self_freq) {
+      Player* lowest_enemy = nullptr;
+
+      for (size_t i = 0; i < game.player_manager.player_count; ++i) {
+        Player* player = game.player_manager.players + i;
+
+        if (player->ship >= 8) continue;
+        if (player->frequency == self_freq) continue;
+        if (player->IsRespawning()) continue;
+        if (!shaft_rect.Contains(player->position)) continue;
+
+        if (!lowest_enemy || player->position.y > lowest_enemy->position.y) {
+          lowest_enemy = player;
+        }
+      }
+
+      return lowest_enemy;
+    }
+
+    Player* GetHighestShaftTeammateBelowEnemy(Game& game, Rectangle& shaft_rect, Player& self, Player* lowest_enemy) {
+      Player* highest_teammate = nullptr;
+
+      for (size_t i = 0; i < game.player_manager.player_count; ++i) {
+        Player* player = game.player_manager.players + i;
+
+        if (player->id == self.id) continue;
+        if (player->ship >= 8) continue;
+        if (player->frequency != self.frequency) continue;
+        if (player->IsRespawning()) continue;
+        if (!shaft_rect.Contains(player->position)) continue;
+
+        // Skip players that are above the lowest enemy
+        if (lowest_enemy && player->position.y < lowest_enemy->position.y) continue;
+
+        if (!highest_teammate || player->position.y < highest_teammate->position.y) {
+          highest_teammate = player;
+        }
+      }
+
+      return highest_teammate;
+    }
+
+    float offset_y = 0.0f;
+    const char* entrance_shaft_rect_key = nullptr;
+    const char* output_key = nullptr;
+  };
+
   // clang-format off
   builder
     .Sequence()
-        .Sequence() // A sequence that contains the conditionals for testing that we are below the entrance.
-            .Child<PlayerPositionQueryNode>("self_position")
-            .InvertChild<InFlagroomNode>("self_position") // We must not be in the flagroom
-            .InvertChild<DistanceThresholdNode>("tw_entrance_position", kEntranceNearbyDistance) // We must be near the 'entrance' position.
-            .Child<ExecuteNode>([](ExecuteContext& ctx) { // We must be below the entrance position
-              auto self = ctx.bot->game->player_manager.GetSelf();
-              if (!self || self->ship >= 8) return ExecuteResult::Failure;
-
-              auto opt_entrance_pos = ctx.blackboard.Value<Vector2f>("tw_entrance_position");
-              if (!opt_entrance_pos) return ExecuteResult::Failure;
-              Vector2f entrance_pos = *opt_entrance_pos;
-
-              return (self->position.y > entrance_pos.y) ? ExecuteResult::Success : ExecuteResult::Failure;
-            })
-            .End()
-        .Selector()
-            .Sequence() // Check if the above area is clear to move up
-                .Selector() // Check if we have a team presence above us so we don't rush in alone.
+        .Child<GetEntranceShaftRectNode>("entrance_shaft_rect")
+        .Child<SectorEqualityNode>(kSelfSectorKey, Sector::Entrance)
+        .Selector() // Determine traversal strategy.
+            .Child<DodgeIncomingDamage>(0.35f, 8.0f, 0.0f)
+            .Sequence() // If we have bursts and we're deep in the entrance, use it.
+                .Child<ShipItemCountThresholdNode>(ShipItemType::Burst)
+                .InvertChild<DistanceThresholdNode>("tw_flag_position", kEntranceFlagBurstDistance)
+                .Composite(CreateBurstSequence())
+                .End()
+            .Sequence() // If we near the top of the shaft, decide if we should rush through
+                // TODO: We should move to the best side
+                .Child<EntranceTopNode>("rush_position")
+                //.Child<DebugPrintNode>("Rushing through")
+                .Child<GoToNode>("rush_position")
+                .End()
+            .Sequence() // Try to follow behind a teammate in the entrance area.
+                .Child<GetSafePushCoordNode>(4.0f, "entrance_shaft_rect", "entrance_push_position")
+                //.Child<DebugPrintNode>("Pushing behind teammate")
+                .Child<GoToNode>("entrance_push_position")
+                .End()
+            .Sequence()
+                .Selector() // Determine if we should go all the way through
                     .Sequence() // If we are alone on a frequency, consider it enough to move forward.
                         .Child<PlayerFrequencyCountQueryNode>("self_freq_size")
                         .InvertChild<ScalarThresholdNode<size_t>>("self_freq_size", 2)
                         .End()
-                    .Selector() // Either we have a teammate in the fr or the fr has no enemies
+                    .Sequence() // If the flagroom is empty or fully team controlled.
                         .Child<SafeFlagroomNode>()
-                        .Child<FlagroomPresenceNode>(kFlagroomPresenceRequirement)
+                        .End()
+                    .Sequence() // If the entrance area is clear of enemies and weapons, move up.
+                        .Child<EmptyEntranceNode>()
+                        .Child<SafeRectNode>("entrance_shaft_rect", kDangerousEntranceDamage)
                         .End()
                     .End()
-                .Child<EmptyEntranceNode>()
-                .Child<GetEntranceShaftRectNode>("entrance_shaft_rect")
-                .Child<SafeRectNode>("entrance_shaft_rect", kDangerousEntranceDamage)
-                .Child<GoToNode>("tw_entrance_position") // Move into entrance area so other tree takes over.
+                .Child<GoToNode>("tw_flag_position")
                 .End()
             .Selector(CompositeDecorator::Success) // Above area is not yet safe, stay below and dodge.
-                .Child<DodgeIncomingDamage>(0.1f, 15.0f, 0.0f)
                 .Composite(CreateEntranceWaitBehavior())
                 .End()
             .End()
@@ -695,15 +872,16 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
 
   BehaviorBuilder builder;
 
+  // TODO: Check our sector to determine what to do
+
   // clang-format off
   builder
     .Sequence()
         .Child<PlayerSelfNode>("self")
-        .Child<PlayerPositionQueryNode>("self_position")
-        .InvertChild<InFlagroomNode>("self_position")
+        .InvertChild<InFlagroomNode>(kSelfPositionKey)
         .SuccessChild<DodgeIncomingDamage>(0.3f, 16.0f, 0.0f)
         .Sequence(CompositeDecorator::Success) // Use afterburners to get to flagroom faster.
-            .InvertChild<InFlagroomNode>("self_position")
+            .InvertChild<InFlagroomNode>(kSelfPositionKey)
             .Child<AfterburnerThresholdNode>(0.5f, 0.95f)
             .End()
         .Child<GoToNode>("tw_flag_position")
@@ -727,12 +905,12 @@ static std::unique_ptr<behavior::BehaviorNode> CreateSafeFlagroomPositionTree() 
     .Sequence()
         .Selector()
             .Sequence() // Try to move to a new quadrant if we are overran by enemies.
-                .Child<FindNewSafePositionNode>("partition", "new_quad_position") // Returns false if we are in the safest quadrant
+                .Child<FindNewSafePositionNode>(kPartitionKey, "new_quad_position") // Returns false if we are in the safest quadrant
                 .Child<GoToNode>("new_quad_position")
                 .End()
             .Sequence() // Begin moving to a new quadrant when we are near an incoming bomb explosion. This might end early and stay in the current quadrant when we escape bomb area.
-                .Child<EscapeBombExplodeQuadrantNode>("partition")
-                .Child<FindNewSafePositionNode>("partition", "new_quad_position") // This will find a new quadrant if we are near a bomb explosion
+                .Child<EscapeBombExplodeQuadrantNode>(kPartitionKey)
+                .Child<FindNewSafePositionNode>(kPartitionKey, "new_quad_position") // This will find a new quadrant if we are near a bomb explosion
                 .Child<GoToNode>("new_quad_position")
                 .End()
             .End()
@@ -756,12 +934,11 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomBehavior() {
   builder
     .Sequence()
         .Sequence() // Find an enemy
-            .Child<PlayerPositionQueryNode>("self_position")
             .Child<NearestTargetNode>("nearest_target", true)
             .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
             .End()
         .Sequence(CompositeDecorator::Success) // If we have a portal but no location, lay one down.
-            .Child<InFlagroomNode>("self_position")
+            .Child<InFlagroomNode>(kSelfPositionKey)
             .Child<InFlagroomNode>("nearest_target_position")
             .Child<ShipItemCountThresholdNode>(ShipItemType::Portal, 1)
             .InvertChild<ShipPortalPositionQueryNode>()
@@ -870,8 +1047,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBadRegionWarpBehavior() {
   // clang-format off
   builder
     .Sequence()
-        .Child<PlayerPositionQueryNode>("self_position")
-        .Child<InFlagroomNode>("self_position")
+        .Child<InFlagroomNode>(kSelfPositionKey)
         .Child<TimerExpiredNode>("tw_stuck_detect_timer")
         .InvertChild<PathableFlagNode>()
         .Sequence(CompositeDecorator::Success) // Not pathable, so always return success to stop running main behavior while we wait for energy.
@@ -889,6 +1065,54 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBadRegionWarpBehavior() {
   return builder.Build();
 }
 
+#if 0
+// We don't control the base, so try to get there safely, attack mid, attack entrance, then transition to defense.
+static std::unique_ptr<behavior::BehaviorNode> CreateAttackingTree() {
+  using namespace behavior;
+
+  BehaviorBuilder builder;
+
+   // clang-format off
+  builder
+    .Sequence()
+        .SuccessChild<FlagroomPartitionNode>(kPartitionKey)
+        .Selector()
+            .Composite(CreateEntranceRushBehavior())
+            .Composite(CreateEntranceBehavior())
+            .Composite(CreateFlagroomTravelBehavior())
+            .Composite(CreateFlagroomBehavior())
+            .Composite(CreateIdleBehavior())
+            .End()
+        .End();
+  // clang-format on
+
+  return builder.Build();
+}
+#endif
+
+// This tree will manage our behavior when we have control of flagroom or both teams are in the flagroom.
+static std::unique_ptr<behavior::BehaviorNode> CreateDefendingTree() {
+  using namespace behavior;
+
+  BehaviorBuilder builder;
+
+  // clang-format off
+  builder
+    .Sequence()
+        .SuccessChild<FlagroomPartitionNode>(kPartitionKey)
+        .Selector() // Handle main behavior based on base position
+            //.Composite(CreateEntranceRushBehavior())
+            .Composite(CreateEntranceBehavior())
+            .Composite(CreateFlagroomTravelBehavior())
+            .Composite(CreateFlagroomBehavior())
+            .Composite(CreateIdleBehavior())
+            .End()
+        .End();
+  // clang-format on
+
+  return builder.Build();
+}
+
 std::unique_ptr<behavior::BehaviorNode> CreateTerrierBasingTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
@@ -899,15 +1123,15 @@ std::unique_ptr<behavior::BehaviorNode> CreateTerrierBasingTree(behavior::Execut
     .Selector()
         .Composite(CreateBadRegionWarpBehavior())
         .Sequence()
-            .SuccessChild<FlagroomPartitionNode>("partition")
+            .Child<PlayerPositionQueryNode>(kSelfPositionKey)
+            .Child<SectorQueryNode>(kSelfSectorKey)
             .Composite(CreateXRadarBehavior(), CompositeDecorator::Success)
-            .Selector() // Handle main behavior based on base position
-                .Composite(CreateEntranceRushBehavior())
-                .Composite(CreateEntranceBehavior())
-                .Composite(CreateBelowEntranceBehavior())
-                .Composite(CreateFlagroomTravelBehavior())
-                .Composite(CreateFlagroomBehavior())
-                .Composite(CreateIdleBehavior())
+            .Selector()
+                .Sequence() // If we control the base, go to flagroom
+                    .Child<BaseTeamControlNode>()
+                    .Composite(CreateDefendingTree())
+                    .End()
+                .Composite(CreateDefendingTree())
                 .End()
             .End()
         .End();

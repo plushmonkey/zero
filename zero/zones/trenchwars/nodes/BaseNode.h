@@ -413,5 +413,86 @@ struct FlagroomPartitionNode : public behavior::BehaviorNode {
   const char* output_key = nullptr;
 };
 
+// Returns success if our frequency is in control of the base.
+struct BaseTeamControlNode : public behavior::BehaviorNode {
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto& pm = ctx.bot->game->player_manager;
+    auto self = pm.GetSelf();
+
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+    if (!opt_tw) return behavior::ExecuteResult::Failure;
+
+    TrenchWars* tw = *opt_tw;
+
+    size_t fr_team_count = 0;
+    size_t fr_enemy_count = 0;
+    float base_team_highest_y = 1024.0f;
+    float base_enemy_highest_y = 1024.0f;
+
+    for (size_t i = 0; i < pm.player_count; ++i) {
+      Player* check_player = pm.players + i;
+
+      if (check_player->ship >= 8) continue;
+      if (check_player->IsRespawning()) continue;
+      if (!pm.IsSynchronized(*check_player)) continue;
+
+      if (tw->base_bitset.Test(check_player->position)) {
+        if (check_player->frequency == self->frequency) {
+          ++fr_team_count;
+        } else {
+          ++fr_enemy_count;
+        }
+      } else if (tw->base_bitset.Test(check_player->position)) {
+        // This player is in the base but not the flagroom.
+        float* highest_y = check_player->frequency == self->frequency ? &base_team_highest_y : &base_enemy_highest_y;
+        if (check_player->position.y < *highest_y) {
+          *highest_y = check_player->position.y;
+        }
+      }
+    }
+
+    // We control the base if we have more people in the flagroom.
+    if (fr_team_count > fr_enemy_count) {
+      return behavior::ExecuteResult::Success;
+    }
+
+    // We control the base if our team's y is a lower value (higher on map)
+    if (base_team_highest_y < base_enemy_highest_y) {
+      return behavior::ExecuteResult::Success;
+    }
+
+    return behavior::ExecuteResult::Failure;
+  }
+};
+
+// Returns success if the provided position is anywhere inside the base.
+struct BasePresenceNode : public behavior::BehaviorNode {
+  BasePresenceNode(const char* position_key) : position_key(position_key) {}
+  BasePresenceNode(Vector2f position) : position(position) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+    if (!opt_tw) return behavior::ExecuteResult::Failure;
+    TrenchWars* tw = *opt_tw;
+
+    Vector2f check_position = position;
+    if (position_key) {
+      auto opt_position = ctx.blackboard.Value<Vector2f>(position_key);
+      if (!opt_position) return behavior::ExecuteResult::Failure;
+
+      check_position = *opt_position;
+    }
+
+    bool in_base = tw->base_bitset.Test(check_position);
+
+    return in_base ? behavior::ExecuteResult::Success : behavior::ExecuteResult::Failure;
+  }
+
+  const char* position_key = nullptr;
+  Vector2f position;
+};
+
 }  // namespace tw
 }  // namespace zero

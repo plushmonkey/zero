@@ -66,7 +66,7 @@ void TwController::CreateBehaviors(const char* arena_name) {
   trench_wars = std::make_unique<TrenchWars>(*bot);
   bot->execute_ctx.blackboard.Set("tw", trench_wars.get());
 
-  trench_wars->BuildFlagroom(*bot);
+  trench_wars->Build(*bot);
 
   auto& repo = bot->bot_controller->behaviors;
 
@@ -87,6 +87,31 @@ void TwController::CreateBehaviors(const char* arena_name) {
   }
 
   Log(LogLevel::Info, "Scorereset interval: %u", scorereset_interval);
+}
+
+void TrenchWars::Build(ZeroBot& bot) {
+  this->fr_bottom_y = 0;
+  this->middle_bottom_y = 0;
+  this->base_bottom_y = 0;
+
+  BuildFlagroom(bot);
+  BuildFlagroomEntrance(bot);
+
+  u8 prev_door_mode = (u8)bot.game->connection.settings.DoorMode;
+#define DOORSEED_BIT(tile_id) (1 << ((tile_id) - 162))
+  u8 temp_door_mode = DOORSEED_BIT(165) | DOORSEED_BIT(166) | DOORSEED_BIT(168);
+
+  // Temporarily update the door seed so only the outer base doors are closed. This allows us to use the pathfinder to
+  // determine traversability for the base flooding while stopping at outer layer.
+  bot.game->GetMap().SeedDoors(temp_door_mode);
+  Event::Dispatch(DoorToggleEvent());
+
+  BuildMiddle(bot);
+  BuildBase(bot);
+
+  // Restore map seed and alert pathfinder to mark as dynamic again.
+  bot.game->GetMap().SeedDoors(prev_door_mode);
+  Event::Dispatch(DoorToggleEvent());
 }
 
 void TrenchWars::BuildFlagroom(ZeroBot& bot) {
@@ -115,12 +140,17 @@ void TrenchWars::BuildFlagroom(ZeroBot& bot) {
 
   tw->flag_position = Vector2f((float)flag_x, (float)flag_y);
   tw->entrance_position = tw->flag_position + Vector2f(0, 12);
+  tw->fr_bottom_y = 0;
 
   bot.execute_ctx.blackboard.Set("tw_flag_position", tw->flag_position);
   bot.execute_ctx.blackboard.Set("tw_entrance_position", tw->entrance_position);
 
   auto visit = [tw](MapCoord coord) {
     tw->fr_bitset.Set(coord.x, coord.y);
+
+    if (coord.y > tw->fr_bottom_y) {
+      tw->fr_bottom_y = coord.y;
+    }
 #if TW_RENDER_FR
     tw->fr_positions.emplace_back((float)coord.x, (float)coord.y);
 #endif
@@ -359,7 +389,167 @@ void TrenchWars::BuildFlagroom(ZeroBot& bot) {
 
   // Fake a door update so we get the right flagroom.
   tw->HandleEvent(DoorToggleEvent());
-  BuildBase(bot);
+}
+
+void TrenchWars::BuildFlagroomEntrance(ZeroBot& bot) {
+  constexpr float kShipRadius = 0.85f;
+  constexpr int kMaxDistance = 22;
+
+  u16 start_x = (u16)flag_position.x;
+  u16 start_y = (u16)flag_position.y + 17;
+
+  auto& pathfinder = *bot.bot_controller->pathfinder;
+  Map& map = bot.game->GetMap();
+
+  auto visit = [this](MapCoord coord) { entrance_bitset.Set(coord.x, coord.y, true); };
+  auto visited = [this](MapCoord coord) { return entrance_bitset.Test(coord.x, coord.y); };
+
+  struct VisitState {
+    MapCoord coord;
+    int depth;
+
+    VisitState(MapCoord coord, int depth) : coord(coord), depth(depth) {}
+  };
+
+  std::deque<VisitState> stack;
+
+  stack.emplace_back(MapCoord(start_x, start_y), 0);
+
+  visit(stack.front().coord);
+
+  while (!stack.empty()) {
+    VisitState current = stack.front();
+    MapCoord coord = current.coord;
+
+    stack.pop_front();
+
+    if (current.depth >= kMaxDistance) continue;
+    if (coord.y > this->fr_bottom_y) continue;
+
+    // Cap our horizontal movement.
+    int dx = (int)coord.x - (int)start_x;
+    if (dx < -8 || dx > 8) continue;
+
+    path::Node* node = pathfinder.GetProcessor().GetNode(path::NodePoint(coord.x, coord.y));
+    path::EdgeSet edgeset = pathfinder.GetProcessor().FindEdges(node, kShipRadius);
+
+    MapCoord west(coord.x - 1, coord.y);
+    MapCoord east(coord.x + 1, coord.y);
+    MapCoord north(coord.x, coord.y - 1);
+    MapCoord south(coord.x, coord.y + 1);
+
+    if (edgeset.IsSet(path::CoordOffset::WestIndex()) && !visited(west)) {
+      stack.emplace_back(west, current.depth + 1);
+      visit(west);
+    }
+
+    if (edgeset.IsSet(path::CoordOffset::EastIndex()) && !visited(east)) {
+      stack.emplace_back(east, current.depth + 1);
+      visit(east);
+    }
+
+    if (edgeset.IsSet(path::CoordOffset::NorthIndex()) && !visited(north)) {
+      stack.emplace_back(north, current.depth + 1);
+      visit(north);
+    }
+
+    if (edgeset.IsSet(path::CoordOffset::SouthIndex()) && !visited(south)) {
+      stack.emplace_back(south, current.depth + 1);
+      visit(south);
+    }
+  }
+}
+
+void TrenchWars::BuildMiddle(ZeroBot& bot) {
+  constexpr float kShipRadius = 0.85f;
+  constexpr int kVerticalExtent = 38;
+
+  u16 start_x = (u16)flag_position.x;
+  u16 start_y = (u16)this->fr_bottom_y + 3;
+
+  u16 top_y = (u16)flag_position.y + 15;
+  u16 bottom_y = start_y + kVerticalExtent;
+
+  auto& pathfinder = *bot.bot_controller->pathfinder;
+  Map& map = bot.game->GetMap();
+
+  auto visit = [this](MapCoord coord) {
+    middle_bitset.Set(coord.x, coord.y, true);
+
+    if (coord.y > this->middle_bottom_y) {
+      this->middle_bottom_y = coord.y;
+    }
+  };
+
+  auto visited = [this](MapCoord coord) { return middle_bitset.Test(coord.x, coord.y); };
+
+  struct VisitState {
+    MapCoord coord;
+    int depth;
+
+    VisitState(MapCoord coord, int depth) : coord(coord), depth(depth) {}
+  };
+
+  std::deque<VisitState> stack;
+
+  stack.emplace_back(MapCoord(start_x, start_y), 0);
+
+  visit(stack.front().coord);
+
+  while (!stack.empty()) {
+    VisitState current = stack.front();
+    MapCoord coord = current.coord;
+
+    stack.pop_front();
+
+    if (coord.y > bottom_y) continue;
+
+    if (coord.y < top_y) {
+      // If we are above the top y, exclude anything too far to the side so they are properly marked as side areas.
+      int dx = (int)coord.x - (int)start_x;
+      if (dx < -25 || dx > 25) {
+        continue;
+      }
+    }
+
+    if (fr_bitset.Test(coord.x, coord.y)) continue;
+    if (entrance_bitset.Test(coord.x, coord.y)) continue;
+
+    path::Node* node = pathfinder.GetProcessor().GetNode(path::NodePoint(coord.x, coord.y));
+
+    if (node->flags & path::NodeFlag_DynamicEmpty) {
+      pathfinder.GetProcessor().UpdateDynamicNode(node, kShipRadius, 0xFFFF);
+    }
+
+    if (!(node->flags & path::NodeFlag_Traversable)) continue;
+
+    path::EdgeSet edgeset = pathfinder.GetProcessor().FindEdges(node, kShipRadius);
+
+    MapCoord west(coord.x - 1, coord.y);
+    MapCoord east(coord.x + 1, coord.y);
+    MapCoord north(coord.x, coord.y - 1);
+    MapCoord south(coord.x, coord.y + 1);
+
+    if (edgeset.IsSet(path::CoordOffset::WestIndex()) && !visited(west)) {
+      stack.emplace_back(west, current.depth + 1);
+      visit(west);
+    }
+
+    if (edgeset.IsSet(path::CoordOffset::EastIndex()) && !visited(east)) {
+      stack.emplace_back(east, current.depth + 1);
+      visit(east);
+    }
+
+    if (edgeset.IsSet(path::CoordOffset::NorthIndex()) && !visited(north)) {
+      stack.emplace_back(north, current.depth + 1);
+      visit(north);
+    }
+
+    if (edgeset.IsSet(path::CoordOffset::SouthIndex()) && !visited(south)) {
+      stack.emplace_back(south, current.depth + 1);
+      visit(south);
+    }
+  }
 }
 
 void TrenchWars::BuildBase(ZeroBot& bot) {
@@ -367,15 +557,6 @@ void TrenchWars::BuildBase(ZeroBot& bot) {
 
   auto& pathfinder = *bot.bot_controller->pathfinder;
   Map& map = bot.game->GetMap();
-
-  u8 prev_door_mode = (u8)bot.game->connection.settings.DoorMode;
-#define DOORSEED_BIT(tile_id) (1 << ((tile_id) - 162))
-  u8 temp_door_mode = DOORSEED_BIT(165) | DOORSEED_BIT(166) | DOORSEED_BIT(168);
-
-  // Temporarily update the door seed so only the outer base doors are closed. This allows us to use the pathfinder to
-  // determine traversability for the base flooding while stopping at outer layer.
-  map.SeedDoors(temp_door_mode);
-  Event::Dispatch(DoorToggleEvent());
 
   auto visit = [this](MapCoord coord) { this->base_bitset.Set(coord.x, coord.y); };
   auto visited = [this](MapCoord coord) { return this->base_bitset.Test(coord.x, coord.y); };
@@ -440,10 +621,6 @@ void TrenchWars::BuildBase(ZeroBot& bot) {
       visit(south);
     }
   }
-
-  // Restore map seed and alert pathfinder to mark as dynamic again.
-  map.SeedDoors(prev_door_mode);
-  Event::Dispatch(DoorToggleEvent());
 }
 
 u16 TrenchWars::CalculateBaseBottom(ZeroBot& bot) const {
@@ -476,6 +653,38 @@ u16 TrenchWars::CalculateBaseBottom(ZeroBot& bot) const {
   }
 
   return best_y;
+}
+
+Sector TrenchWars::GetSector(Vector2f position) const {
+  u16 x = (u16)position.x;
+  u16 y = (u16)position.y;
+
+  if (!base_bitset.Test(x, y)) {
+    if (y < (u16)this->flag_position.y) {
+      return Sector::Roof;
+    }
+
+    return Sector::Center;
+  }
+
+  if (entrance_bitset.Test(x, y)) return Sector::Entrance;
+  if (fr_bitset.Test(x, y)) return Sector::Flagroom;
+  if (middle_bitset.Test(x, y)) return Sector::Middle;
+
+  // Check if we are in one of the side tubes.
+  if (y < this->middle_bottom_y) {
+    if (x < (u16)this->flag_position.x) {
+      return Sector::West;
+    }
+
+    return Sector::East;
+  }
+
+  return Sector::Bottom;
+}
+
+bool TrenchWars::InFlagroom(Vector2f position) const {
+  return fr_bitset.Test(position);
 }
 
 void TrenchWars::HandleEvent(const DoorToggleEvent&) {

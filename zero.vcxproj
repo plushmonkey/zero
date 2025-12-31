@@ -286,6 +286,7 @@
     <ClInclude Include="zero\zones\trenchwars\nodes\BaseNode.h" />
     <ClInclude Include="zero\zones\trenchwars\nodes\FlagNode.h" />
     <ClInclude Include="zero\zones\trenchwars\nodes\MoveNode.h" />
+    <ClInclude Include="zero\zones\trenchwars\nodes\SectorNode.h" />
     <ClInclude Include="zero\zones\trenchwars\solo\SoloBehavior.h" />
     <ClInclude Include="zero\zones\trenchwars\solo\SoloWarbirdBehavior.h" />
     <ClInclude Include="zero\zones\trenchwars\team\TeamBehavior.h" />
@@ -323,7 +324,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>

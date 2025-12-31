@@ -9,7 +9,7 @@
 
 #include <chrono>
 
-#if 1
+#if 0
 #define SURFACE_WIDTH 1152
 #define SURFACE_HEIGHT 648
 #else
