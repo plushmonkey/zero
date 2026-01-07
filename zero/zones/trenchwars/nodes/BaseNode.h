@@ -287,6 +287,24 @@ struct InFlagroomNode : public behavior::BehaviorNode {
   const char* position_key = nullptr;
 };
 
+struct InBaseNode : public behavior::BehaviorNode {
+  InBaseNode(const char* position_key) : position_key(position_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+    if (!opt_tw) return behavior::ExecuteResult::Failure;
+
+    auto opt_position = ctx.blackboard.Value<Vector2f>(position_key);
+    if (!opt_position) return behavior::ExecuteResult::Failure;
+
+    bool in_base = (*opt_tw)->base_bitset.Test(*opt_position);
+
+    return in_base ? behavior::ExecuteResult::Success : behavior::ExecuteResult::Failure;
+  }
+
+  const char* position_key = nullptr;
+};
+
 // Returns success if the target player has some number of teammates within the flag room, including self.
 struct FlagroomPresenceNode : public behavior::BehaviorNode {
   FlagroomPresenceNode(u32 count) : count_check(count) {}
@@ -436,9 +454,10 @@ struct BaseTeamControlNode : public behavior::BehaviorNode {
 
       if (check_player->ship >= 8) continue;
       if (check_player->IsRespawning()) continue;
-      if (!pm.IsSynchronized(*check_player)) continue;
+      // TODO: Should we only use synchronized positions? Might be better not to for some 'memory'.
+      // if (!pm.IsSynchronized(*check_player)) continue;
 
-      if (tw->base_bitset.Test(check_player->position)) {
+      if (tw->fr_bitset.Test(check_player->position)) {
         if (check_player->frequency == self->frequency) {
           ++fr_team_count;
         } else {
@@ -467,31 +486,51 @@ struct BaseTeamControlNode : public behavior::BehaviorNode {
   }
 };
 
-// Returns success if the provided position is anywhere inside the base.
-struct BasePresenceNode : public behavior::BehaviorNode {
-  BasePresenceNode(const char* position_key) : position_key(position_key) {}
-  BasePresenceNode(Vector2f position) : position(position) {}
+// Determines which sector we should be defending.
+// If enemies are in the flagroom, defend flagroom.
+// If enemies aren't in flagroom, but in are mid, defend mid.
+// Etc
+struct FindDefendSectorNode : public behavior::BehaviorNode {
+  FindDefendSectorNode(const char* output_key) : output_key(output_key) {}
 
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto& pm = ctx.bot->game->player_manager;
+    auto self = pm.GetSelf();
+
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
     auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
     if (!opt_tw) return behavior::ExecuteResult::Failure;
     TrenchWars* tw = *opt_tw;
 
-    Vector2f check_position = position;
-    if (position_key) {
-      auto opt_position = ctx.blackboard.Value<Vector2f>(position_key);
-      if (!opt_position) return behavior::ExecuteResult::Failure;
+    Sector highest_sector = Sector::Bottom;
 
-      check_position = *opt_position;
+    for (size_t i = 0; i < pm.player_count; ++i) {
+      Player& player = pm.players[i];
+
+      if (player.frequency == self->frequency) continue;
+      if (player.IsRespawning()) continue;
+
+      if (tw->InFlagroom(player.position)) {
+        highest_sector = Sector::Flagroom;
+        break;
+      }
+
+      Sector sector = tw->GetSector(player.position);
+
+      if (IsSectorAbove(sector, highest_sector)) {
+        highest_sector = sector;
+      }
     }
 
-    bool in_base = tw->base_bitset.Test(check_position);
+    Sector defend_sector = GetAboveSector(highest_sector);
 
-    return in_base ? behavior::ExecuteResult::Success : behavior::ExecuteResult::Failure;
+    ctx.blackboard.Set<Sector>(output_key, defend_sector);
+
+    return behavior::ExecuteResult::Success;
   }
 
-  const char* position_key = nullptr;
-  Vector2f position;
+  const char* output_key = nullptr;
 };
 
 }  // namespace tw

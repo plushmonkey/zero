@@ -706,6 +706,17 @@ Sector TrenchWars::GetSector(Vector2f position) const {
 
   // Check if we are in one of the side tubes.
   if (y < this->middle_bottom_y) {
+    // Ignore sides on maps that don't have corridors into the flagroom.
+    if (this->corridors.size() < 2) {
+      // There are parts of the base where the bottom area is higher on the map than the middle bottom y.
+      // Treat these as Bottom sector while making sure any upper areas are part of middle still.
+      constexpr s16 kBottomExtent = 15;
+      s16 dy = (s16)this->middle_bottom_y - (s16)y;
+      bool bottom_area = dy < kBottomExtent;
+
+      return bottom_area ? Sector::Bottom : Sector::Middle;
+    }
+
     if (x < (u16)this->flag_position.x) {
       return Sector::West;
     }
@@ -714,6 +725,11 @@ Sector TrenchWars::GetSector(Vector2f position) const {
   }
 
   return Sector::Bottom;
+}
+
+Sector TrenchWars::GetDefiniteSector(Vector2f position) const {
+  if (InFlagroom(position)) return Sector::Flagroom;
+  return GetSector(position);
 }
 
 bool TrenchWars::InFlagroom(Vector2f position) const {

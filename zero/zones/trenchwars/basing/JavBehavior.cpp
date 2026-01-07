@@ -391,6 +391,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
 
   // Spread out from team members while going to flagroom so we don't all die in one shot.
   float kAvoidTeamTravelRange = 4.0f;
+  constexpr float kAttachDistanceThreshold = 25.0f;
 
   // clang-format off
   builder
@@ -421,7 +422,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
                     .Child<AfterburnerThresholdNode>()
                     .End()
                 .Selector()
-                    .Composite(CreateBaseAttachTree("self"))
+                    .Composite(CreateBaseAttachTree(kAttachDistanceThreshold))
                     .Sequence() // Go directly to the flag room if we aren't there.
                         .InvertChild<InFlagroomNode>("self_position")
                         .Child<GoToNode>("tw_flag_position")

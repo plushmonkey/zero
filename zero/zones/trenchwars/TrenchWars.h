@@ -4,6 +4,7 @@
 #include <zero/RegionRegistry.h>
 #include <zero/game/GameEvent.h>
 #include <zero/path/Path.h>
+#include <zero/zones/trenchwars/Sector.h>
 
 #include <bitset>
 #include <memory>
@@ -35,17 +36,6 @@ struct RegionBitset {
   }
 
   inline void Clear() { data.reset(); }
-};
-
-enum class Sector {
-  Flagroom,
-  Entrance,
-  Middle,
-  Bottom,
-  West,    // At least as high as middle, but in the west tube.
-  East,    // At least as high as middle, but in the east tube.
-  Roof,    // Outside of the base but higher than flagroom.
-  Center,  // Outside of the base but not above roof.
 };
 
 struct TrenchWars : EventHandler<DoorToggleEvent> {
@@ -96,6 +86,10 @@ struct TrenchWars : EventHandler<DoorToggleEvent> {
   // Entrance and Flagroom can overlap, but this will prioritize returning Entrance.
   // Use InFlagroom(position) to determine flagroom presence.
   Sector GetSector(Vector2f position) const;
+
+  // This will determine which part of the map the position resides in.
+  // Entrance and Flagroom can overlap, so this will first check if they are in the flagroom.
+  Sector GetDefiniteSector(Vector2f position) const;
   bool InFlagroom(Vector2f position) const;
 
   void HandleEvent(const DoorToggleEvent&) override;

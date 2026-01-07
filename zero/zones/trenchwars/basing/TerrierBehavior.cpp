@@ -33,9 +33,9 @@ namespace tw {
 
 constexpr float kTerrierLeashDistance = 30.0f;
 
-const char* kSelfSectorKey = "self_sector";
-const char* kSelfPositionKey = "self_position";
-const char* kPartitionKey = "partition";
+static const char* kSelfSectorKey = "self_sector";
+static const char* kSelfPositionKey = "self_position";
+static const char* kPartitionKey = "partition";
 
 static std::unique_ptr<behavior::BehaviorNode> CreateEntranceWaitBehavior();
 

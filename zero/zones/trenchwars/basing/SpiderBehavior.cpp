@@ -13,7 +13,6 @@
 #include <zero/behavior/nodes/RegionNode.h>
 #include <zero/behavior/nodes/RenderNode.h>
 #include <zero/behavior/nodes/ShipNode.h>
-#include <zero/behavior/nodes/TargetNode.h>
 #include <zero/behavior/nodes/ThreatNode.h>
 #include <zero/behavior/nodes/TimerNode.h>
 #include <zero/behavior/nodes/WaypointNode.h>
@@ -27,12 +26,16 @@
 #include <zero/zones/trenchwars/nodes/BaseNode.h>
 #include <zero/zones/trenchwars/nodes/FlagNode.h>
 #include <zero/zones/trenchwars/nodes/MoveNode.h>
+#include <zero/zones/trenchwars/nodes/SectorNode.h>
+#include <zero/zones/trenchwars/nodes/TargetNode.h>
 
 namespace zero {
 namespace tw {
 
 constexpr float kSpiderLeashDistance = 30.0f;
 constexpr float kAvoidTeamDistance = 2.0f;
+
+static const char* kSelfSectorKey = "self_sector";
 
 static std::unique_ptr<behavior::BehaviorNode> CreateDefensiveTree() {
   using namespace behavior;
@@ -137,7 +140,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateOffensiveTree(const char* n
   return builder.Build();
 }
 
-static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
+static std::unique_ptr<behavior::BehaviorNode> CreateDefenseTravelBehavior(const char* defend_sector_key) {
   using namespace behavior;
 
   BehaviorBuilder builder;
@@ -145,6 +148,9 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
   // clang-format off
   builder
     .Sequence()
+        .Child<SectorBottomCoordNode>(defend_sector_key, "defend_position")
+        .Child<GoToNode>("defend_position")
+#if 0
         .Child<PlayerSelfNode>("self")
         .Child<PlayerPositionQueryNode>("self_position")
         .Selector() // Choose between traveling and fighting enemies in the base.
@@ -179,7 +185,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
                         .Child<FlagPositionQueryNode>("nearest_flag", "nearest_flag_position")
                         .Child<BestFlagClaimerNode>()
                         .Sequence(CompositeDecorator::Success)
-                            .Child<NearestTargetNode>("nearest_target", true)
+                            .Child<NearestTargetPrioritizeSectorNode>("nearest_target", kSelfSectorKey, true)
                             .Composite(CreateShootTree("nearest_target")) // Shoot weapons while collecting flag so we don't ride on top of each other
                             .End()
                         .Selector()
@@ -193,6 +199,64 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
                     .End()
                 .End() // End travel to flagroom sequence
             .End() // End fight/travel selector
+#endif
+        .End();
+  // clang-format on
+
+  return builder.Build();
+}
+
+static std::unique_ptr<behavior::BehaviorNode> CreateBaseDefendTree(behavior::ExecuteContext& ctx) {
+  using namespace behavior;
+
+  constexpr float kDefendAreaDistance = 12.0f;
+  constexpr float kAttachDistanceThreshold = 25.0f;
+
+  BehaviorBuilder builder;
+
+  // TODO: This isn't really implemented. Only the foundation for movement / Finding areas to defend.
+  // TODO: Determine when to go grab flag if not controlled.
+  // TODO: We shouldn't get distracted with random enemies in base. Focus on ones near horizontal center of base.
+  // TODO: Stick to our control area. Should move backward and forward to shoot bullets down chokes.
+  
+  // clang-format off
+  builder
+    .Sequence()
+        .Child<FindDefendSectorNode>("defend_sector")
+        .Child<SectorBottomCoordNode>("defend_sector", "defend_position")
+        .Sequence(CompositeDecorator::Success) // Try to attach to a player if we aren't in defend sector.
+            .InvertChild<SectorEqualityNode>(kSelfSectorKey, "defend_sector")
+            .Composite(CreateBaseAttachTree(kAttachDistanceThreshold))
+            .End()
+        .Selector()
+            .Sequence() // Find nearest target and either path to them or seek them directly.
+                .Sequence() // Find an enemy
+                    .Child<PlayerPositionQueryNode>("self_position")
+                    .Child<NearestTargetPrioritizeSectorNode>("nearest_target", kSelfSectorKey, true)
+                    .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
+                    .Child<InBaseNode>("nearest_target_position")
+                    .End()
+                .Selector()
+                    .Composite(CreateDefensiveTree())
+                    .Sequence()
+                        .Selector()
+                            .Sequence()
+                                .Child<ShipTraverseQueryNode>("nearest_target_position")
+                                .Composite(CreateOffensiveTree("nearest_target", "nearest_target_position"))
+                                .End()
+                            .Child<GoToNode>("nearest_target_position")
+                            .End()
+                        .End()
+                    .End()
+                .End()
+            .Sequence()
+                .Child<DistanceThresholdNode>("defend_position", kDefendAreaDistance)
+                .Child<AfterburnerThresholdNode>()
+                .Child<GoToNode>("defend_position")
+                .End()
+            .Sequence(CompositeDecorator::Success) // TODO: Find something to do if no enemies. Maybe have it spread around the defense position.
+                .End()
+            .End()
         .End();
   // clang-format on
 
@@ -222,29 +286,37 @@ std::unique_ptr<behavior::BehaviorNode> CreateSpiderBasingTree(behavior::Execute
   return builder.Build();
 #endif
 
+#if 0
+  // clang-format off
+  builder.
+    Sequence()
+        .Child<ExecuteNode>([](ExecuteContext& ctx) {
+          auto self = ctx.bot->game->player_manager.GetSelf();
+          if (self) {
+            const char* kSectors[] = {"Flagroom", "Entrance", "Middle", "Bottom", "West", "East", "Roof", "Center"};
+            TrenchWars* tw = ctx.blackboard.ValueOr<TrenchWars*>("tw", nullptr);
+            Sector sector = tw->GetSector(self->position);
+            size_t index = (size_t)sector;
+            Log(LogLevel::Info, "Sector: %s", kSectors[index]);
+          }
+          return ExecuteResult::Success;
+        })
+        .End();
+  // clang-format on
+
+  return builder.Build();
+#endif
+
   // clang-format off
   builder
-    .Selector()
-        .Composite(CreateFlagroomTravelBehavior())
-        .Sequence() // Find nearest target and either path to them or seek them directly.
-            .Sequence() // Find an enemy
-                .Child<PlayerPositionQueryNode>("self_position")
-                .Child<NearestTargetNode>("nearest_target", true)
-                .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
+    .Sequence()
+        .Child<SectorQueryNode>(kSelfSectorKey)
+        .Selector()
+            .Sequence() // If we control the base, we should defend the best position of the base instead of just sitting in fr.
+                .Child<BaseTeamControlNode>()
+                .Composite(CreateBaseDefendTree(ctx))
                 .End()
-            .Selector()
-                .Composite(CreateDefensiveTree())
-                .Sequence() // Go to enemy and attack if they are in the flag room.
-                    .Child<InFlagroomNode>("nearest_target_position")
-                    .Selector()
-                        .Sequence()
-                            .Child<ShipTraverseQueryNode>("nearest_target_position")
-                            .Composite(CreateOffensiveTree("nearest_target", "nearest_target_position"))
-                            .End()
-                        .Child<GoToNode>("nearest_target_position")
-                        .End()
-                    .End()
-                .End()
+            .Composite(CreateBaseDefendTree(ctx))
             .End()
         .End();
   // clang-format on

@@ -201,6 +201,11 @@ void DevastationController::LoadArenaType(ArenaType arena_type) {
       repo.Add("test", std::make_unique<TestBehavior>());
 
       SetBehavior("center");
+
+      // Force registry to be recreated so the base manager can handle the events.
+      this->bot->bot_controller->pathfinder = nullptr;
+      float ship_radius = this->bot->game->connection.settings.ShipSettings[0].GetRadius();
+      this->bot->bot_controller->UpdatePathfinder(ship_radius);
     } break;
     default: {
       repo.Add("center", std::make_unique<CenterBehavior>());

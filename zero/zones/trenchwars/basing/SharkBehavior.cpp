@@ -222,7 +222,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateOffensiveTree(const char* n
                 .InvertChild<ShipWeaponCooldownQueryNode>(WeaponType::Bomb)
                 .InvertChild<DistanceThresholdNode>(nearest_target_position_key, kNearEnemyMineDistance)
                 .Selector() // Find the nearest terrier and don't lay a mine if it's near us.
-                    .InvertChild<BestAttachQueryNode>(false, "nearest_terrier_player") // Invert this so we mark this selector as true when no terrier exists.
+                    .InvertChild<BestAttachQueryNode>(BestAttachQueryNode::Filter::Any, "nearest_terrier_player") // Invert this so we mark this selector as true when no terrier exists.
                     .Sequence() // If we had a nearest_terrier_player, check nearby distance.
                         .Child<PlayerPositionQueryNode>("nearest_terrier_player", "nearest_terrier_player_position")
                         .Child<DistanceThresholdNode>("nearest_terrier_player_position", 16.0f)
@@ -298,6 +298,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
   BehaviorBuilder builder;
 
   constexpr float kNearFlagroomDistance = 50.0f;
+  constexpr float kAttachDistanceThreshold = 25.0f;
 
   // clang-format off
   builder
@@ -321,7 +322,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateFlagroomTravelBehavior() {
                 .Child<AfterburnerThresholdNode>()
                 .End()
             .Selector()
-                .Composite(CreateBaseAttachTree("self"))
+                .Composite(CreateBaseAttachTree(kAttachDistanceThreshold))
                 .Sequence() // Go directly to the flag room if we aren't there.
                     .InvertChild<InFlagroomNode>("self_position")
                     .Child<GoToNode>("tw_flag_position")

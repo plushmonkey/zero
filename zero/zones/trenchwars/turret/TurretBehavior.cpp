@@ -38,7 +38,7 @@ std::unique_ptr<behavior::BehaviorNode> TurretBehavior::CreateTree(behavior::Exe
                 .InvertChild<PlayerEnergyPercentThresholdNode>(1.0f) // This is inverted so the parent sequence halts while waiting.
                 .Sequence() // Try to attach once we have full energy.
                     .Child<TimerExpiredNode>("attach_cooldown")
-                    .Child<BestAttachQueryNode>(false, "best_attach_player")
+                    .Child<BestAttachQueryNode>(BestAttachQueryNode::Filter::Any, "best_attach_player")
                     .Child<PlayerEnergyQueryNode>("best_attach_player", "best_attach_player_energy")
                     .Child<ScalarThresholdNode<float>>("best_attach_player_energy", 0.0f)
                     .Child<AttachNode>("best_attach_player")

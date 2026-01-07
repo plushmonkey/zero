@@ -38,6 +38,7 @@
     <ClCompile Include="zero\Actuator.cpp" />
     <ClCompile Include="zero\behavior\BehaviorBuilder.cpp" />
     <ClCompile Include="zero\behavior\BehaviorTree.cpp" />
+    <ClCompile Include="zero\behavior\nodes\MoveNode.cpp" />
     <ClCompile Include="zero\BotController.cpp" />
     <ClCompile Include="zero\ChatQueue.cpp" />
     <ClCompile Include="zero\commands\CommandSystem.cpp" />
@@ -57,6 +58,7 @@
     <ClCompile Include="zero\game\render\TileRenderer.cpp" />
     <ClCompile Include="zero\HeuristicEnergyTracker.cpp" />
     <ClCompile Include="zero\MapBase.cpp" />
+    <ClCompile Include="zero\Steering.cpp" />
     <ClCompile Include="zero\ZeroBot.cpp" />
     <ClCompile Include="zero\game\BrickManager.cpp" />
     <ClCompile Include="zero\game\Buffer.cpp" />
@@ -287,6 +289,8 @@
     <ClInclude Include="zero\zones\trenchwars\nodes\FlagNode.h" />
     <ClInclude Include="zero\zones\trenchwars\nodes\MoveNode.h" />
     <ClInclude Include="zero\zones\trenchwars\nodes\SectorNode.h" />
+    <ClInclude Include="zero\zones\trenchwars\nodes\TargetNode.h" />
+    <ClInclude Include="zero\zones\trenchwars\Sector.h" />
     <ClInclude Include="zero\zones\trenchwars\solo\SoloBehavior.h" />
     <ClInclude Include="zero\zones\trenchwars\solo\SoloWarbirdBehavior.h" />
     <ClInclude Include="zero\zones\trenchwars\team\TeamBehavior.h" />
@@ -318,7 +322,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
