@@ -533,5 +533,46 @@ struct FindDefendSectorNode : public behavior::BehaviorNode {
   const char* output_key = nullptr;
 };
 
+struct FindHighestBaseEnemyPosition : public behavior::BehaviorNode {
+  FindHighestBaseEnemyPosition(const char* output_key) : output_key(output_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto& pm = ctx.bot->game->player_manager;
+    auto self = pm.GetSelf();
+
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+    if (!opt_tw) return behavior::ExecuteResult::Failure;
+    TrenchWars* tw = *opt_tw;
+
+    Vector2f highest_position = Vector2f(0, 1025);
+    Player* highest_player = nullptr;
+
+    for (size_t i = 0; i < pm.player_count; ++i) {
+      Player& player = pm.players[i];
+
+      if (player.frequency == self->frequency) continue;
+      if (player.IsRespawning()) continue;
+      if (!tw->base_bitset.Test(player.position)) continue;
+
+      if (player.position.y < highest_position.y) {
+        highest_position = player.position;
+        highest_player = &player;
+      }
+    }
+
+    if (!highest_player) {
+      return behavior::ExecuteResult::Failure;
+    }
+
+    ctx.blackboard.Set(output_key, highest_position);
+
+    return behavior::ExecuteResult::Success;
+  }
+
+  const char* output_key = nullptr;
+};
+
 }  // namespace tw
 }  // namespace zero

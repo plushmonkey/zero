@@ -323,5 +323,51 @@ struct PathDistanceQueryNode : public BehaviorNode {
   const char* output_key = nullptr;
 };
 
+struct ActuatorReverseNode : public BehaviorNode {
+  ActuatorReverseNode(bool allow) : allow_reversing(allow) {}
+  ActuatorReverseNode(const char* allow_key) : allow_key(allow_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    bool allow = this->allow_reversing;
+
+    if (allow_key) {
+      auto opt_allow = ctx.blackboard.Value<bool>(allow_key);
+      if (!opt_allow) return ExecuteResult::Failure;
+
+      allow = *opt_allow;
+    }
+
+    ctx.bot->bot_controller->actuator.allow_reversing = allow;
+
+    return ExecuteResult::Success;
+  }
+
+  bool allow_reversing = true;
+  const char* allow_key = nullptr;
+};
+
+struct ActuatorForwardVectorRequirementNode : public BehaviorNode {
+  ActuatorForwardVectorRequirementNode(float percent) : percent(percent) {}
+  ActuatorForwardVectorRequirementNode(const char* percent_key) : percent_key(percent_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    float required_percent = this->percent;
+
+    if (percent_key) {
+      auto opt_percent = ctx.blackboard.Value<bool>(percent_key);
+      if (!opt_percent) return ExecuteResult::Failure;
+
+      required_percent = *opt_percent;
+    }
+
+    ctx.bot->bot_controller->actuator.required_forward_vector_to_thrust = required_percent;
+
+    return ExecuteResult::Success;
+  }
+
+  float percent = 0.65f;
+  const char* percent_key = nullptr;
+};
+
 }  // namespace behavior
 }  // namespace zero

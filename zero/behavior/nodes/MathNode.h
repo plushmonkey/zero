@@ -590,17 +590,23 @@ struct VectorDotNode : public BehaviorNode {
 struct VectorAddNode : public BehaviorNode {
   VectorAddNode(const char* vector_a_key, const char* vector_b_key, const char* output_key, bool normalize = false)
       : vector_a_key(vector_a_key), vector_b_key(vector_b_key), output_key(output_key), normalize(normalize) {}
+  VectorAddNode(const char* vector_a_key, Vector2f amount, const char* output_key, bool normalize = false)
+      : vector_a_key(vector_a_key), amount(amount), output_key(output_key), normalize(normalize) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override {
     auto opt_vector_a = ctx.blackboard.Value<Vector2f>(vector_a_key);
     if (!opt_vector_a.has_value()) return ExecuteResult::Failure;
 
-    auto opt_vector_b = ctx.blackboard.Value<Vector2f>(vector_b_key);
-    if (!opt_vector_b.has_value()) return ExecuteResult::Failure;
+    Vector2f vector_b = amount;
+
+    if (vector_b_key) {
+      auto opt_vector_b = ctx.blackboard.Value<Vector2f>(vector_b_key);
+      if (!opt_vector_b.has_value()) return ExecuteResult::Failure;
+
+      vector_b = *opt_vector_b;
+    }
 
     Vector2f vector_a = opt_vector_a.value();
-    Vector2f vector_b = opt_vector_b.value();
-
     Vector2f result = vector_a + vector_b;
 
     if (normalize) {
@@ -612,10 +618,12 @@ struct VectorAddNode : public BehaviorNode {
     return ExecuteResult::Success;
   }
 
-  const char* vector_a_key;
-  const char* vector_b_key;
-  const char* output_key;
-  bool normalize;
+  const char* vector_a_key = nullptr;
+  const char* vector_b_key = nullptr;
+  Vector2f amount;
+
+  const char* output_key = nullptr;
+  bool normalize = false;
 };
 
 // Computes vector_a_key - vector_b_key and stores in output_key.
@@ -648,6 +656,27 @@ struct VectorSubtractNode : public BehaviorNode {
   const char* vector_b_key;
   const char* output_key;
   bool normalize;
+};
+
+// Returns Success if vector_key has a lower Y value than compare_key.
+struct VectorAboveNode : public BehaviorNode {
+  VectorAboveNode(const char* vector_key, const char* compare_key) : vector_key(vector_key), compare_key(compare_key) {}
+
+  ExecuteResult Execute(ExecuteContext& ctx) override {
+    if (!vector_key || !compare_key) return ExecuteResult::Failure;
+
+    auto opt_vector = ctx.blackboard.Value<Vector2f>(vector_key);
+    auto opt_compare = ctx.blackboard.Value<Vector2f>(compare_key);
+
+    if (!opt_vector || !opt_compare) return ExecuteResult::Failure;
+
+    if (opt_vector->y < opt_compare->y) return ExecuteResult::Success;
+
+    return ExecuteResult::Failure;
+  }
+
+  const char* vector_key = nullptr;
+  const char* compare_key = nullptr;
 };
 
 struct NormalizeNode : public BehaviorNode {

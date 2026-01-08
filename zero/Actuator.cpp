@@ -1,5 +1,11 @@
 #include "Actuator.h"
 
+#include <zero/Math.h>
+#include <zero/game/Game.h>
+#include <zero/game/Player.h>
+
+#include <cmath>
+
 namespace zero {
 
 static inline float SignedAngle(const Vector2f& a, const Vector2f& b) {
@@ -30,7 +36,7 @@ static float CalculateRotatedTravelTime(Game& game, const Player& self, const Ve
   // Assume we apply no thrust while rotating, so we adjust remaining distance by inertia speed.
   distance -= speed * seconds_to_rotate;
 
-  float travel_seconds = 0.0f;
+  float travel_seconds = seconds_to_rotate;
 
   while (distance > 0.0f) {
     speed = speed + thrust;
@@ -105,11 +111,9 @@ void Actuator::Update(Game& game, InputState& input, const Vector2f& force, floa
     leftside = steering_direction.Dot(perp) < 0;
   }
 
-  constexpr float kRequiredForwardAngle = 0.3f;
-
   // If our target is behind us, calculate how long it would take to rotate toward it.
   // If it takes too long, just go backwards there, otherwise rotate and go forward.
-  if (behind && !has_rotation) {
+  if (allow_reversing && behind && !has_rotation) {
     float forward_seconds = CalculateRotatedTravelTime(game, *self, heading, steering_direction, force);
     float reverse_seconds = CalculateRotatedTravelTime(game, *self, -heading, steering_direction, force);
 
@@ -122,7 +126,7 @@ void Actuator::Update(Game& game, InputState& input, const Vector2f& force, floa
         input.SetAction(InputAction::Left, !clockwise);
       }
 
-      if (heading.Dot(steering_direction) >= (1.0f - kRequiredForwardAngle)) {
+      if (heading.Dot(steering_direction) >= required_forward_vector_to_thrust) {
         input.SetAction(InputAction::Backward, true);
       }
 
@@ -133,8 +137,8 @@ void Actuator::Update(Game& game, InputState& input, const Vector2f& force, floa
   bool clockwise = !leftside;
 
   if (has_force) {
-    bool move_reverse = has_rotation || -heading.Dot(steering_direction) >= (1.0f - kRequiredForwardAngle);
-    bool move_forward = has_rotation || heading.Dot(steering_direction) >= (1.0f - kRequiredForwardAngle);
+    bool move_reverse = has_rotation || -heading.Dot(steering_direction) >= required_forward_vector_to_thrust;
+    bool move_forward = has_rotation || heading.Dot(steering_direction) >= required_forward_vector_to_thrust;
 
     if (behind && move_reverse) {
       input.SetAction(InputAction::Backward, true);

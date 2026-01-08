@@ -836,12 +836,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateEntranceBehavior() {
                 //.Child<DebugPrintNode>("Rushing through")
                 .Child<GoToNode>("rush_position")
                 .End()
-            .Sequence() // Try to follow behind a teammate in the entrance area.
-                .Child<GetSafePushCoordNode>(4.0f, "entrance_shaft_rect", "entrance_push_position")
-                //.Child<DebugPrintNode>("Pushing behind teammate")
-                .Child<GoToNode>("entrance_push_position")
-                .End()
-            .Sequence()
+            .Sequence() // Rush flagroom when safe.
                 .Selector() // Determine if we should go all the way through
                     .Sequence() // If we are alone on a frequency, consider it enough to move forward.
                         .Child<PlayerFrequencyCountQueryNode>("self_freq_size")
@@ -856,6 +851,11 @@ static std::unique_ptr<behavior::BehaviorNode> CreateEntranceBehavior() {
                         .End()
                     .End()
                 .Child<GoToNode>("tw_flag_position")
+                .End()
+            .Sequence() // Try to follow behind a teammate in the entrance area.
+                .Child<GetSafePushCoordNode>(4.0f, "entrance_shaft_rect", "entrance_push_position")
+                //.Child<DebugPrintNode>("Pushing behind teammate")
+                .Child<GoToNode>("entrance_push_position")
                 .End()
             .Selector(CompositeDecorator::Success) // Above area is not yet safe, stay below and dodge.
                 .Composite(CreateEntranceWaitBehavior())

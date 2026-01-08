@@ -36,6 +36,7 @@ constexpr float kSpiderLeashDistance = 30.0f;
 constexpr float kAvoidTeamDistance = 2.0f;
 
 static const char* kSelfSectorKey = "self_sector";
+static const char* kSelfPositionKey = "self_position";
 
 static std::unique_ptr<behavior::BehaviorNode> CreateDefensiveTree() {
   using namespace behavior;
@@ -126,7 +127,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateOffensiveTree(const char* n
                     .Child<ScalarNode>(1.0f, "rushing")
                     .End()
                 .Sequence() // Begin moving away if our energy is low.
-                    .InvertChild<PlayerEnergyPercentThresholdNode>(0.3f)
+                    .InvertChild<PlayerEnergyPercentThresholdNode>(0.6f)
                     .Child<SeekNode>("aimshot", kSpiderLeashDistance, SeekNode::DistanceResolveType::Dynamic)
                     .End()
                 .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Zero)
@@ -211,6 +212,9 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBaseDefendTree(behavior::Ex
 
   constexpr float kDefendAreaDistance = 12.0f;
   constexpr float kAttachDistanceThreshold = 25.0f;
+  // Try to attach if the highest enemy in the base is at least this far above us in the base.
+  // This is to stop us from spamming attach as soon as an enemy passes us in the base.
+  constexpr float kAttachAboveEnemyThreshold = 10.0f;
 
   BehaviorBuilder builder;
 
@@ -218,14 +222,25 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBaseDefendTree(behavior::Ex
   // TODO: Determine when to go grab flag if not controlled.
   // TODO: We shouldn't get distracted with random enemies in base. Focus on ones near horizontal center of base.
   // TODO: Stick to our control area. Should move backward and forward to shoot bullets down chokes.
-  
+
   // clang-format off
   builder
     .Sequence()
         .Child<FindDefendSectorNode>("defend_sector")
         .Child<SectorBottomCoordNode>("defend_sector", "defend_position")
-        .Sequence(CompositeDecorator::Success) // Try to attach to a player if we aren't in defend sector.
-            .InvertChild<SectorEqualityNode>(kSelfSectorKey, "defend_sector")
+        .Sequence(CompositeDecorator::Success) // Try to attach to a player if it puts us in a better position.
+            .Selector() // Determine if we should execute attach tree.
+                .Child<AttachedQueryNode>() // Always detach
+                .Child<SectorEqualityNode>(kSelfSectorKey, Sector::Center)
+                .Child<SectorEqualityNode>(kSelfSectorKey, Sector::Roof)
+                .Sequence() // Attach if the highest enemy in the base has gotten beyond our reach.
+                    .InvertChild<SectorEqualityNode>(kSelfSectorKey, Sector::Flagroom)
+                    .InvertChild<SectorEqualityNode>(kSelfSectorKey, Sector::Entrance)
+                    .Child<FindHighestBaseEnemyPosition>("highest_base_enemy_position")
+                    .Child<VectorAddNode>("highest_base_enemy_position", Vector2f(0, kAttachAboveEnemyThreshold), "highest_attach_requirement")
+                    .Child<VectorAboveNode>("highest_attach_requirement", kSelfPositionKey)
+                    .End()
+                .End()
             .Composite(CreateBaseAttachTree(kAttachDistanceThreshold))
             .End()
         .Selector()
@@ -235,6 +250,8 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBaseDefendTree(behavior::Ex
                     .Child<NearestTargetPrioritizeSectorNode>("nearest_target", kSelfSectorKey, true)
                     .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
                     .Child<InBaseNode>("nearest_target_position")
+                    //.Child<ActuatorReverseNode>(false)
+                    .Child<AvoidTeamNode>(4.0f)
                     .End()
                 .Selector()
                     .Composite(CreateDefensiveTree())
@@ -252,7 +269,9 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBaseDefendTree(behavior::Ex
             .Sequence()
                 .Child<DistanceThresholdNode>("defend_position", kDefendAreaDistance)
                 .Child<AfterburnerThresholdNode>()
+                .Child<AvoidTeamNode>(4.0f)
                 .Child<GoToNode>("defend_position")
+                .Child<RenderPathNode>(Vector3f(1, 0, 0))
                 .End()
             .Sequence(CompositeDecorator::Success) // TODO: Find something to do if no enemies. Maybe have it spread around the defense position.
                 .End()
@@ -311,6 +330,9 @@ std::unique_ptr<behavior::BehaviorNode> CreateSpiderBasingTree(behavior::Execute
   builder
     .Sequence()
         .Child<SectorQueryNode>(kSelfSectorKey)
+        .Child<PlayerPositionQueryNode>(kSelfPositionKey)
+        .Child<ActuatorReverseNode>(true)
+        .Child<ActuatorForwardVectorRequirementNode>(0.65f)
         .Selector()
             .Sequence() // If we control the base, we should defend the best position of the base instead of just sitting in fr.
                 .Child<BaseTeamControlNode>()

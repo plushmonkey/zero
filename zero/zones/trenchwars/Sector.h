@@ -98,11 +98,11 @@ inline bool IsSectorAbove(Sector sector, Sector compare) {
     case Sector::West:
     case Sector::East:
     case Sector::Entrance:
-      return kAboveEntranceBits & SBIT(compare);
+      return kAboveEntranceBits & SBIT(sector);
     case Sector::Middle:
-      return kAboveMiddleBits & SBIT(compare);
+      return kAboveMiddleBits & SBIT(sector);
     case Sector::Bottom:
-      return kAboveBottomBits & SBIT(compare);
+      return kAboveBottomBits & SBIT(sector);
       break;
     default:
       return false;
