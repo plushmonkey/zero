@@ -267,9 +267,7 @@ class SetShipCommand : public CommandExecutor {
       auto opt_previous = bot.execute_ctx.blackboard.Value<int>("previous_ship");
 
       if (opt_previous) {
-        // Toggle request_ship and previous_ship
-        SetPreviousShip(bot);
-        bot.execute_ctx.blackboard.Set<int>("request_ship", *opt_previous);
+        TrySetShip(bot, *opt_previous, sender);
       }
 
       return;
@@ -287,8 +285,7 @@ class SetShipCommand : public CommandExecutor {
       return;
     }
 
-    SetPreviousShip(bot);
-    bot.execute_ctx.blackboard.Set<int>("request_ship", parsed_ship_num - 1);
+    TrySetShip(bot, parsed_ship_num - 1, sender);
   }
 
   void SetPreviousShip(ZeroBot& bot) {
@@ -305,6 +302,30 @@ class SetShipCommand : public CommandExecutor {
         bot.execute_ctx.blackboard.Set<int>("previous_ship", self->ship);
       }
     }
+  }
+
+  void TrySetShip(ZeroBot& bot, int new_ship, const std::string& sender) {
+    if (bot.bot_controller->locked_ships) {
+      Tick current_tick = GetCurrentTick();
+
+      if (TICK_GT(current_tick, bot.bot_controller->locked_ships->end_tick)) {
+        // If we have locked ships but it is expired, clear it.
+        bot.bot_controller->locked_ships = nullptr;
+      } else {
+        if (bot.bot_controller->locked_ships->IsLocked(new_ship)) {
+          s32 remaining_ticks = TICK_DIFF(bot.bot_controller->locked_ships->end_tick, current_tick);
+          s32 remaining_mins = (remaining_ticks / (60 * 100)) + 1;
+
+          std::string message = "Requested ship is locked for " + std::to_string(remaining_mins) + " minutes.";
+
+          Event::Dispatch(ChatQueueEvent::Private(sender.data(), message.data()));
+          return;
+        }
+      }
+    }
+
+    SetPreviousShip(bot);
+    bot.execute_ctx.blackboard.Set<int>("request_ship", new_ship);
   }
 
   void SendUsage(ZeroBot& bot, const char* player) {

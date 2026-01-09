@@ -28,6 +28,16 @@ struct BehaviorChangeEvent : public Event {
   BehaviorChangeEvent(const std::string& previous, const std::string& name) : previous(previous), name(name) {}
 };
 
+struct LockedShipState {
+  u8 blocked_ships_bitset;
+  Tick end_tick;
+
+  LockedShipState(Tick end_tick) : end_tick(end_tick), blocked_ships_bitset(0) {}
+
+  void LockShip(int ship_num) { blocked_ships_bitset |= (1 << ship_num); }
+  inline bool IsLocked(int ship_num) const { return blocked_ships_bitset & (1 << ship_num); }
+};
+
 struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>,
                        EventHandler<JoinGameEvent>,
                        EventHandler<PlayerEnterEvent>,
@@ -59,6 +69,7 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>,
   InfluenceMap influence_map;
 
   std::string default_arena;
+  std::unique_ptr<LockedShipState> locked_ships;
 
   BotController(Game& game);
 

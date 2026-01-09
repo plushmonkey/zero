@@ -16,12 +16,20 @@
 #include <bitset>
 #include <deque>
 #include <memory>
+#include <string_view>
 #include <unordered_map>
 
 namespace zero {
 namespace tw {
 
-struct TwController : ZoneController, EventHandler<SpawnEvent> {
+static constexpr const std::string_view kTwPubSystemName = "tw-pubsystem";
+static constexpr const std::string_view kBombShipLockedMessage =
+    "You have been automatically locked out of bombing ships";
+
+static constexpr const std::string_view kTkShipChangeMessage =
+    "NOTICE: Your ship has been automatically changed due to excessive killing of teammates.";
+
+struct TwController : ZoneController, EventHandler<SpawnEvent>, EventHandler<ChatEvent> {
   bool IsZone(Zone zone) override {
     bot->execute_ctx.blackboard.Erase("tw");
     bot->execute_ctx.blackboard.Erase("tw_flag_position");
@@ -39,6 +47,31 @@ struct TwController : ZoneController, EventHandler<SpawnEvent> {
         Event::Dispatch(ChatQueueEvent::Public("?scorereset"));
         last_scorereset_tick = current_tick;
       }
+    }
+  }
+
+  void HandleEvent(const ChatEvent& event) override {
+    if (event.type != ChatType::Private && event.type != ChatType::RemotePrivate) return;
+    if (!trench_wars) return;
+
+    std::string sender = Lowercase(event.sender);
+    if (sender != kTwPubSystemName) return;
+
+    std::string_view message = event.message;
+
+    if (message.starts_with(kBombShipLockedMessage) || message.starts_with(kTkShipChangeMessage)) {
+      constexpr u32 kTicksPerHour = 100 * 60 * 60;
+      constexpr int kDefaultShip = 2;
+
+      Tick end_tick = MAKE_TICK(GetCurrentTick() + kTicksPerHour);
+
+      bot->execute_ctx.blackboard.Set<int>("request_ship", kDefaultShip);
+
+      // Lock jav, levi, and shark for 1 hour.
+      bot->bot_controller->locked_ships = std::make_unique<LockedShipState>(end_tick);
+      bot->bot_controller->locked_ships->LockShip(1);
+      bot->bot_controller->locked_ships->LockShip(3);
+      bot->bot_controller->locked_ships->LockShip(7);
     }
   }
 
