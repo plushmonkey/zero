@@ -46,6 +46,11 @@ struct BestFlagClaimerNode : public behavior::BehaviorNode {
     auto self = pm.GetSelf();
     if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
 
+    auto opt_tw = ctx.blackboard.Value<TrenchWars*>("tw");
+    if (!opt_tw) return behavior::ExecuteResult::Failure;
+
+    TrenchWars* tw = *opt_tw;
+
     Player* best_player = nullptr;
     float best_dist_sq = 1024.0f * 1024.0f;
 
@@ -57,6 +62,8 @@ struct BestFlagClaimerNode : public behavior::BehaviorNode {
 
       if (player->ship >= 8) continue;
       if (player->frequency != self->frequency) continue;
+      // Only consider players inside the base.
+      if (!tw->base_bitset.Test(player->position)) continue;
 
       float dist_sq = player->position.DistanceSq(flag_position);
       if (dist_sq < best_dist_sq) {

@@ -105,12 +105,15 @@ inline bool IsSectorAbove(Sector sector, Sector compare) {
       return kAboveBottomBits & SBIT(sector);
       break;
     default:
-      return false;
+      break;
   }
 
 #undef SBIT
 
-  return false;
+  // compare must be outside the base if it wasn't handled in the switch, so if sector is inside the base, it is above.
+  bool sector_is_inside_base = !(sector == Sector::Center || sector == Sector::Roof);
+
+  return sector_is_inside_base;
 }
 
 }  // namespace tw

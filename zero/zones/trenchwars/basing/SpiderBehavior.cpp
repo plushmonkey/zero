@@ -46,20 +46,20 @@ static std::unique_ptr<behavior::BehaviorNode> CreateDefensiveTree() {
   // This is how far away to check for enemies that are rushing at us with low energy.
   // We will stop dodging and try to finish them off if they are within this distance and low energy.
   constexpr float kNearbyEnemyThreshold = 20.0f;
+  constexpr float kVeryCloseEnemyThreshold = 6.0f;
 
   BehaviorBuilder builder;
 
   // clang-format off
   builder
-    .Sequence() // Attempt to dodge and use defensive items.
-        .Sequence(CompositeDecorator::Success) // Always check incoming damage 
-            .Child<svs::IncomingDamageQueryNode>(kRepelDistance, "incoming_damage")
-            .Child<PlayerCurrentEnergyQueryNode>("self_energy")
-            .End()
-        .Sequence(CompositeDecorator::Invert) // Check if enemy is very low energy and close to use. Don't bother dodging if they are rushing us with low energy.
-            .Child<PlayerEnergyQueryNode>("nearest_target", "nearest_target_energy")
-            .InvertChild<ScalarThresholdNode<float>>("nearest_target_energy", kLowEnergyThreshold)
-            .InvertChild<DistanceThresholdNode>("nearest_target_position", "self_position", kNearbyEnemyThreshold)
+    .Sequence() // Attempt to dodge.
+        .Selector(CompositeDecorator::Invert) // We invert this so the sequence fails and we don't execute the Dodge node.
+            .Sequence() // Check if enemy is very low energy and close to use. Don't bother dodging if they are rushing us with low energy.
+                .Child<PlayerEnergyQueryNode>("nearest_target", "nearest_target_energy")
+                .InvertChild<ScalarThresholdNode<float>>("nearest_target_energy", kLowEnergyThreshold)
+                .InvertChild<DistanceThresholdNode>("nearest_target_position", "self_position", kNearbyEnemyThreshold)
+                .End()
+            .InvertChild<DistanceThresholdNode>("nearest_target_position", "self_position", kVeryCloseEnemyThreshold)
             .End()
         .Child<DodgeIncomingDamage>(0.4f, 16.0f, 0.0f)
         .End();
@@ -218,8 +218,6 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBaseDefendTree(behavior::Ex
 
   BehaviorBuilder builder;
 
-  // TODO: This isn't really implemented. Only the foundation for movement / Finding areas to defend.
-  // TODO: Determine when to go grab flag if not controlled.
   // TODO: We shouldn't get distracted with random enemies in base. Focus on ones near horizontal center of base.
   // TODO: Stick to our control area. Should move backward and forward to shoot bullets down chokes.
 
@@ -244,10 +242,26 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBaseDefendTree(behavior::Ex
             .Composite(CreateBaseAttachTree(kAttachDistanceThreshold))
             .End()
         .Selector()
+            .Sequence() // Collect flag if we are the closest player to the flag.
+                .Child<NearestFlagNode>(NearestFlagNode::Type::Unclaimed, "nearest_flag")
+                .Child<FlagPositionQueryNode>("nearest_flag", "nearest_flag_position")
+                .Child<BestFlagClaimerNode>()
+                .Sequence(CompositeDecorator::Success)
+                    .Child<NearestTargetPrioritizeSectorNode>("nearest_target", kSelfSectorKey, NearestTargetPrioritizeSectorNode::Direction::Above, true)
+                    .Composite(CreateShootTree("nearest_target")) // Shoot weapons while collecting flag so we don't ride on top of each other
+                    .End()
+                .Selector()
+                    .Sequence()
+                        .InvertChild<ShipTraverseQueryNode>("nearest_flag_position")
+                        .Child<GoToNode>("nearest_flag_position")
+                        .End()
+                    .Child<ArriveNode>("nearest_flag_position", 1.25f)
+                    .End()
+                .End()
             .Sequence() // Find nearest target and either path to them or seek them directly.
                 .Sequence() // Find an enemy
                     .Child<PlayerPositionQueryNode>("self_position")
-                    .Child<NearestTargetPrioritizeSectorNode>("nearest_target", kSelfSectorKey, true)
+                    .Child<NearestTargetPrioritizeSectorNode>("nearest_target", kSelfSectorKey, NearestTargetPrioritizeSectorNode::Direction::Above, true)
                     .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
                     .Child<InBaseNode>("nearest_target_position")
                     //.Child<ActuatorReverseNode>(false)
@@ -259,9 +273,18 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBaseDefendTree(behavior::Ex
                         .Selector()
                             .Sequence()
                                 .Child<ShipTraverseQueryNode>("nearest_target_position")
-                                .Composite(CreateOffensiveTree("nearest_target", "nearest_target_position"))
+                                .Composite(CreateShootTree("nearest_target"))
+                                .Child<FaceNode>("aimshot")
+                                .Child<ActuatorReverseNode>(true)
                                 .End()
-                            .Child<GoToNode>("nearest_target_position")
+                            .Sequence() // If enemy is in same sector or above, go to them to attack.
+                                .Child<SectorQueryNode>("nearest_target_position", "nearest_target_sector")
+                                .Selector()
+                                    .Child<SectorEqualityNode>(kSelfSectorKey, "nearest_target_sector")
+                                    .Child<SectorIsAboveNode>("nearest_target_sector", kSelfSectorKey)
+                                    .End()
+                                .Child<GoToNode>("nearest_target_position")
+                                .End()
                             .End()
                         .End()
                     .End()
@@ -274,6 +297,84 @@ static std::unique_ptr<behavior::BehaviorNode> CreateBaseDefendTree(behavior::Ex
                 .Child<RenderPathNode>(Vector3f(1, 0, 0))
                 .End()
             .Sequence(CompositeDecorator::Success) // TODO: Find something to do if no enemies. Maybe have it spread around the defense position.
+                .End()
+            .End()
+        .End();
+  // clang-format on
+
+  return builder.Build();
+}
+
+static std::unique_ptr<behavior::BehaviorNode> CreateBaseAttackTree(behavior::ExecuteContext& ctx) {
+  using namespace behavior;
+
+  constexpr float kAttachDistanceThreshold = 25.0f;
+
+  BehaviorBuilder builder;
+
+  // clang-format off
+  builder
+    .Sequence()
+        //.Child<FindDefendSectorNode>("defend_sector") // TODO: Find attack sector
+        .Sequence(CompositeDecorator::Success) // Try to attach to a player if it puts us in a better position.
+            .Selector() // Determine if we should execute attach tree.
+                .Child<AttachedQueryNode>() // Always detach
+                .Child<SectorEqualityNode>(kSelfSectorKey, Sector::Center)
+                .Child<SectorEqualityNode>(kSelfSectorKey, Sector::Roof)
+                .End()
+            .Composite(CreateBaseAttachTree(kAttachDistanceThreshold))
+            .End()
+        .Selector()
+            .Sequence() // Collect flag if we are the closest player to the flag and in flagroom.
+                .Child<SectorEqualityNode>(kSelfSectorKey, Sector::Flagroom)
+                .Child<NearestFlagNode>(NearestFlagNode::Type::Unclaimed, "nearest_flag")
+                .Child<FlagPositionQueryNode>("nearest_flag", "nearest_flag_position")
+                .Child<BestFlagClaimerNode>()
+                .Sequence(CompositeDecorator::Success)
+                    .Child<NearestTargetPrioritizeSectorNode>("nearest_target", kSelfSectorKey, NearestTargetPrioritizeSectorNode::Direction::Above, true)
+                    .Composite(CreateShootTree("nearest_target")) // Shoot weapons while collecting flag so we don't ride on top of each other
+                    .End()
+                .Selector()
+                    .Sequence()
+                        .InvertChild<ShipTraverseQueryNode>("nearest_flag_position")
+                        .Child<GoToNode>("nearest_flag_position")
+                        .End()
+                    .Child<ArriveNode>("nearest_flag_position", 1.25f)
+                    .End()
+                .End()
+            .Sequence() // Find nearest target and either path to them or seek them directly.
+                .Sequence() // Find an enemy
+                    .Child<PlayerPositionQueryNode>("self_position")
+                    .Child<NearestTargetPrioritizeSectorNode>("nearest_target", kSelfSectorKey, NearestTargetPrioritizeSectorNode::Direction::Above, true)
+                    .Child<PlayerPositionQueryNode>("nearest_target", "nearest_target_position")
+                    .Child<InBaseNode>("nearest_target_position")
+                    //.Child<ActuatorReverseNode>(false)
+                    .Child<AvoidTeamNode>(4.0f)
+                    .End()
+                .Selector()
+                    .Composite(CreateDefensiveTree())
+                    .Sequence()
+                        .Selector()
+                            .Sequence()
+                                .Child<ShipTraverseQueryNode>("nearest_target_position")
+                                .Composite(CreateShootTree("nearest_target"))
+                                .Child<FaceNode>("aimshot")
+                                .Child<ActuatorReverseNode>(true)
+                                .End()
+                            .Sequence() // If enemy is in same sector or above, go to them to attack.
+                                .Child<SectorQueryNode>("nearest_target_position", "nearest_target_sector")
+                                .Selector()
+                                    .Child<SectorEqualityNode>(kSelfSectorKey, "nearest_target_sector")
+                                    .Child<SectorIsAboveNode>("nearest_target_sector", kSelfSectorKey)
+                                    .End()
+                                .Child<GoToNode>("nearest_target_position")
+                                .End()
+                            .End()
+                        .End()
+                    .End()
+                .End()
+            .Sequence(CompositeDecorator::Success) // No enemies, so just go sit in flagroom.
+                .Child<GoToNode>("tw_flag_position")
                 .End()
             .End()
         .End();
@@ -331,14 +432,14 @@ std::unique_ptr<behavior::BehaviorNode> CreateSpiderBasingTree(behavior::Execute
     .Sequence()
         .Child<SectorQueryNode>(kSelfSectorKey)
         .Child<PlayerPositionQueryNode>(kSelfPositionKey)
-        .Child<ActuatorReverseNode>(true)
+        .Child<ActuatorReverseNode>(false)
         .Child<ActuatorForwardVectorRequirementNode>(0.65f)
         .Selector()
             .Sequence() // If we control the base, we should defend the best position of the base instead of just sitting in fr.
                 .Child<BaseTeamControlNode>()
                 .Composite(CreateBaseDefendTree(ctx))
                 .End()
-            .Composite(CreateBaseDefendTree(ctx))
+            .Composite(CreateBaseAttackTree(ctx))
             .End()
         .End();
   // clang-format on

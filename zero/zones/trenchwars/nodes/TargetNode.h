@@ -9,13 +9,16 @@
 namespace zero {
 namespace tw {
 
-// Finds the nearest target that prioritizes self's sector or above.
+// Finds the nearest target that prioritizes self's sector or above/below.
 // Will target sector below if none viable.
 // Requires TrenchWars* "tw" key to function.
 // If obey_stealth is true, then we will ignore players that we can't see.
 struct NearestTargetPrioritizeSectorNode : public behavior::BehaviorNode {
-  NearestTargetPrioritizeSectorNode(const char* player_key, const char* sector_key, bool obey_stealth = false)
-      : player_key(player_key), sector_key(sector_key), obey_stealth(obey_stealth) {}
+  enum class Direction { Above, Below };
+
+  NearestTargetPrioritizeSectorNode(const char* player_key, const char* sector_key, Direction direction,
+                                    bool obey_stealth = false)
+      : player_key(player_key), sector_key(sector_key), direction(direction), obey_stealth(obey_stealth) {}
 
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
     Player* self = ctx.bot->game->player_manager.GetSelf();
@@ -92,7 +95,13 @@ struct NearestTargetPrioritizeSectorNode : public behavior::BehaviorNode {
       float dist_sq = player->position.DistanceSq(self.position);
 
       Sector player_sector = tw->GetDefiniteSector(player->position);
-      bool priority = !IsSectorAbove(sector, player_sector);
+      bool priority = false;
+
+      if (direction == Direction::Above) {
+        priority = sector == player_sector || IsSectorAbove(sector, player_sector);
+      } else {
+        priority = sector == player_sector || IsSectorAbove(player_sector, sector);
+      }
 
       if (priority) {
         if (!best_target_prio || dist_sq < closest_dist_prio_sq) {
@@ -112,6 +121,7 @@ struct NearestTargetPrioritizeSectorNode : public behavior::BehaviorNode {
     return best_target;
   }
 
+  Direction direction = Direction::Above;
   bool obey_stealth = false;
   const char* sector_key = nullptr;
   const char* player_key = nullptr;

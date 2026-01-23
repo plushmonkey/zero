@@ -73,9 +73,40 @@ struct SectorEqualityNode : public behavior::BehaviorNode {
   const char* check_key = nullptr;
 };
 
+// Returns Success if the first sector is above the second one.
+struct SectorIsAboveNode : public behavior::BehaviorNode {
+  SectorIsAboveNode(const char* sector_key, Sector check) : sector_key(sector_key), sector_check(check) {}
+  SectorIsAboveNode(const char* sector_key, const char* check_key) : sector_key(sector_key), check_key(check_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    Sector check = sector_check;
+
+    if (check_key) {
+      auto opt_check = ctx.blackboard.Value<Sector>(check_key);
+      if (!opt_check) return behavior::ExecuteResult::Failure;
+
+      check = *opt_check;
+    }
+
+    auto opt_sector = ctx.blackboard.Value<Sector>(sector_key);
+    if (!opt_sector) return behavior::ExecuteResult::Failure;
+
+    Sector sector = *opt_sector;
+
+    bool is_above = IsSectorAbove(sector, check);
+
+    return is_above ? behavior::ExecuteResult::Success : behavior::ExecuteResult::Failure;
+  }
+
+  const char* sector_key = nullptr;
+
+  Sector sector_check = Sector::Flagroom;
+  const char* check_key = nullptr;
+};
+
 // Returns the Sector that is directly above this Sector.
-struct SectorAboveNode : public behavior::BehaviorNode {
-  SectorAboveNode(const char* sector_key, const char* output_key) : sector_key(sector_key), output_key(output_key) {}
+struct GetSectorAboveNode : public behavior::BehaviorNode {
+  GetSectorAboveNode(const char* sector_key, const char* output_key) : sector_key(sector_key), output_key(output_key) {}
 
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
     auto opt_sector = ctx.blackboard.Value<Sector>(sector_key);
@@ -94,8 +125,8 @@ struct SectorAboveNode : public behavior::BehaviorNode {
 };
 
 // Returns the Sector that is directly below this Sector.
-struct SectorBelowNode : public behavior::BehaviorNode {
-  SectorBelowNode(const char* sector_key, const char* output_key) : sector_key(sector_key), output_key(output_key) {}
+struct GetSectorBelowNode : public behavior::BehaviorNode {
+  GetSectorBelowNode(const char* sector_key, const char* output_key) : sector_key(sector_key), output_key(output_key) {}
 
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
     auto opt_sector = ctx.blackboard.Value<Sector>(sector_key);
