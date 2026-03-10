@@ -66,6 +66,7 @@ ServerInfo kServers[] = {
     {"SSCU Extreme Games", "208.118.63.35", 7900, Zone::ExtremeGames},
     {"SSCU Trench Wars", "127.0.0.1", 5000, Zone::TrenchWars},
     {"Nexus", "127.0.0.1", 5000, Zone::Nexus},
+    {"HockeyZone", "127.0.0.1", 5000, Zone::HockeyZone},
 };
 
 static_assert(ZERO_ARRAY_SIZE(kServers) == (size_t)Zone::Count - 1);
@@ -103,6 +104,10 @@ const std::unordered_map<std::string_view, ServerInfo*> kServerMap = {
     {"tw", &kServers[6]},
 
     {"nexus", &kServers[7]},
+
+    {"hockeyzone", &kServers[8]},
+    {"hockey", &kServers[8]},
+    {"hz", &kServers[8]},
 };
 
 const char* kLoginName = "ZeroBot";

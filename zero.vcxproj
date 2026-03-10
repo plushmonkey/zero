@@ -91,6 +91,8 @@
     <ClCompile Include="zero\zones\devastation\Devastation.cpp" />
     <ClCompile Include="zero\zones\devastation\FrogRaceBehavior.cpp" />
     <ClCompile Include="zero\zones\extremegames\BaseBehavior.cpp" />
+    <ClCompile Include="zero\zones\hockey\HockeyZone.cpp" />
+    <ClCompile Include="zero\zones\hockey\OffenseBehavior.cpp" />
     <ClCompile Include="zero\zones\nexus\FoursBehavior.cpp" />
     <ClCompile Include="zero\zones\nexus\TwosBoxBehavior.cpp" />
     <ClCompile Include="zero\zones\nexus\TwosBehavior.cpp" />
@@ -240,6 +242,8 @@
     <ClInclude Include="zero\zones\extremegames\BaseBehavior.h" />
     <ClInclude Include="zero\zones\extremegames\ExtremeGames.h" />
     <ClInclude Include="zero\zones\extremegames\nodes\BaseNode.h" />
+    <ClInclude Include="zero\zones\hockey\HockeyZone.h" />
+    <ClInclude Include="zero\zones\hockey\OffenseBehavior.h" />
     <ClInclude Include="zero\zones\nexus\FoursBehavior.h" />
     <ClInclude Include="zero\zones\nexus\nodes\NearestTeammatePlayerPositionQueryNode.h" />
     <ClInclude Include="zero\zones\nexus\TwosBoxBehavior.h" />
@@ -317,13 +321,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>

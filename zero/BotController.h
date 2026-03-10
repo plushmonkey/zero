@@ -76,6 +76,7 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>,
   void Update(RenderContext& rc, float dt, InputState& input, behavior::ExecuteContext& execute_ctx);
 
   void UpdatePathfinder(float radius);
+  void RebuildRegionRegistry();
 
   void HandleEvent(const JoinGameEvent& event) override;
   void HandleEvent(const PlayerEnterEvent& event) override;

@@ -201,6 +201,8 @@ void DevastationController::LoadArenaType(ArenaType arena_type) {
       repo.Add("test", std::make_unique<TestBehavior>());
 
       SetBehavior("center");
+
+      bot->bot_controller->RebuildRegionRegistry();
     } break;
     default: {
       repo.Add("center", std::make_unique<CenterBehavior>());

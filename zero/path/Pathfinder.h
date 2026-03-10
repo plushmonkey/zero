@@ -56,7 +56,7 @@ struct Pathfinder {
 
   WeightConfig config;
 
-  Pathfinder(std::unique_ptr<NodeProcessor> processor, RegionRegistry& regions);
+  Pathfinder(std::unique_ptr<NodeProcessor> processor, RegionRegistry* regions);
   Path FindPath(const Map& map, const Vector2f& from, const Vector2f& to, float radius, u16 frequency);
 
   void CreateMapWeights(MemoryArena& temp_arena, const Map& map, WeightConfig config);
@@ -67,14 +67,13 @@ struct Pathfinder {
 
   inline NodeProcessor& GetProcessor() { return *processor_; }
 
- private:
   struct NodeCompare {
     bool operator()(const Node* lhs, const Node* rhs) const { return lhs->f > rhs->f; }
   };
 
   std::vector<Vector2f> path_;
   std::unique_ptr<NodeProcessor> processor_;
-  RegionRegistry& regions_;
+  RegionRegistry* regions_;
   PriorityQueue<Node*, NodeCompare> openset_;
   std::vector<Node*> touched_;
 };

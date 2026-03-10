@@ -53,7 +53,7 @@ static inline float Euclidean(const NodePoint& __restrict from_p, const NodePoin
   return _mm_cvtss_f32(result);
 }
 
-Pathfinder::Pathfinder(std::unique_ptr<NodeProcessor> processor, RegionRegistry& regions)
+Pathfinder::Pathfinder(std::unique_ptr<NodeProcessor> processor, RegionRegistry* regions)
     : processor_(std::move(processor)), regions_(regions) {}
 
 Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& to, float radius, u16 frequency) {
@@ -90,7 +90,7 @@ Path Pathfinder::FindPath(const Map& map, const Vector2f& from, const Vector2f& 
   NodePoint start_p = processor_->GetPoint(start);
   NodePoint goal_p = processor_->GetPoint(goal);
 
-  if (!regions_.IsConnected(MapCoord(start_p.x, start_p.y), MapCoord(goal_p.x, goal_p.y))) {
+  if (!regions_->IsConnected(MapCoord(start_p.x, start_p.y), MapCoord(goal_p.x, goal_p.y))) {
     return path;
   }
 

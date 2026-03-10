@@ -67,6 +67,7 @@ MetalGear = 69.164.220.203:14000
 ExtremeGames = 208.118.63.35:7900
 TrenchWars = 127.0.0.1:5000
 Nexus = 127.0.0.1:5000
+HockeyZone = 127.0.0.1:5000
 
 [Debug]
 # Set this to 1 to display a window with the game rendered. This requires the graphics folder from Continuum.

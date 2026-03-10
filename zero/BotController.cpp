@@ -81,7 +81,7 @@ void BotController::UpdatePathfinder(float radius) {
   region_registry = std::make_unique<RegionRegistry>();
   region_registry->CreateAll(game.GetMap(), radius);
 
-  pathfinder = std::make_unique<path::Pathfinder>(std::move(processor), *region_registry);
+  pathfinder = std::make_unique<path::Pathfinder>(std::move(processor), region_registry.get());
 
   path::Pathfinder::WeightConfig cfg = {};
 
@@ -91,6 +91,21 @@ void BotController::UpdatePathfinder(float radius) {
 
   pathfinder->CreateMapWeights(game.temp_arena, game.GetMap(), cfg);
   pathfinder->SetDoorSolidMethod(door_solid_method);
+}
+
+void BotController::RebuildRegionRegistry() {
+  Player* self = game.player_manager.GetSelf();
+  float radius = 14.0f / 16.0f;
+
+  if (pathfinder) {
+    radius = pathfinder->config.ship_radius;
+  } else if (self && self->ship < 8) {
+    game.connection.settings.ShipSettings[self->ship].GetRadius();
+  }
+
+  region_registry = std::make_unique<RegionRegistry>();
+  region_registry->CreateAll(game.GetMap(), radius);
+  pathfinder->regions_ = region_registry.get();
 }
 
 void BotController::HandleEvent(const DoorToggleEvent& event) {
