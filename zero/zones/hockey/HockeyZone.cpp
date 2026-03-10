@@ -43,7 +43,7 @@ void HockeyZoneController::CreateBehaviors(const char* arena_name) {
 
 static Rectangle* GetGoalRect(Rink* rink, Map& map, Vector2f position) {
   // Cast a ray east to see if we hit a wall. If we did then this must be the east goal.
-  CastResult result = map.Cast(position, Vector2f(-1, 0), 20.0f, 0xFFFF);
+  CastResult result = map.Cast(position, Vector2f(1, 0), 20.0f, 0xFFFF);
   if (result.hit) {
     return &rink->east_goal_rect;
   }

@@ -182,15 +182,15 @@ struct FindEnemyGoalRectNode : public behavior::BehaviorNode {
     if (IsRinkClosed(map, *rink)) {
       // Determine which side of the rink we're on if the doors are closed because we can only use that goal.
       if (self->position.x < rink->center.x) {
-        ctx.blackboard.Set(output_key, rink->east_goal_rect);
-      } else {
         ctx.blackboard.Set(output_key, rink->west_goal_rect);
+      } else {
+        ctx.blackboard.Set(output_key, rink->east_goal_rect);
       }
     } else {
       if (self->frequency & 1) {
-        ctx.blackboard.Set(output_key, rink->east_goal_rect);
-      } else {
         ctx.blackboard.Set(output_key, rink->west_goal_rect);
+      } else {
+        ctx.blackboard.Set(output_key, rink->east_goal_rect);
       }
     }
 
