@@ -101,6 +101,39 @@ struct PowerballTeamOwnedNode : public behavior::BehaviorNode {
   const char* ball_key = nullptr;
 };
 
+struct RinkCenterNode : public behavior::BehaviorNode {
+  RinkCenterNode(const char* output_key) : output_key(output_key) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    auto self = ctx.bot->game->player_manager.GetSelf();
+    if (!self || self->ship >= 8) return behavior::ExecuteResult::Failure;
+
+    auto opt_hz = ctx.blackboard.Value<HockeyZone*>("hz");
+    if (!opt_hz) return behavior::ExecuteResult::Failure;
+
+    HockeyZone* hz = *opt_hz;
+
+    Rink* rink = hz->GetRinkFromTile(self->position);
+    if (!rink) return behavior::ExecuteResult::Failure;
+
+    Vector2f center = rink->center;
+
+    if (IsRinkClosed(ctx.bot->game->GetMap(), *rink)) {
+      if (self->position.x < rink->center.x) {
+        center = (rink->west_goal_rect.min + rink->west_goal_rect.max) * 0.5f + Vector2f(20.0f, 0);
+      } else {
+        center = (rink->east_goal_rect.min + rink->east_goal_rect.max) * 0.5f + Vector2f(-20.0f, 0);
+      }
+    }
+
+    ctx.blackboard.Set(output_key, center);
+
+    return behavior::ExecuteResult::Success;
+  }
+
+  const char* output_key = nullptr;
+};
+
 struct RectangleCenterNode : public behavior::BehaviorNode {
   RectangleCenterNode(const char* rect_key, const char* output_key) : rect_key(rect_key), output_key(output_key) {}
 
@@ -266,6 +299,7 @@ static std::unique_ptr<behavior::BehaviorNode> CreateShootTree(const char* neare
   builder
     .Sequence()
         .Sequence(CompositeDecorator::Success) // Determine if a shot should be fired by using weapon trajectory and bounding boxes.
+            .Child<AimNode>(WeaponType::Bullet, nearest_target_key, "aimshot")
             .Child<PlayerPositionQueryNode>("self_position")
             .Child<PlayerPositionQueryNode>(nearest_target_key, "nearest_target_position")
             .InvertChild<DistanceThresholdNode>("nearest_target_position", kShotAttemptDistance)
@@ -287,33 +321,12 @@ static std::unique_ptr<behavior::BehaviorNode> CreateShootTree(const char* neare
   return builder.Build();
 }
 
-static std::unique_ptr<behavior::BehaviorNode> CreateOffensiveTree(const char* nearest_target_key,
-                                                                   const char* nearest_target_position_key) {
-  using namespace behavior;
-
-  BehaviorBuilder builder;
-
-  // clang-format off
-  builder
-    .Sequence() // Aim at target and shoot while seeking them.
-        .Child<AimNode>(WeaponType::Bullet, nearest_target_key, "aimshot")
-        .Parallel()
-            .Child<FaceNode>("aimshot")
-            .Child<SeekNode>("aimshot", 0.0f, SeekNode::DistanceResolveType::Static)
-            .Composite(CreateShootTree(nearest_target_key))
-            .End()
-        .End();
-  // clang-format on
-
-  return builder.Build();
-}
-
 std::unique_ptr<behavior::BehaviorNode> OffenseBehavior::CreateTree(behavior::ExecuteContext& ctx) {
   using namespace behavior;
 
   BehaviorBuilder builder;
 
-  const Vector2f center(512, 512);
+  constexpr float kCreaseDistance = 16.0f;
 
   // clang-format off
   builder
@@ -326,23 +339,32 @@ std::unique_ptr<behavior::BehaviorNode> OffenseBehavior::CreateTree(behavior::Ex
             .Sequence() // If we have ball, go to goal and shoot. TODO: Passing
                 .Child<PowerballCarryQueryNode>()
                 .Child<FindEnemyGoalRectNode>("enemy_goal_rect")
-                .Child<AvoidEnemyNode>(8.0f)
                 .Child<RectangleCenterNode>("enemy_goal_rect", "enemy_goal_center")
-                .Child<tw::AfterburnerThresholdNode>(0.3f, 0.85f)
                 .Selector()
-                    .Sequence()
-                        .Child<ShipTraverseQueryNode>("enemy_goal_center")
-                        .Child<SeekNode>("enemy_goal_center")
+                    .Sequence() // If we are within crease, leave it.
+                        .InvertChild<DistanceThresholdNode>("enemy_goal_center", kCreaseDistance)
+                        .Child<RinkCenterNode>("rink_center")
+                        .Child<GoToNode>("rink_center")
                         .End()
-                    .Child<GoToNode>("enemy_goal_center")
-                    .End()
-                .Sequence(CompositeDecorator::Success)
-                    .InvertChild<DistanceThresholdNode>("enemy_goal_center", 40.0f)
-                    .Child<DistanceThresholdNode>("enemy_goal_center", 16.0f) // Crease
-                    .Child<FaceNode>("enemy_goal_center")
-                    .Child<PowerballGoalPathQuery>("projected_ball_position", "goal_scored", false)
-                    .Child<EqualityNode<bool>>("goal_scored", true)
-                    .Child<PowerballFireNode>()
+                    .Sequence()
+                        .Child<AvoidEnemyNode>(8.0f)
+                        .Child<tw::AfterburnerThresholdNode>(0.3f, 0.85f)
+                        .Selector()
+                            .Sequence()
+                                .Child<ShipTraverseQueryNode>("enemy_goal_center")
+                                .Child<SeekNode>("enemy_goal_center")
+                                .End()
+                            .Child<GoToNode>("enemy_goal_center")
+                            .End()
+                        .Sequence(CompositeDecorator::Success)
+                            .InvertChild<DistanceThresholdNode>("enemy_goal_center", 40.0f)
+                            .Child<DistanceThresholdNode>("enemy_goal_center", kCreaseDistance)
+                            .Child<FaceNode>("enemy_goal_center")
+                            .Child<PowerballGoalPathQuery>("projected_ball_position", "goal_scored", false)
+                            .Child<EqualityNode<bool>>("goal_scored", true)
+                            .Child<PowerballFireNode>()
+                            .End()
+                        .End()
                     .End()
                 .End()
             .Sequence() // If ball is uncarried, grab it
@@ -383,7 +405,7 @@ std::unique_ptr<behavior::BehaviorNode> OffenseBehavior::CreateTree(behavior::Ex
                             .End()
                         .Sequence(CompositeDecorator::Success)
                             .Child<PowerballCarrierQueryNode>("target_ball", "nearest_target")
-                            .Composite(CreateOffensiveTree("nearest_target", "target_ball_position"))
+                            .Composite(CreateShootTree("nearest_target"))
                             .End()
                         .End()
                     .End()
