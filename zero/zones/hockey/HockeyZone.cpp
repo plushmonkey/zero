@@ -5,6 +5,7 @@
 #include <zero/game/Logger.h>
 #include <zero/zones/ZoneController.h>
 #include <zero/zones/hockey/OffenseBehavior.h>
+#include <zero/zones/hockey/GoalieBehavior.h>
 
 #include <memory>
 
@@ -35,6 +36,7 @@ void HockeyZoneController::CreateBehaviors(const char* arena_name) {
   auto& repo = bot->bot_controller->behaviors;
 
   repo.Add("offense", std::make_unique<OffenseBehavior>());
+  repo.Add("goalie", std::make_unique<GoalieBehavior>());
 
   SetBehavior("offense");
 

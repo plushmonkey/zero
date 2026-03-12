@@ -91,6 +91,7 @@
     <ClCompile Include="zero\zones\devastation\Devastation.cpp" />
     <ClCompile Include="zero\zones\devastation\FrogRaceBehavior.cpp" />
     <ClCompile Include="zero\zones\extremegames\BaseBehavior.cpp" />
+    <ClCompile Include="zero\zones\hockey\GoalieBehavior.cpp" />
     <ClCompile Include="zero\zones\hockey\HockeyZone.cpp" />
     <ClCompile Include="zero\zones\hockey\OffenseBehavior.cpp" />
     <ClCompile Include="zero\zones\nexus\FoursBehavior.cpp" />
@@ -242,7 +243,10 @@
     <ClInclude Include="zero\zones\extremegames\BaseBehavior.h" />
     <ClInclude Include="zero\zones\extremegames\ExtremeGames.h" />
     <ClInclude Include="zero\zones\extremegames\nodes\BaseNode.h" />
+    <ClInclude Include="zero\zones\hockey\GoalieBehavior.h" />
     <ClInclude Include="zero\zones\hockey\HockeyZone.h" />
+    <ClInclude Include="zero\zones\hockey\nodes\PowerballNode.h" />
+    <ClInclude Include="zero\zones\hockey\nodes\RinkNode.h" />
     <ClInclude Include="zero\zones\hockey\OffenseBehavior.h" />
     <ClInclude Include="zero\zones\nexus\FoursBehavior.h" />
     <ClInclude Include="zero\zones\nexus\nodes\NearestTeammatePlayerPositionQueryNode.h" />

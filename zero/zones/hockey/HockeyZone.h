@@ -1,6 +1,5 @@
 #pragma once
 
-#include <zero/BotController.h>
 #include <zero/Math.h>
 #include <zero/RegionRegistry.h>
 
@@ -32,6 +31,11 @@ struct Rink {
     east_goal_rect.min.y = 1024.0f;
   }
 };
+
+static inline bool IsRinkClosed(Map& map, Rink& rink) {
+  TileId tile_id = map.GetTileId(rink.east_door_x, (u16)rink.center.y);
+  return tile_id >= kTileIdFirstDoor && tile_id <= kTileIdLastDoor;
+}
 
 struct HockeyZone {
   ZeroBot* bot;
