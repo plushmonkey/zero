@@ -65,6 +65,7 @@ void Soccer::Render(Camera& camera, SpriteRenderer& renderer) {
 
   u64 microtick = GetMicrosecondTick();
   u32 tick = GetCurrentTick();
+  u32 server_tick = connection.GetServerTick();
 
   for (size_t i = 0; i < ZERO_ARRAY_SIZE(balls); ++i) {
     Powerball* ball = balls + i;
@@ -72,9 +73,20 @@ void Soccer::Render(Camera& camera, SpriteRenderer& renderer) {
     if (ball->id != kInvalidBallId) {
       animation.sprite = &Graphics::anim_powerball;
 
-      if (ball->state == BallState::World &&
-          TICK_DIFF(tick, ball->last_touch_timestamp) < connection.settings.PassDelay) {
-        animation.sprite = &Graphics::anim_powerball_phased;
+      if (ball->state == BallState::World) {
+        // Ball was close to someone, so don't render it until the server acks the pickup or it times out.
+        if (TICK_GT(server_tick, ball->last_touch_timestamp) &&
+            TICK_DIFF(server_tick, ball->last_touch_timestamp) < 40) {
+          continue;
+        }
+
+        bool phased_passing = TICK_GT(server_tick, ball->last_fire_timestamp) &&
+                              TICK_DIFF(server_tick, ball->last_fire_timestamp) < connection.settings.PassDelay;
+        bool phased_pickup = TICK_GT(server_tick, ball->last_touch_timestamp) &&
+                             TICK_DIFF(server_tick, ball->last_touch_timestamp) < 100;
+        if (phased_passing || phased_pickup) {
+          animation.sprite = &Graphics::anim_powerball_phased;
+        }
       }
 
       SpriteRenderable& renderable = animation.GetFrame();
@@ -114,9 +126,21 @@ void Soccer::RenderIndicator(Powerball& ball, const Vector2f& position) {
                                               RadarIndicatorFlag_All);
 }
 
+static inline bool CanPickupBall(Soccer& soccer, Player& player, Powerball& ball) {
+  if (player.ship >= 8) return false;
+  if (player.enter_delay > 0.0f) return false;
+  if (!soccer.player_manager.IsSynchronized(player)) return false;
+  if (player.id == ball.carrier_id && (ball.vel_x != 0 || ball.vel_y != 0)) return false;
+  if (player.attach_parent != kInvalidPlayerId) return false;
+  if (player.id == soccer.player_manager.player_id && soccer.IsCarryingBall()) return false;
+
+  return true;
+}
+
 void Soccer::Update(float dt) {
   u64 microtick = GetMicrosecondTick();
   u32 tick = GetCurrentTick();
+  u32 server_tick = connection.GetServerTick();
 
   s32 pass_delay = connection.settings.PassDelay;
 
@@ -156,42 +180,41 @@ void Soccer::Update(float dt) {
     }
 
     // Check for nearby player touches if the ball isn't currently phased
-    if (ball->state == BallState::World && TICK_DIFF(tick, ball->last_touch_timestamp) >= pass_delay) {
+    if (ball->state == BallState::World && TICK_DIFF(server_tick, ball->last_fire_timestamp) >= pass_delay &&
+        TICK_DIFF(server_tick, ball->last_touch_timestamp) >= 100) {
       Vector2f position(ball->x / 16000.0f, ball->y / 16000.0f);
 
-      float closest_distance = FLT_MAX;
-      Player* closest_player = nullptr;
+      Player* self = player_manager.GetSelf();
 
-      // Loop over players to find anyone close enough to pick up the ball
-      for (size_t j = 0; j < player_manager.player_count; ++j) {
-        Player* player = player_manager.players + j;
+      if (self && self->ship < 8 && TICK_DIFF(tick, last_pickup_request) >= 100 && CanPickupBall(*this, *self, *ball)) {
+        float pickup_radius = connection.settings.ShipSettings[self->ship].SoccerBallProximity / 16.0f;
+        float dx = self->position.x - position.x;
+        float dy = self->position.y - position.y;
 
-        if (player->ship == 8) continue;
-        if (player->enter_delay > 0.0f) continue;
-        if (!player_manager.IsSynchronized(*player)) continue;
-        if (player->id == ball->carrier_id && (ball->vel_x != 0 || ball->vel_y != 0)) continue;
-        if (player->attach_parent != kInvalidPlayerId) continue;
-        if (IsCarryingBall() && player->id == player_manager.player_id) continue;
-
-        float pickup_radius = connection.settings.ShipSettings[player->ship].SoccerBallProximity / 16.0f;
-        float dist_sq = position.DistanceSq(player->position);
-
-        if (dist_sq <= pickup_radius * pickup_radius && dist_sq < closest_distance) {
-          closest_distance = dist_sq;
-          closest_player = player;
-        }
-      }
-
-      if (closest_player) {
-        if (closest_player->id == player_manager.player_id && TICK_DIFF(tick, last_pickup_request) >= 100) {
+        if (fabsf(dx) < pickup_radius && fabsf(dy) < pickup_radius) {
           // Send pickup
           connection.SendBallPickup((u8)ball->id, ball->timestamp);
           last_pickup_request = tick;
 
           Event::Dispatch(BallRequestPickupEvent(*ball));
+          ball->last_touch_timestamp = connection.GetServerTick();
         }
+      }
 
-        ball->last_touch_timestamp = GetCurrentTick();
+      // Loop over players to find anyone close enough to pick up the ball
+      for (size_t j = 0; j < player_manager.player_count; ++j) {
+        Player* player = player_manager.players + j;
+
+        if (!CanPickupBall(*this, *player, *ball)) continue;
+
+        float pickup_radius = connection.settings.ShipSettings[player->ship].SoccerBallProximity / 16.0f;
+        float dx = position.x - player->position.x;
+        float dy = position.y - player->position.y;
+
+        if (fabsf(dx) < pickup_radius && fabsf(dy) < pickup_radius) {
+          ball->last_touch_timestamp = connection.GetServerTick();
+          break;
+        }
       }
     }
   }
@@ -221,6 +244,8 @@ bool Soccer::FireBall(BallFireMethod method) {
   Vector2f velocity = self->velocity + Vector2f(heading) * speed;
 
   u32 timestamp = MAKE_TICK(GetCurrentTick() + connection.time_diff);
+
+  ball->last_fire_timestamp = timestamp;
 
   connection.SendBallFire((u8)carry_id, self->position.PixelRounded(), velocity.PixelRounded(), self->id, timestamp);
   carry_id = kInvalidBallId;
@@ -281,7 +306,8 @@ void Soccer::Clear() {
     ball->id = kInvalidBallId;
     ball->carrier_id = kInvalidPlayerId;
     ball->timestamp = 0;
-    ball->last_touch_timestamp = GetCurrentTick();
+    ball->last_touch_timestamp = connection.GetServerTick();
+    ball->last_fire_timestamp = connection.GetServerTick();
   }
 
   last_pickup_request = GetCurrentTick();
@@ -317,6 +343,7 @@ void Soccer::OnPowerballPosition(u8* pkt, size_t size) {
     ball->vel_y = velocity_y;
     ball->frequency = 0xFFFF;
     ball->state = BallState::World;
+    ball->last_fire_timestamp = timestamp;
 
     if (ball_id == carry_id) {
       carry_id = kInvalidBallId;
@@ -332,7 +359,7 @@ void Soccer::OnPowerballPosition(u8* pkt, size_t size) {
     u32 current_timestamp = MAKE_TICK(GetCurrentTick() + connection.time_diff);
     s32 sim_ticks = TICK_DIFF(current_timestamp, timestamp);
 
-    if (sim_ticks > 6000 || sim_ticks < 0) {
+    if (sim_ticks > 6000) {
       sim_ticks = 6000;
     }
 
@@ -362,7 +389,7 @@ void Soccer::OnPowerballPosition(u8* pkt, size_t size) {
         last_pickup_request = GetCurrentTick();
       }
 
-      ball->last_touch_timestamp = GetCurrentTick();
+      ball->last_touch_timestamp = MAKE_TICK(connection.GetServerTick() - 100);
     }
 
     if (ball->vel_x != 0 || ball->vel_y != 0) {

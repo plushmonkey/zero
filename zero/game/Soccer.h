@@ -36,6 +36,7 @@ struct Powerball {
   u64 last_micro_tick;
 
   u32 last_touch_timestamp;
+  u32 last_fire_timestamp;
   s32 trail_delay;
 
   BallState state;
