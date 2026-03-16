@@ -145,6 +145,19 @@ void ShipController::Update(const InputState& input, float dt) {
 
     if (rockets_enabled) {
       thrust = connection.settings.RocketThrust;
+    }
+
+    if (self->flags > 0 || (self->ball_carrier && connection.settings.UseFlagger)) {
+      s64 new_thrust = (s64)thrust + (s64)connection.settings.FlaggerThrustAdjustment;
+
+      if (new_thrust < 0) {
+        thrust = 0;
+      } else {
+        thrust = (u32)new_thrust;
+      }
+    }
+
+    if (rockets_enabled) {
       self->velocity += OrientationToHeading(direction) * (thrust * (10.0f / 16.0f)) * dt;
     } else {
       if (input.IsDown(InputAction::Backward)) {
@@ -226,6 +239,16 @@ void ShipController::Update(const InputState& input, float dt) {
     }
 
     self->repel_time -= dt;
+  }
+
+  if (self->flags > 0 || (self->ball_carrier && connection.settings.UseFlagger)) {
+    s64 new_speed = (s64)speed + (s64)connection.settings.FlaggerSpeedAdjustment;
+
+    if (new_speed < 0) {
+      speed = 0;
+    } else {
+      speed = (u32)new_speed;
+    }
   }
 
   ship.last_speed = speed;
@@ -446,6 +469,8 @@ Exhaust* ShipController::CreateExhaust(const Vector2f& position, const Vector2f&
 }
 
 inline void SetNextTick(u32* target, u32 next_tick) {
+  next_tick = MAKE_TICK(next_tick);
+
   if (TICK_GT(next_tick, *target)) {
     *target = next_tick;
   }
@@ -467,11 +492,18 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
   memset(&self.weapon, 0, sizeof(self.weapon));
   bool used_weapon = false;
 
-  u16 energy_cost = 0;
+  float energy_cost = 0.0f;
 
   bool in_safe = connection.map.GetTileId(self.position) == kTileIdSafe;
 
   bool can_fastshoot = !afterburners || !ship_settings.DisableFastShooting;
+
+  u32 bomb_fire_delay = ship_settings.BombFireDelay;
+  if (self.flags > 0 || (self.ball_carrier && connection.settings.UseFlagger)) {
+    if (connection.settings.FlaggerBombFireDelay > 0) {
+      bomb_fire_delay += connection.settings.FlaggerBombFireDelay;
+    }
+  }
 
   if (input.IsDown(InputAction::Repel)) {
     if (TICK_GT(tick, ship.next_repel_tick)) {
@@ -483,9 +515,9 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
           --ship.repels;
         }
 
-        SetNextTick(&ship.next_bomb_tick, tick + ship_settings.BombFireDelay);
-        SetNextTick(&ship.next_bullet_tick, tick + ship_settings.BombFireDelay);
-        ship.next_repel_tick = tick + kRepelDelayTicks;
+        SetNextTick(&ship.next_bomb_tick, tick + bomb_fire_delay);
+        SetNextTick(&ship.next_bullet_tick, tick + bomb_fire_delay);
+        ship.next_repel_tick = MAKE_TICK(tick + kRepelDelayTicks);
       }
     }
   }
@@ -500,9 +532,9 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
           --ship.bursts;
         }
 
-        SetNextTick(&ship.next_bomb_tick, tick + ship_settings.BombFireDelay);
-        SetNextTick(&ship.next_bullet_tick, tick + ship_settings.BombFireDelay);
-        ship.next_repel_tick = tick + kRepelDelayTicks;
+        SetNextTick(&ship.next_bomb_tick, tick + bomb_fire_delay);
+        SetNextTick(&ship.next_bullet_tick, tick + bomb_fire_delay);
+        ship.next_repel_tick = MAKE_TICK(tick + kRepelDelayTicks);
       }
     }
   }
@@ -517,9 +549,9 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
           --ship.thors;
         }
 
-        SetNextTick(&ship.next_bomb_tick, tick + ship_settings.BombFireDelay);
-        SetNextTick(&ship.next_bullet_tick, tick + ship_settings.BombFireDelay);
-        ship.next_repel_tick = tick + kRepelDelayTicks;
+        SetNextTick(&ship.next_bomb_tick, tick + bomb_fire_delay);
+        SetNextTick(&ship.next_bullet_tick, tick + bomb_fire_delay);
+        ship.next_repel_tick = MAKE_TICK(tick + kRepelDelayTicks);
       }
     }
   }
@@ -534,9 +566,9 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
           --ship.decoys;
         }
 
-        SetNextTick(&ship.next_bomb_tick, tick + ship_settings.BombFireDelay);
-        SetNextTick(&ship.next_bullet_tick, tick + ship_settings.BombFireDelay);
-        ship.next_repel_tick = tick + kRepelDelayTicks;
+        SetNextTick(&ship.next_bomb_tick, tick + bomb_fire_delay);
+        SetNextTick(&ship.next_bullet_tick, tick + bomb_fire_delay);
+        ship.next_repel_tick = MAKE_TICK(tick + kRepelDelayTicks);
       }
     }
   }
@@ -547,8 +579,8 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
         --ship.bricks;
 
         connection.SendDropBrick(self.position);
-        SetNextTick(&ship.next_bomb_tick, tick + ship_settings.BombFireDelay);
-        SetNextTick(&ship.next_bullet_tick, tick + ship_settings.BombFireDelay);
+        SetNextTick(&ship.next_bomb_tick, tick + bomb_fire_delay);
+        SetNextTick(&ship.next_bullet_tick, tick + bomb_fire_delay);
       }
     }
   }
@@ -558,11 +590,7 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
       if (ship.rockets > 0) {
         --ship.rockets;
 
-        ship.rocket_end_tick = tick + ship_settings.RocketTime;
-
-        SetNextTick(&ship.next_bomb_tick, tick + ship_settings.BombFireDelay);
-        SetNextTick(&ship.next_bullet_tick, tick + ship_settings.BombFireDelay);
-        ship.next_repel_tick = tick + kRepelDelayTicks;
+        ship.rocket_end_tick = MAKE_TICK(tick + ship_settings.RocketTime);
       }
     }
   }
@@ -675,10 +703,14 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
         u32 delay = 0;
         if (self.weapon.alternate) {
           delay = ship_settings.MultiFireDelay;
-          energy_cost = ship_settings.MultiFireEnergy * (self.weapon.level + 1);
+          energy_cost = (float)(ship_settings.MultiFireEnergy * (self.weapon.level + 1));
         } else {
           delay = ship_settings.BulletFireDelay;
-          energy_cost = ship_settings.BulletFireEnergy * (self.weapon.level + 1);
+          energy_cost = (float)(ship_settings.BulletFireEnergy * (self.weapon.level + 1));
+        }
+
+        if (self.flags > 0 || (self.ball_carrier && connection.settings.UseFlagger)) {
+          energy_cost = energy_cost * (connection.settings.FlaggerFireCostPercent / 1000.0f);
         }
 
         used_weapon = energy_cost < self.energy;
@@ -715,7 +747,11 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
         }
 
         energy_cost =
-            ship_settings.LandmineFireEnergy + ship_settings.LandmineFireEnergyUpgrade * (self.weapon.level + 1);
+            (float)(ship_settings.LandmineFireEnergy + ship_settings.LandmineFireEnergyUpgrade * self.weapon.level);
+
+        if (self.flags > 0 || (self.ball_carrier && connection.settings.UseFlagger)) {
+          energy_cost = energy_cost * (connection.settings.FlaggerFireCostPercent / 1000.0f);
+        }
 
         used_weapon = energy_cost < self.energy;
 
@@ -751,7 +787,12 @@ void ShipController::FireWeapons(Player& self, const InputState& input, float dt
           self.weapon.shrapbouncing = (ship.capability & ShipCapability_BouncingBullets) > 0;
         }
 
-        energy_cost = ship_settings.BombFireEnergy + ship_settings.BombFireEnergyUpgrade * (self.weapon.level + 1);
+        energy_cost = (float)(ship_settings.BombFireEnergy + ship_settings.BombFireEnergyUpgrade * self.weapon.level);
+
+        if (self.flags > 0 || (self.ball_carrier && connection.settings.UseFlagger)) {
+          energy_cost = energy_cost * (connection.settings.FlaggerFireCostPercent / 1000.0f);
+        }
+
         used_weapon = energy_cost < self.energy;
 
         // Disable prox bombs if they are fired near other players with BombSafety on
@@ -2035,6 +2076,10 @@ void ShipController::OnWeaponHit(Weapon& weapon) {
       (type == WeaponType::Bullet || type == WeaponType::BouncingBullet || type == WeaponType::Burst)) {
     u32 r = (rand() * 1000) % (damage * damage + 1);
     damage = (s32)sqrt(r);
+  }
+
+  if (self->flags > 0 || (self->ball_carrier && connection.settings.UseFlagger)) {
+    damage = (int)(damage * (connection.settings.FlaggerDamagePercent / 1000.0f));
   }
 
   if (damage <= 0) return;
