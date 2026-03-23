@@ -46,27 +46,123 @@ void ExtremeGamesController::CreateBehaviors(const char* arena_name) {
   bot->bot_controller->energy_tracker.estimate_type = EnergyHeuristicType::Average;
 }
 
+static MapCoord GenerateRandomSpawn(ZeroBot& bot) {
+  MapCoord spawn;
+
+  Connection& connection = bot.game->connection;
+  size_t spawn_count = 0;
+
+  for (size_t i = 0; i < ZERO_ARRAY_SIZE(connection.settings.SpawnSettings); ++i) {
+    if (connection.settings.SpawnSettings[i].X != 0 || connection.settings.SpawnSettings[i].Y != 0 ||
+        connection.settings.SpawnSettings[i].Radius != 0) {
+      ++spawn_count;
+    }
+  }
+
+  float ship_radius = connection.settings.ShipSettings[0].GetRadius();
+  u32 rand_seed = rand();
+
+  u32 player_count = (u32)bot.game->player_manager.player_count;
+
+  if (spawn_count == 0) {
+    // Default position to center of map if no location could be found.
+    spawn = MapCoord(512, 512);
+
+    for (size_t i = 0; i < 100; ++i) {
+      u16 x = 0;
+      u16 y = 0;
+
+      switch (connection.settings.RadarMode) {
+        case 1:
+        case 3: {
+          VieRNG rng = {(s32)rand_seed};
+          u8 rng_x = (u8)rng.GetNext();
+          u8 rng_y = (u8)rng.GetNext();
+
+          x = rng_x;
+          y = rng_y + 0x100;
+        } break;
+        case 2:
+        case 4: {
+          VieRNG rng = {(s32)rand_seed};
+          u8 rng_x = (u8)rng.GetNext();
+          u8 rng_y = (u8)rng.GetNext();
+
+          x = rng_x;
+          y = rng_y;
+        } break;
+        default: {
+          u32 spawn_radius = (((u32)player_count / 8) * 0x2000 + 0x400) / 0x60 + 0x100;
+
+          if (spawn_radius > (u32)connection.settings.WarpRadiusLimit) {
+            spawn_radius = (u32)connection.settings.WarpRadiusLimit;
+          }
+
+          if (spawn_radius < 3) {
+            spawn_radius = 3;
+          }
+
+          VieRNG rng = {(s32)rand_seed};
+          x = rng.GetNext() % (spawn_radius - 2) - 9 + ((0x400 - spawn_radius) / 2) + (rand() % 0x14);
+          y = rng.GetNext() % (spawn_radius - 2) - 9 + ((0x400 - spawn_radius) / 2) + (rand() % 0x14);
+        } break;
+      }
+
+      Vector2f new_spawn((float)x, (float)y);
+
+      if (connection.map.CanFit(new_spawn, ship_radius, 0)) {
+        spawn = new_spawn;
+        break;
+      }
+    }
+  } else {
+    u32 spawn_index = 0;
+
+    float x_center = (float)connection.settings.SpawnSettings[spawn_index].X;
+    float y_center = (float)connection.settings.SpawnSettings[spawn_index].Y;
+    int radius = connection.settings.SpawnSettings[spawn_index].Radius;
+
+    if (x_center == 0) {
+      x_center = 512;
+    } else if (x_center < 0) {
+      x_center += 1024;
+    }
+    if (y_center == 0) {
+      y_center = 512;
+    } else if (y_center < 0) {
+      y_center += 1024;
+    }
+
+    // Default to exact center in the case that a random position wasn't found
+    spawn = Vector2f(x_center, y_center);
+
+    if (radius > 0) {
+      // Try 100 times to spawn in a random spot.
+      for (int i = 0; i < 100; ++i) {
+        u32 xrand = ((u32)rand());
+        u32 yrand = ((u32)rand());
+
+        float x_offset = (float)((int)(xrand % (radius * 2)) - radius);
+        float y_offset = (float)((int)(yrand % (radius * 2)) - radius);
+
+        Vector2f new_spawn(x_center + x_offset, y_center + y_offset);
+
+        if (connection.map.CanFit(new_spawn, ship_radius, 0)) {
+          spawn = new_spawn;
+          break;
+        }
+      }
+    }
+  }
+
+  return spawn;
+}
+
 void ExtremeGames::CreateBases(ZeroBot& bot) {
   MapBuildConfig cfg = {};
 
-  MapCoord spawn((u16)bot.game->connection.settings.SpawnSettings[0].X,
-                 (u16)bot.game->connection.settings.SpawnSettings[0].Y);
-  u32 radius = bot.game->connection.settings.SpawnSettings[0].Radius;
-  if (radius == 0) radius = 512;
-
-  // Try to find a good starting area for searching for bases.
-  constexpr size_t kMaxSpawnTries = 32;
-  for (int i = 0; i < kMaxSpawnTries; ++i) {
-    s16 rand_x = (s16)(((u32)rand() % (radius * 2)) - radius);
-    s16 rand_y = (s16)(((u32)rand() % (radius * 2)) - radius);
-
-    MapCoord coord(spawn.x + rand_x, spawn.y + rand_y);
-
-    if (bot.game->GetMap().CanFit(Vector2f((float)coord.x, (float)coord.y), 14.0f / 16.0f, 0xFFFF)) {
-      cfg.spawn = coord;
-      break;
-    }
-  }
+  MapCoord spawn = GenerateRandomSpawn(bot);
+  cfg.spawn = spawn;
 
   std::vector<Vector2f> waypoints;
 
@@ -111,6 +207,13 @@ void ExtremeGames::CreateBases(ZeroBot& bot) {
   }
 
   cfg.populate_flood_map = true;
+
+  auto opt_empty_exit_range = bot.config->GetInt("ExtremeGames", "EmptyExitRange");
+  if (opt_empty_exit_range) {
+    cfg.empty_exit_range = *opt_empty_exit_range;
+  } else {
+    cfg.empty_exit_range = 25;
+  }
 
   // TODO: Add config option for specifying bases manually to reduce startup work. Or just store the results once per
   // map.

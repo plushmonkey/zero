@@ -52,8 +52,11 @@ ScoreresetInterval = 360000
 [ExtremeGames]
 RequestShip = 3
 Behavior = base
-Arena = eg
-BaseCount = 8
+Arena = egpub
+BaseCount = 6
+# How many tiles should we search around the current tile to see if it has escaped the base.
+# This should be high enough that it doesn't consider parts of the internal base to be empty.
+EmptyExitRange = 25
 # List of fallback waypoint positions formatted as { x, y }; { x, y }; { x, y }
 Waypoints = { 450, 460 }; { 575, 460 }; { 575, 560 }; { 450, 560 }
 

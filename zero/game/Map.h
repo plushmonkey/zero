@@ -6,7 +6,166 @@
 #include <zero/game/Memory.h>
 #include <zero/game/Random.h>
 
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 namespace zero {
+
+// This uses a bitset to manage a tightly-bound region.
+// This saves memory over a full map bitset.
+// Manually calling Fit when the boundary is known will have better performance than calling Set many times.
+// Recommended usage:
+// Fit 0, 1023, 0, 1023 to fully compact the region, fit it to one of the tiles in the set with shrink.
+struct RegionBitset {
+  using SliceType = unsigned int;
+
+  unsigned short start_x = 0;
+  unsigned short start_y = 0;
+
+  unsigned short end_x = 0;
+  unsigned short end_y = 0;
+
+  std::vector<SliceType> data;
+
+  bool Test(unsigned short x, unsigned short y) const {
+    if (data.empty()) return false;
+    if (x < start_x || x > end_x) return false;
+    if (y < start_y || y > end_y) return false;
+
+    return _Test(x, y);
+  }
+
+  void Set(unsigned short x, unsigned short y, bool value) {
+    bool shrinking = false;
+
+    if (!value && Test(x, y)) {
+      // The value is being cleared and it's in our set, so we should clear it before shrinking.
+      size_t x_delta = (size_t)x - (size_t)start_x;
+      size_t y_delta = (size_t)y - (size_t)start_y;
+
+      size_t width = (size_t)end_x - (size_t)start_x + 1;
+      size_t total_index = (size_t)y_delta * width + (size_t)x_delta;
+      size_t slice_index = total_index / sizeof(SliceType);
+      size_t bit_index = total_index % sizeof(SliceType);
+
+      data[slice_index] &= ~(1 << bit_index);
+      shrinking = true;
+    }
+
+    Fit(x, x, y, y, shrinking);
+
+    size_t x_delta = (size_t)x - (size_t)start_x;
+    size_t y_delta = (size_t)y - (size_t)start_y;
+    size_t width = (size_t)end_x - (size_t)start_x + 1;
+    size_t total_index = (size_t)y_delta * width + (size_t)x_delta;
+    size_t slice_index = total_index / sizeof(SliceType);
+    size_t bit_index = total_index % sizeof(SliceType);
+
+    if (value) {
+      data[slice_index] |= (1 << bit_index);
+    } else {
+      data[slice_index] &= ~(1 << bit_index);
+    }
+  }
+
+  inline void Compact() {
+    if (data.empty()) return;
+
+    for (u16 y = 0; y < 1024; ++y) {
+      for (u16 x = 0; x < 1024; ++x) {
+        if (Test(x, y)) {
+          Fit(x, y, true);
+          return;
+        }
+      }
+    }
+
+    Fit(0, 1023, 0, 1023, false);
+  }
+
+  inline void Fit(unsigned short x, unsigned short y, bool shrink) { Fit(x, x, y, y, shrink); }
+  void Fit(unsigned short fit_start_x, unsigned short fit_end_x, unsigned short fit_start_y, unsigned short fit_end_y,
+           bool shrink) {
+    // Begin by making us just fit this one tile.
+    unsigned short new_start_x = fit_start_x;
+    unsigned short new_start_y = fit_start_y;
+    unsigned short new_end_x = fit_end_x;
+    unsigned short new_end_y = fit_end_y;
+
+    if (shrink && !data.empty()) {
+      // Expand to include existing set data.
+      for (unsigned short check_y = start_y; check_y <= end_y; ++check_y) {
+        for (unsigned short check_x = start_x; check_x <= end_x; ++check_x) {
+          bool outside_region =
+              check_x < new_start_x || check_x > new_end_x || check_y < new_start_y || check_y > new_end_y;
+
+          if (_Test(check_x, check_y)) {
+            if (check_x < new_start_x) new_start_x = check_x;
+            if (check_x > new_end_x) new_end_x = check_x;
+            if (check_y < new_start_y) new_start_y = check_y;
+            if (check_y > new_end_y) new_end_y = check_y;
+          }
+        }
+      }
+    } else if (!data.empty()) {
+      if (start_x < new_start_x) new_start_x = start_x;
+      if (end_x > new_end_x) new_end_x = end_x;
+      if (start_y < new_start_y) new_start_y = start_y;
+      if (end_y > new_end_y) new_end_y = end_y;
+    }
+
+    if (new_start_x != start_x || new_end_x != end_x || new_start_y != start_y || new_end_y != end_y) {
+      size_t new_width = (size_t)(new_end_x - new_start_x + 1);
+      size_t new_height = (size_t)(new_end_y - new_start_y + 1);
+
+      size_t total_size = new_height * new_width;
+      size_t total_slices = (total_size + (sizeof(SliceType) - 1)) / sizeof(SliceType);
+
+      std::vector<SliceType> new_data(total_slices);
+
+      // Loop through old set and update our new data
+      if (!data.empty()) {
+        for (unsigned short check_y = start_y; check_y <= end_y; ++check_y) {
+          for (unsigned short check_x = start_x; check_x <= end_x; ++check_x) {
+            if (_Test(check_x, check_y)) {
+              size_t x_delta = (size_t)check_x - (size_t)new_start_x;
+              size_t y_delta = (size_t)check_y - (size_t)new_start_y;
+
+              size_t total_index = (size_t)y_delta * new_width + (size_t)x_delta;
+              size_t slice_index = total_index / sizeof(SliceType);
+              size_t bit_index = total_index % sizeof(SliceType);
+
+              new_data[slice_index] |= (1 << bit_index);
+            }
+          }
+        }
+      }
+
+      data = new_data;
+
+      start_x = new_start_x;
+      start_y = new_start_y;
+      end_x = new_end_x;
+      end_y = new_end_y;
+    }
+  }
+
+ private:
+  inline bool _Test(unsigned short x, unsigned short y) const {
+    // Map into local space to get bit index.
+    unsigned short x_delta = x - start_x;
+    unsigned short y_delta = y - start_y;
+    unsigned short width = end_x - start_x + 1;
+
+    size_t total_index = (size_t)y_delta * (size_t)width + (size_t)x_delta;
+    size_t slice_index = total_index / sizeof(SliceType);
+    size_t bit_index = total_index % sizeof(SliceType);
+
+    return data[slice_index] & (1 << bit_index);
+  }
+};
 
 struct Tile {
   u32 x : 12;
@@ -98,6 +257,35 @@ inline bool IsSolidEmptyDoors(TileId id) {
   return false;
 }
 
+namespace elvl {
+
+enum {
+  RegionFlag_Base = (1 << 0),
+  RegionFlag_NoAntiwarp = (1 << 1),
+  RegionFlag_NoWeapons = (1 << 2),
+  RegionFlag_NoFlags = (1 << 3),
+};
+using RegionFlags = u32;
+
+struct Region {
+  std::string name;
+  RegionFlags flags = 0;
+
+  // If a tile is part of this region then it will be set in this bitset.
+  // Lazily initialized so empty regions don't take up a lot of memory.
+  RegionBitset tiles;
+
+  inline void SetTile(u16 x, u16 y) { tiles.Set(x, y, 1); }
+
+  inline bool InRegion(u16 x, u16 y) const {
+    if (x > 1023 || y > 1023) return false;
+
+    return tiles.Test(x, y);
+  }
+};
+
+}  // namespace elvl
+
 struct Map {
   bool Load(MemoryArena& arena, const char* filename);
   bool LoadFromMemory(MemoryArena& arena, const char* filename, const u8* data, size_t size);
@@ -147,12 +335,28 @@ struct Map {
   inline AnimatedTileSet& GetAnimatedTileSet(AnimatedTile type) { return animated_tiles[(size_t)type]; }
   inline const AnimatedTileSet& GetAnimatedTileSet(AnimatedTile type) const { return animated_tiles[(size_t)type]; }
 
+  std::vector<const elvl::Region*> GetRegions(Vector2f position) const;
+  std::vector<const elvl::Region*> GetRegions(u16 x, u16 y) const;
+
+  bool InRegion(const char* name, Vector2f position) const;
+  bool InRegion(const char* name, u16 x, u16 y) const;
+
+  const elvl::Region* GetRegionByName(const char* name) const;
+
+  // This is a fairly expensive operation, so the results should be cached after map is loaded once.
+  std::vector<Tile> GetRegionTiles(const elvl::Region& region) const;
+
+  // This needs to be called manually to parse the regions from the data.
+  // Only do this if the regions will be used because they can use a lot of memory.
+  void ParseRegions();
+
   char filename[1024];
   u32 checksum = 0;
   VieRNG door_rng;
   u32 last_seed_tick = 0;
   u32 compressed_size = 0;
   char* data = nullptr;
+  size_t data_size = 0;
   u8* tiles = nullptr;
 
   size_t door_count = 0;
@@ -161,6 +365,9 @@ struct Map {
   BrickManager* brick_manager = nullptr;
 
   AnimatedTileSet animated_tiles[kAnimatedTileCount];
+
+  std::vector<elvl::Region> regions;
+  std::unordered_map<std::string, elvl::Region*> region_map;
 
  private:
   size_t GetTileCount(Tile* tiles, size_t tile_count, TileId id_begin, TileId id_end);

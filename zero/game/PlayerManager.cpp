@@ -198,7 +198,7 @@ void PlayerManager::Update(float dt) {
     if (player->enter_delay > 0.0f) {
       player->enter_delay -= dt;
 
-      if (player->explode_anim_t >= kAnimDurationShipExplode) {
+      if (connection.settings.EnterDelay > 0 && player->explode_anim_t >= kAnimDurationShipExplode) {
         if (player != self) {
           player->position = Vector2f(0, 0);
           player->lerp_time = 0.0f;

@@ -4,8 +4,8 @@
 #include <zero/ZeroBot.h>
 #include <zero/game/Logger.h>
 #include <zero/zones/ZoneController.h>
-#include <zero/zones/hockey/OffenseBehavior.h>
 #include <zero/zones/hockey/GoalieBehavior.h>
+#include <zero/zones/hockey/OffenseBehavior.h>
 
 #include <memory>
 
@@ -27,6 +27,8 @@ static HockeyZoneController controller;
 
 void HockeyZoneController::CreateBehaviors(const char* arena_name) {
   Log(LogLevel::Info, "Registering HockeyZone behaviors.");
+
+  bot->game->GetMap().ParseRegions();
 
   hz = std::make_unique<HockeyZone>(this->bot);
   hz->Build();

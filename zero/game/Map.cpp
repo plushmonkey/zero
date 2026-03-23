@@ -14,6 +14,11 @@
 
 namespace zero {
 
+template <int a, int b, int c, int d>
+struct FourCC {
+  static const unsigned int value = (((((d << 8) | c) << 8) | b) << 8) | a;
+};
+
 inline static bool CornerPointCheck(const Map& map, int sX, int sY, int diameter, u32 frequency) {
   for (int y = 0; y < diameter; ++y) {
     for (int x = 0; x < diameter; ++x) {
@@ -634,6 +639,7 @@ bool Map::LoadFromMemory(MemoryArena& arena, const char* filename, const u8* raw
   if (raw_data) {
     // Maps are allocated in their own arena so they are freed automatically when the arena is reset
     data = (char*)arena.Allocate(size);
+    data_size = size;
     if (!data) return false;
 
     memcpy(data, raw_data, size);
@@ -696,6 +702,296 @@ bool Map::LoadFromMemory(MemoryArena& arena, const char* filename, const u8* raw
   }
 
   return true;
+}
+
+void Map::ParseRegions() {
+  using namespace elvl;
+
+  // The offset to elvl data will be stored in the bitmap reserved section.
+  std::size_t elvl_metadata_offset = *(u32*)(&this->data[6]);
+
+  constexpr u32 kElvlMagicNumber = 0x6c766c65;
+  struct ElvlMetadataHeader {
+    u32 magic;  // 0x6c766c65 ("elvl")
+    u32 totalsize;
+    u32 reserved;
+  };
+
+  struct ELvlChunkHeader {
+    u32 type;
+    u32 size;
+  };
+
+  this->regions.clear();
+  this->region_map.clear();
+
+  if (!elvl_metadata_offset || elvl_metadata_offset + sizeof(ElvlMetadataHeader) >= this->data_size) return;
+
+  ElvlMetadataHeader* header = (ElvlMetadataHeader*)(this->data + elvl_metadata_offset);
+
+  if (header->magic != kElvlMagicNumber) return;
+  if (header->totalsize > this->data_size - elvl_metadata_offset) return;
+
+  u8* current = (u8*)(header + 1);
+
+  while (current < (u8*)header + header->totalsize) {
+    ELvlChunkHeader* chunk_header = (ELvlChunkHeader*)current;
+    current += sizeof(ELvlChunkHeader);
+
+    u8* chunk_data = current;
+
+    // The case statements here are reversed because of endianness.
+    switch (chunk_header->type) {
+      case FourCC<'A', 'T', 'T', 'R'>::value: {  // Attributes
+        // This stores the information about the map, such as name, version, zone, creator.
+      } break;
+      case FourCC<'R', 'E', 'G', 'N'>::value: {
+        // Region data
+        u8* sub_data = chunk_data;
+
+        regions.emplace_back();
+        Region& region = regions.back();
+
+        // The current tile being processed for the run-length encoded data.
+        int current_x = 0;
+        int current_y = 0;
+
+        while (sub_data < chunk_data + chunk_header->size) {
+          ELvlChunkHeader* subchunk = (ELvlChunkHeader*)sub_data;
+
+          sub_data += sizeof(ELvlChunkHeader);
+
+          switch (subchunk->type) {
+            case FourCC<'r', 'N', 'A', 'M'>::value: {
+              // Descriptive name
+              region.name = std::string_view((char*)sub_data, subchunk->size);
+            } break;
+            case FourCC<'r', 'T', 'I', 'L'>::value: {
+              // Tile data
+              u8* tile_ptr = sub_data;
+
+              while (tile_ptr < sub_data + subchunk->size) {
+                u8 sequence_type = *tile_ptr >> 5;
+
+                // This sequence type is based on the first 3 bits.
+                // The 1-32 and 1-1024 of the same type are used for optimization since it would require more bits
+                // to encode 1024 always. By using 3 bits to determine, the 1-32 can fit in the remaining 5 bits
+                // instead of having to have an extra byte that would be needed for 1024.
+                //
+                // Since a single tile would be required for the existence of one of these types, it is encoded as
+                // +1 from the remaining bit value. That allows 5 bits to be used for 31(32) since 32 wouldn't
+                // normally fit.
+                switch (sequence_type) {
+                  case 0: {  // 1-32 Empty tiles in a row
+                    u8 run = (tile_ptr[0] & 0x1F) + 1;
+
+                    current_x += run;
+                    if (current_x >= 1024) {
+                      current_x = 0;
+                      current_y++;
+                    }
+
+                    tile_ptr += 1;
+                  } break;
+                  case 1: {  // 1-1024 Empty tiles in a row
+                    u16 run = (((tile_ptr[0] & 3) << 8) | tile_ptr[1]) + 1;
+
+                    current_x += run;
+                    if (current_x >= 1024) {
+                      current_x = 0;
+                      current_y++;
+                    }
+
+                    tile_ptr += 2;
+                  } break;
+                  case 2: {  // 1-32 Present tiles in a row
+                    u8 run = (tile_ptr[0] & 0x1F) + 1;
+
+                    for (int i = 0; i < run; ++i) {
+                      region.SetTile(current_x + i, current_y);
+                    }
+
+                    current_x += run;
+                    if (current_x >= 1024) {
+                      current_x = 0;
+                      current_y++;
+                    }
+
+                    tile_ptr += 1;
+                  } break;
+                  case 3: {  // 1-1024 Present tiles in a row
+                    u16 run = (((tile_ptr[0] & 3) << 8) | tile_ptr[1]) + 1;
+
+                    for (int i = 0; i < run; ++i) {
+                      region.SetTile(current_x + i, current_y);
+                    }
+
+                    current_x += run;
+                    if (current_x >= 1024) {
+                      current_x = 0;
+                      current_y++;
+                    }
+
+                    tile_ptr += 2;
+                  } break;
+                  case 4: {  // 1-32 Rows of empty
+                    u8 run = (tile_ptr[0] & 0x1F) + 1;
+
+                    current_x = 0;
+                    current_y += run;
+
+                    tile_ptr += 1;
+                  } break;
+                  case 5: {  // 1-1024 Rows of empty
+                    u16 run = (((tile_ptr[0] & 3) << 8) | tile_ptr[1]) + 1;
+
+                    current_x = 0;
+                    current_y += run;
+
+                    tile_ptr += 2;
+                  } break;
+                  case 6: {  // Repeat last row 1-32 times
+                    u8 run = (tile_ptr[0] & 0x1F) + 1;
+
+                    current_x = 0;
+
+                    for (int i = 0; i < run; ++i) {
+                      for (int x = 0; x < 1024; ++x) {
+                        if (region.InRegion(x, current_y - 1)) {
+                          region.SetTile(x, current_y + i);
+                        }
+                      }
+                    }
+
+                    current_y += run;
+
+                    tile_ptr += 1;
+                  } break;
+                  case 7: {  // Repeat last row 1-204 times
+                    u16 run = (((tile_ptr[0] & 3) << 8) | tile_ptr[1]) + 1;
+
+                    current_x = 0;
+
+                    for (int i = 0; i < run; ++i) {
+                      for (int x = 0; x < 1024; ++x) {
+                        if (region.InRegion(x, current_y - 1)) {
+                          region.SetTile(x, current_y + i);
+                        }
+                      }
+                    }
+
+                    current_y += run;
+
+                    tile_ptr += 2;
+                  } break;
+                }
+              }
+            } break;
+            case FourCC<'r', 'B', 'S', 'E'>::value: {
+              // Base
+              region.flags |= RegionFlag_Base;
+            } break;
+            case FourCC<'r', 'N', 'A', 'W'>::value: {
+              // No antiwarp
+              region.flags |= RegionFlag_NoAntiwarp;
+            } break;
+            case FourCC<'r', 'N', 'W', 'P'>::value: {
+              // No weapons
+              region.flags |= RegionFlag_NoWeapons;
+            } break;
+            case FourCC<'r', 'N', 'F', 'L'>::value: {
+              // No flag drops
+              region.flags |= RegionFlag_NoFlags;
+            } break;
+            case FourCC<'r', 'A', 'W', 'P'>::value: {
+              // Auto-warp upon entering region
+            } break;
+            case FourCC<'r', 'P', 'Y', 'C'>::value: {
+              // Python execution on enter/leave
+            } break;
+          }
+
+          // Align the pointer to 4 byte boundary.
+          sub_data += (subchunk->size + 3) & ~3;
+        }
+      } break;
+      case FourCC<'T', 'S', 'E', 'T'>::value: {
+        // Tileset data
+      } break;
+      case FourCC<'T', 'I', 'L', 'E'>::value: {
+        // Tile data
+      } break;
+      default: {
+        // Invalid
+        break;
+      }
+    }
+
+    // Align the pointer to 4 byte boundary.
+    current += (chunk_header->size + 3) & ~3;
+  }
+
+  // Create a mapping from names to region data.
+  for (auto& region : regions) {
+    region_map[region.name] = &region;
+
+    // Compact the tiles so they take up less memory.
+    region.tiles.Compact();
+  }
+}
+
+const elvl::Region* Map::GetRegionByName(const char* name) const {
+  auto iter = this->region_map.find(name);
+  if (iter == this->region_map.end()) return nullptr;
+  return iter->second;
+}
+
+std::vector<const elvl::Region*> Map::GetRegions(Vector2f position) const {
+  return GetRegions((u16)position.x, (u16)position.y);
+}
+
+bool Map::InRegion(const char* name, Vector2f position) const {
+  return InRegion(name, (u16)position.x, (u16)position.y);
+}
+
+std::vector<const elvl::Region*> Map::GetRegions(u16 x, u16 y) const {
+  std::vector<const elvl::Region*> result;
+
+  for (auto& region : regions) {
+    if (region.InRegion(x, y)) {
+      result.push_back(&region);
+    }
+  }
+
+  return result;
+}
+
+bool Map::InRegion(const char* name, u16 x, u16 y) const {
+  auto iter = region_map.find(name);
+
+  if (iter == region_map.end()) return false;
+
+  return iter->second->InRegion(x, y);
+}
+
+std::vector<Tile> Map::GetRegionTiles(const elvl::Region& region) const {
+  std::vector<Tile> result;
+
+  for (u16 y = 0; y < 1024; ++y) {
+    for (u16 x = 0; x < 1024; ++x) {
+      if (region.InRegion(x, y)) {
+        Tile tile = {};
+
+        tile.x = x;
+        tile.y = y;
+        tile.id = GetTileId(x, y);
+
+        result.push_back(tile);
+      }
+    }
+  }
+
+  return result;
 }
 
 size_t Map::GetTileCount(Tile* tiles, size_t tile_count, TileId id_begin, TileId id_end) {
