@@ -134,6 +134,15 @@ static inline bool CanPickupBall(Soccer& soccer, Player& player, Powerball& ball
   if (player.attach_parent != kInvalidPlayerId) return false;
   if (player.id == soccer.player_manager.player_id && soccer.IsCarryingBall()) return false;
 
+  if (soccer.connection.settings.DisableBallThroughWalls) {
+    Vector2f direction = soccer.GetBallPosition(ball, GetMicrosecondTick()) - player.position;
+    float distance = direction.Length();
+
+    direction = Normalize(direction);
+
+    return !soccer.connection.map.Cast(player.position, direction, distance, player.frequency).hit;
+  }
+
   return true;
 }
 
