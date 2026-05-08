@@ -110,7 +110,7 @@ struct Player {
   u8 ship;
   u8 togglables;
   u8 ping;
-  u8 koth;
+  u8 has_crown;
 
   u32 last_bounce_tick;
 

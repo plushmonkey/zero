@@ -151,6 +151,24 @@ static void OnSetCoordinatesPkt(void* user, u8* pkt, size_t size) {
   manager->SendPositionPacket();
 }
 
+static void OnKothSetTimer(void* user, u8* pkt, size_t size) {
+  PlayerManager* manager = (PlayerManager*)user;
+
+  manager->OnKothSetTimer(pkt, size);
+}
+
+static void OnKothGameReset(void* user, u8* pkt, size_t size) {
+  PlayerManager* manager = (PlayerManager*)user;
+
+  manager->OnKothGameReset(pkt, size);
+}
+
+static void OnKothAddTime(void* user, u8* pkt, size_t size) {
+  PlayerManager* manager = (PlayerManager*)user;
+
+  manager->OnKothAddTime(pkt, size);
+}
+
 inline bool IsPlayerVisible(Player& self, u32 self_freq, Player& player) {
   if (self_freq == player.frequency) return true;
 
@@ -175,6 +193,10 @@ PlayerManager::PlayerManager(MemoryArena& perm_arena, Connection& connection, Pa
   dispatcher.Register(ProtocolS2C::CreateTurret, OnCreateTurretLinkPkt, this);
   dispatcher.Register(ProtocolS2C::DestroyTurret, OnDestroyTurretLinkPkt, this);
 
+  dispatcher.Register(ProtocolS2C::SetPersonalKothTimer, zero::OnKothSetTimer, this);
+  dispatcher.Register(ProtocolS2C::KothGameReset, zero::OnKothGameReset, this);
+  dispatcher.Register(ProtocolS2C::AddKothTime, zero::OnKothAddTime, this);
+
   memset(player_lookup, 0xFF, sizeof(player_lookup));
 }
 
@@ -183,6 +205,22 @@ void PlayerManager::Update(float dt) {
   Player* self = GetPlayerById(player_id);
 
   if (!self) return;
+
+  if (this->remaining_crown_ticks > 0) {
+    crown_dt += dt;
+
+    while (crown_dt >= 1.0f / 100.0f) {
+      if (this->remaining_crown_ticks > 0) {
+        this->remaining_crown_ticks -= 1;
+
+        if (this->remaining_crown_ticks == 0) {
+          this->connection.SendCrownExpire();
+        }
+      }
+
+      crown_dt -= 1.0f / 100.0f;
+    }
+  }
 
   for (size_t i = 0; i < this->player_count; ++i) {
     Player* player = this->players + i;
@@ -541,7 +579,13 @@ void PlayerManager::SendPositionPacket() {
   if (connection.extra_position_info || connection.settings.ExtraPositionData) {
     buffer.WriteU16(energy);
     buffer.WriteU16(connection.ping / 10);
-    buffer.WriteU16(player->flag_timer / 100);
+    u16 timer = player->flag_timer / 100;
+
+    if (player->flag_timer == 0) {
+      timer = this->remaining_crown_ticks / 100;
+    }
+
+    buffer.WriteU16(timer);
 
     struct {
       u32 shields : 1;
@@ -609,6 +653,8 @@ void PlayerManager::OnPlayerIdChange(u8* pkt, size_t size) {
   this->player_count = 0;
   this->received_initial_list = false;
   this->kdtree = nullptr;
+  this->crown_dt = 0.0f;
+  this->remaining_crown_ticks = 0;
 
   memset(player_lookup, 0xFF, sizeof(player_lookup));
 }
@@ -653,7 +699,7 @@ void PlayerManager::OnPlayerEnter(u8* pkt, size_t size) {
   player->losses = buffer.ReadU16();
   player->attach_parent = buffer.ReadU16();
   player->flags = buffer.ReadU16();
-  player->koth = buffer.ReadU8();
+  player->has_crown = buffer.ReadU8();
   player->timestamp = kInvalidSmallTick;
 
   player->warp_anim_t = kAnimDurationShipWarp;
@@ -1690,6 +1736,49 @@ bool PlayerManager::IsAntiwarped(Player& self, bool notify) {
   }
 
   return false;
+}
+
+void PlayerManager::OnKothSetTimer(u8* pkt, size_t size) {
+  if (size < 5) return;
+
+  this->remaining_crown_ticks = *(u32*)(pkt + 1);
+  this->crown_dt = 0.0f;
+}
+
+void PlayerManager::OnKothGameReset(u8* pkt, size_t size) {
+  if (size < 8) return;
+
+  u8 adding = pkt[1];
+  u32 timer = *(u32*)(pkt + 2);
+  u16 pid = *(u16*)(pkt + 6);
+
+  if (pid == kInvalidPlayerId) {
+    for (size_t i = 0; i < player_count; ++i) {
+      Player* player = players + i;
+
+      player->has_crown = adding;
+    }
+
+    this->remaining_crown_ticks = timer;
+    this->crown_dt = 0.0f;
+  } else {
+    Player* player = GetPlayerById(pid);
+
+    if (player) {
+      player->has_crown = adding;
+
+      if (player->id == player_id) {
+        this->remaining_crown_ticks = timer;
+        this->crown_dt = 0.0f;
+      }
+    }
+  }
+}
+
+void PlayerManager::OnKothAddTime(u8* pkt, size_t size) {
+  if (size < 5) return;
+
+  this->remaining_crown_ticks += *(u32*)(pkt + 1);
 }
 
 }  // namespace zero

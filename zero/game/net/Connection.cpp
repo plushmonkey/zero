@@ -716,6 +716,15 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
       } break;
       case ProtocolS2C::BatchedLargePosition: {
       } break;
+      case ProtocolS2C::SetPersonalKothTimer: {
+
+      } break;
+      case ProtocolS2C::KothGameReset: {
+
+      } break;
+      case ProtocolS2C::AddKothTime: {
+
+      } break;
       default: {
         Log(LogLevel::Info, "Received unhandled non-core packet of type 0x%02X", (int)type);
       } break;
@@ -1018,7 +1027,7 @@ void Connection::SendBallGoal(u8 ball_id, s16 x, s16 y) {
   packet_sequencer.SendReliableMessage(*this, (u8*)&pkt, sizeof(pkt));
 }
 
-void zero::Connection::SendDamage(size_t damage_count, Damage* damages) {
+void Connection::SendDamage(size_t damage_count, Damage* damages) {
   if (!send_damage || damage_count == 0) return;
 
   u8 data[kMaxPacketSize];
@@ -1046,6 +1055,16 @@ void zero::Connection::SendDamage(size_t damage_count, Damage* damages) {
   }
 
   packet_sequencer.SendReliableMessage(*this, buffer.data, buffer.GetSize());
+}
+
+void Connection::SendCrownExpire() {
+#pragma pack(push, 1)
+  struct {
+    u8 type;
+  } pkt = { 0x1E };
+#pragma pack(pop)
+
+  packet_sequencer.SendReliableMessage(*this, (u8*)&pkt, sizeof(pkt));
 }
 
 ConnectResult Connection::Connect(const char* ip, u16 port) {

@@ -63,6 +63,10 @@ struct PlayerManager {
   Animation bombflash_animation;
 
   u32 last_send_damage_tick = 0;
+
+  float crown_dt = 0.0f;
+  u32 remaining_crown_ticks = 0;
+
   size_t damage_count = 0;
   Damage damages[10];
 
@@ -122,6 +126,10 @@ struct PlayerManager {
   void OnFlagDrop(u8* pkt, size_t size);
   void OnCreateTurretLink(u8* pkt, size_t size);
   void OnDestroyTurretLink(u8* pkt, size_t size);
+
+  void OnKothSetTimer(u8* pkt, size_t size);
+  void OnKothGameReset(u8* pkt, size_t size);
+  void OnKothAddTime(u8* pkt, size_t size);
 
   void OnPositionPacket(Player& player, const Vector2f& position, const Vector2f& velocity, s32 sim_ticks);
 
