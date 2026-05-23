@@ -123,9 +123,9 @@ void HeuristicEnergyTracker::HandleEvent(const WeaponFireEvent& event) {
     case WeaponType::Bomb:
     case WeaponType::ProximityBomb: {
       if (event.data.alternate) {
-        cost = settings.LandmineFireEnergy + settings.LandmineFireEnergyUpgrade * (event.data.level + 1);
+        cost = settings.LandmineFireEnergy + settings.LandmineFireEnergyUpgrade * event.data.level;
       } else {
-        cost = settings.BombFireEnergy + settings.BombFireEnergyUpgrade * (event.data.level + 1);
+        cost = settings.BombFireEnergy + settings.BombFireEnergyUpgrade * event.data.level;
       }
     } break;
     default: {
@@ -277,7 +277,7 @@ void HeuristicEnergyTracker::HandleEvent(const WeaponHitEvent& event) {
       }
     } break;
     case WeaponType::Burst: {
-      damage = connection.settings.BurstDamageLevel;
+      damage = connection.settings.BurstDamageLevel / 1000;
     } break;
     default: {
     } break;
