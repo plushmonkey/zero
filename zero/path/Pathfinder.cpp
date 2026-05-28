@@ -3,7 +3,9 @@
 #include <zero/path/Pathfinder.h>
 //
 #include <math.h>
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
 #include <xmmintrin.h>
+#endif
 
 #include <thread>
 
@@ -14,6 +16,7 @@ namespace path {
 // This is set here instead of stored in a node so traveling through multiple safe tiles isn't very expensive.
 constexpr float kSafetyWeight = 300.0f;
 
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
 static inline float fast_sqrt(float v) {
   __m128 v_x4 = _mm_set1_ps(v);
 
@@ -23,6 +26,11 @@ static inline float fast_sqrt(float v) {
 
   return v;
 }
+#else
+static inline float fast_sqrt(float v) {
+  return sqrtf(v);
+}
+#endif
 
 static inline NodePoint ToNodePoint(const Vector2f v) {
   NodePoint np;
@@ -43,6 +51,7 @@ static inline float Euclidean(NodeProcessor& processor, const Node* from, const 
   return sqrt(dx * dx + dy * dy);
 }
 
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
 static inline float Euclidean(const NodePoint& __restrict from_p, const NodePoint& __restrict to_p) {
   float dx = static_cast<float>(from_p.x - to_p.x);
   float dy = static_cast<float>(from_p.y - to_p.y);
@@ -52,6 +61,14 @@ static inline float Euclidean(const NodePoint& __restrict from_p, const NodePoin
 
   return _mm_cvtss_f32(result);
 }
+#else
+static inline float Euclidean(const NodePoint& __restrict from_p, const NodePoint& __restrict to_p) {
+  float dx = static_cast<float>(from_p.x - to_p.x);
+  float dy = static_cast<float>(from_p.y - to_p.y);
+
+  return sqrtf(dx * dx + dy * dy);
+}
+#endif
 
 Pathfinder::Pathfinder(std::unique_ptr<NodeProcessor> processor, RegionRegistry* regions)
     : processor_(std::move(processor)), regions_(regions) {}
