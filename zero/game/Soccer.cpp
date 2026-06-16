@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <float.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <zero/game/Clock.h>
 #include <zero/game/GameEvent.h>
@@ -189,13 +190,14 @@ void Soccer::Update(float dt) {
     }
 
     // Check for nearby player touches if the ball isn't currently phased
-    if (ball->state == BallState::World && TICK_DIFF(server_tick, ball->last_fire_timestamp) >= pass_delay &&
-        TICK_DIFF(server_tick, ball->last_touch_timestamp) >= 100) {
+    if (ball->state == BallState::World && abs(TICK_DIFF(server_tick, ball->last_fire_timestamp)) >= pass_delay &&
+        abs(TICK_DIFF(server_tick, ball->last_touch_timestamp)) >= 100) {
       Vector2f position(ball->x / 16000.0f, ball->y / 16000.0f);
 
       Player* self = player_manager.GetSelf();
 
-      if (self && self->ship < 8 && TICK_DIFF(tick, last_pickup_request) >= 100 && CanPickupBall(*this, *self, *ball)) {
+      if (self && self->ship < 8 && abs(TICK_DIFF(tick, last_pickup_request)) >= 100 &&
+          CanPickupBall(*this, *self, *ball)) {
         float pickup_radius = connection.settings.ShipSettings[self->ship].SoccerBallProximity / 16.0f;
         float dx = self->position.x - position.x;
         float dy = self->position.y - position.y;
@@ -339,11 +341,16 @@ void Soccer::OnPowerballPosition(u8* pkt, size_t size) {
 
   Powerball* ball = balls + ball_id;
 
-  bool new_ball_pos_pkt = ball->id == kInvalidBallId || TICK_GT(timestamp, ball->timestamp) ||
-                          ball->state == BallState::Goal || (ball->state == BallState::Carried && timestamp != 0);
+  bool ball_was_invalid = ball->id == kInvalidBallId;
+  bool ball_was_goal = ball->state == BallState::Goal;
+  bool ball_world_timestamp_change = (timestamp != 0 && timestamp != ball->timestamp);
+  bool ball_fired = (ball->state == BallState::Carried && timestamp != 0);
+
+  bool new_ball_world_pos_pkt = ball_was_invalid || ball_world_timestamp_change || ball_was_goal || ball_fired;
+
   ball->id = ball_id;
 
-  if (new_ball_pos_pkt) {
+  if (new_ball_world_pos_pkt) {
     ball->x = x * 1000;
     ball->y = y * 1000;
     ball->next_x = ball->x;
