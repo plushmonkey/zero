@@ -159,8 +159,8 @@ WeaponSimulateResult WeaponManager::Simulate(Weapon& weapon, u32 current_tick) {
     gravity_effect = SimulateWormholeGravity(weapon);
   }
 
-  u16 prev_x = weapon.x;
-  u16 prev_y = weapon.y;
+  u32 prev_x = weapon.x;
+  u32 prev_y = weapon.y;
 
   WeaponSimulateResult position_result = SimulatePosition(weapon);
 
@@ -556,7 +556,7 @@ void WeaponManager::CreateExplosion(Weapon& weapon) {
         shrap->x = weapon.x;
         shrap->y = weapon.y;
         shrap->last_tick = GetCurrentTick();
-        shrap->end_tick = shrap->last_tick + connection.settings.BulletAliveTime;
+        shrap->end_tick = MAKE_TICK(shrap->last_tick + connection.settings.BulletAliveTime);
         shrap->UpdatePosition();
 
         Player* player = player_manager.GetPlayerById(weapon.player_id);
