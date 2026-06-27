@@ -157,7 +157,7 @@ void BotController::HandleEvent(const LoginResponseEvent& event) {
   }
 }
 
-void BotController::Update(RenderContext& rc, float dt, InputState& input, behavior::ExecuteContext& execute_ctx) {
+void BotController::Update(RenderContext& rc, InputState& input, behavior::ExecuteContext& execute_ctx) {
   this->input = &input;
 
   steering.Reset();

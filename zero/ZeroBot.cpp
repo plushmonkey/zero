@@ -141,9 +141,79 @@ bool ZeroBot::JoinZone(ServerInfo& server) {
   return true;
 }
 
-void ZeroBot::Run() {
-  constexpr float kMaxDelta = 1.0f / 20.0f;
+constexpr float kTickTime = 1.0f / 100.0f;
 
+void ZeroBot::UpdateRelaxed(size_t update_count) {
+  if (bot_controller && bot_controller->actuator.enabled) {
+    input.Clear();
+  } else {
+    input.ClearWeapons();
+  }
+
+  if (bot_controller && game->connection.login_state == Connection::LoginState::Complete) {
+    execute_ctx.bot = this;
+    execute_ctx.dt = kTickTime * (float)update_count;
+
+    RenderContext rc(&game->camera, &game->ui_camera, &game->sprite_renderer);
+
+    bot_controller->Update(rc, input, execute_ctx);
+  }
+
+  for (size_t i = 0; i < update_count; ++i) {
+    if (!game->Update(input, kTickTime)) {
+      game->Cleanup();
+      break;
+    }
+
+    if (i == update_count - 1) {
+      game->Render(kTickTime);
+    } else {
+      game->animation.Update(kTickTime);
+      game->sprite_renderer.push_buffer.Reset();
+      game->sprite_renderer.texture_push_buffer.Reset();
+    }
+
+    game->player_manager.kdtree = nullptr;
+    trans_arena.Reset();
+  }
+}
+
+void ZeroBot::Update(size_t update_count) {
+  for (size_t i = 0; i < update_count; ++i) {
+    if (bot_controller && bot_controller->actuator.enabled) {
+      input.Clear();
+    } else {
+      input.ClearWeapons();
+    }
+
+    if (bot_controller && game->connection.login_state == Connection::LoginState::Complete) {
+      execute_ctx.bot = this;
+      execute_ctx.dt = kTickTime;
+
+      RenderContext rc(&game->camera, &game->ui_camera, &game->sprite_renderer);
+
+      bot_controller->Update(rc, input, execute_ctx);
+    }
+
+    if (!game->Update(input, kTickTime)) {
+      game->Cleanup();
+      break;
+    }
+
+    if (i == update_count - 1) {
+      game->Render(kTickTime);
+    } else {
+      game->animation.Update(kTickTime);
+      game->sprite_renderer.push_buffer.Reset();
+      game->sprite_renderer.texture_push_buffer.Reset();
+    }
+
+    game->player_manager.kdtree = nullptr;
+    trans_arena.Reset();
+  }
+}
+
+void ZeroBot::Run() {
   // TODO: better timer
   using ms_float = std::chrono::duration<float, std::milli>;
   float frame_time = 0.0f;
@@ -155,25 +225,21 @@ void ZeroBot::Run() {
   auto opt_sleep_ms = this->config->GetInt("General", "SleepMs");
   if (opt_sleep_ms) sleep_ms = *opt_sleep_ms;
 
+  float dt_accumulator = 0.0f;
+
+  bool relaxed_controller_tick = false;
+
+  auto opt_relaxed_controller_tick = this->config->GetInt("General", "RelaxedControllerTick");
+  if (opt_relaxed_controller_tick) relaxed_controller_tick = *opt_relaxed_controller_tick;
+
   while (true) {
     auto start = std::chrono::high_resolution_clock::now();
 
-    float dt = frame_time / 1000.0f;
-
-    // Cap dt so window movement doesn't cause large updates
-    if (dt > kMaxDelta) {
-      dt = kMaxDelta;
-    }
+    dt_accumulator += frame_time / 1000.0f;
 
     Connection::TickResult tick_result = game->connection.Tick();
     if (tick_result != Connection::TickResult::Success) {
       break;
-    }
-
-    if (bot_controller && bot_controller->actuator.enabled) {
-      input.Clear();
-    } else {
-      input.ClearWeapons();
     }
 
     if (game->render_enabled && !debug_renderer.Begin()) {
@@ -181,21 +247,21 @@ void ZeroBot::Run() {
       break;
     }
 
-    if (bot_controller && game->connection.login_state == Connection::LoginState::Complete) {
-      execute_ctx.bot = this;
-      execute_ctx.dt = dt;
+    size_t update_count = (size_t)(dt_accumulator / kTickTime);
 
-      RenderContext rc(&game->camera, &game->ui_camera, &game->sprite_renderer);
+    if (update_count > 0) {
+      dt_accumulator -= (float)update_count * kTickTime;
 
-      bot_controller->Update(rc, dt, input, execute_ctx);
+      if (dt_accumulator < 0.0f) {
+        dt_accumulator = 0.0f;
+      }
+
+      if (relaxed_controller_tick) {
+        this->UpdateRelaxed(update_count);
+      } else {
+        this->Update(update_count);
+      }
     }
-
-    if (!game->Update(input, dt)) {
-      game->Cleanup();
-      break;
-    }
-
-    game->Render(dt);
 
     if (game->render_enabled) {
       debug_renderer.Present();
@@ -207,9 +273,6 @@ void ZeroBot::Run() {
 
     auto end = std::chrono::high_resolution_clock::now();
     frame_time = std::chrono::duration_cast<ms_float>(end - start).count();
-
-    game->player_manager.kdtree = nullptr;
-    trans_arena.Reset();
   }
 
   if (game && game->connection.connected) {

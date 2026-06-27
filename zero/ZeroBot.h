@@ -86,6 +86,9 @@ struct ZeroBot {
 
   void Run();
 
+  void UpdateRelaxed(size_t update_count);
+  void Update(size_t update_count);
+
   struct JoinRequestEvent : public Event {
     ZeroBot& bot;
     ServerInfo& server;

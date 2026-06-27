@@ -73,7 +73,7 @@ struct BotController : EventHandler<PlayerFreqAndShipChangeEvent>,
 
   BotController(Game& game);
 
-  void Update(RenderContext& rc, float dt, InputState& input, behavior::ExecuteContext& execute_ctx);
+  void Update(RenderContext& rc, InputState& input, behavior::ExecuteContext& execute_ctx);
 
   void UpdatePathfinder(float radius);
   void RebuildRegionRegistry();

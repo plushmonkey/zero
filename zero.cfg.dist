@@ -25,6 +25,10 @@ RequestShip = 1
 # How many milliseconds the bot should sleep per update.
 # Increasing this will reduce how often the bot is updated, but will use less cpu.
 SleepMs = 1
+# This will tick the bot controller only once per loop. The game update can be ticked multiple times before the controller is ticked again.
+# Only enable this if the bot controller is using too much cpu to keep up with the game tick.
+# This should be a last resort. The performance of the bot update should be improved to reduce cpu usage instead.
+RelaxedControllerTick = 0
 
 [Subgame]
 RequestShip = 5
